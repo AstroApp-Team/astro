@@ -1,7 +1,7 @@
 import { hc } from "hono/client";
 
-import type { AppType } from "../../worker/index.ts";
-import { PASSWORD_QUERY_PARAM } from "../../shared/realtime.ts";
+import type { AppType } from "../../../worker/index.ts";
+import { PASSWORD_QUERY_PARAM } from "@shared/realtime.ts";
 
 /**
  * On the web the SPA is served by the same Worker, so a relative base works.

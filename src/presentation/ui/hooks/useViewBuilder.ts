@@ -2,8 +2,8 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState } from "react";
 
-import { describeProgress, type View, type ViewUIMessage } from "../../shared/view.ts";
-import { viewUrl } from "./api.ts";
+import { describeProgress, type View, type ViewUIMessage } from "@shared/view.ts";
+import { viewUrl } from "@infra/api/httpClient.ts";
 
 /**
  * Built once: `useChat` resolves the transport per request through its own

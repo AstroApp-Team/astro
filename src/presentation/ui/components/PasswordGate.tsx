@@ -2,8 +2,8 @@ import { IonButton, IonInput, IonNote, IonText } from "@ionic/react";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { api } from "../lib/api.ts";
-import { setPassword } from "../lib/password.ts";
+import { api } from "@infra/api/httpClient.ts";
+import { setPassword } from "@infra/api/credentialStore.ts";
 
 /**
  * Checks the shared password before anything can open a billable session.

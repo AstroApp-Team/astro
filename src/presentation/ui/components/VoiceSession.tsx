@@ -11,11 +11,11 @@ import {
   RENDER_VIEW_TOOL_NAME,
   VOICE_MODEL_ID,
   VOICE_NAME,
-} from "../../shared/realtime.ts";
-import { realtimeSetupUrl } from "../lib/api.ts";
-import { useViewBuilder } from "../lib/use-view-builder.ts";
-import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
-import { startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
+} from "@shared/realtime.ts";
+import { realtimeSetupUrl } from "@infra/api/httpClient.ts";
+import { useViewBuilder } from "@presentation/ui/hooks/useViewBuilder.ts";
+import { describeViewEvent, useViewEvents } from "@presentation/ui/hooks/useViewEvents.ts";
+import { startSessionClock, stopSessionClock } from "@presentation/state/useVoiceUsageStore.ts";
 
 /**
  * Both of these are compared by identity inside the hook: a fresh object on

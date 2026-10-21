@@ -1,0 +1,152 @@
+/**
+ * Studio Corner + canvas styles.
+ *
+ * Plain CSS rather than Ionic components, because this layer sits *over* a WebGL
+ * canvas: the toolbar has to be out of the way of the pointer events R3F needs
+ * for raycasting, and Ionic's touch handling intercepts gestures on purpose.
+ */
+
+.studio-stage {
+  position: relative;
+  width: 100%;
+  /* IonContent's scroll container is height:100% with an inner wrapper, so an
+     absolute canvas host needs an explicit height to have a canvas at all. */
+  height: 100%;
+  min-height: 320px;
+  background: #0b1120;
+}
+
+.studio-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-host {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* Set inline as well: this is the property that stops a drag inside the scene
+     from becoming a page scroll, and an iOS swipe from the left edge from
+     becoming the native back gesture. */
+  touch-action: none;
+}
+
+.canvas-host canvas {
+  display: block;
+  outline: none;
+}
+
+.studio-toolbar {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  /* Above the drei `<Html>` cards (zIndexRange tops out at 20) and below the
+     Theatre.js Studio panel, which owns the layer above everything. */
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(360px, calc(100% - 24px));
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgb(15 23 42 / 82%);
+  color: #e2e8f0;
+  font:
+    500 12px/1.45 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  backdrop-filter: blur(6px);
+  /* The toolbar is HTML sitting on a canvas that owns the pointer. Let drags
+     that miss a button fall through to the 3D scene. */
+  pointer-events: auto;
+}
+
+.studio-toolbar__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.studio-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid rgb(148 163 184 / 35%);
+  border-radius: 7px;
+  background: rgb(30 41 59 / 90%);
+  color: #e2e8f0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.studio-toolbar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.studio-toolbar__readout {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.studio-toolbar__readout dt {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.studio-toolbar__readout dd {
+  margin: 0 0 4px;
+}
+
+/** The card drei's <Html> renders inside the 3D scene. */
+.node-card-wrapper {
+  pointer-events: none;
+}
+
+.node-card {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 9px;
+  border: 1px solid rgb(148 163 184 / 30%);
+  border-radius: 8px;
+  background: rgb(15 23 42 / 78%);
+  color: #e2e8f0;
+  font:
+    500 12px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.node-card span {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.node-card--selected {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px rgb(56 189 248 / 45%);
+}
+
+/** The dev-only floating link on the voice screen. */
+.studio-dev-button {
+  position: fixed;
+  right: 14px;
+  bottom: 84px;
+  z-index: 40;
+  padding: 8px 12px;
+  border: 1px solid rgb(148 163 184 / 35%);
+  border-radius: 999px;
+  background: rgb(15 23 42 / 85%);
+  color: #e2e8f0;
+  font:
+    600 12px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-decoration: none;
+}

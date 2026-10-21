@@ -7,11 +7,26 @@
     "module": "esnext",
     "types": ["vite/client"],
     "allowArbitraryExtensions": true,
+    /* Theatre.js exports its animation state as JSON; infrastructure/theatre/states imports it. */
+    "resolveJsonModule": true,
 
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+
+    /**
+     * Clean-architecture layer aliases, mirrored in vite.config.ts. `@shared/*`
+     * is not in the brief's list but is needed: `core/` imports the realtime
+     * rate constants, and a `../../../../shared` walk from three layers down is
+     * the kind of path that breaks the first time a folder is renamed.
+     */
+    "paths": {
+      "@core/*": ["./src/core/*"],
+      "@infra/*": ["./src/infrastructure/*"],
+      "@presentation/*": ["./src/presentation/*"],
+      "@shared/*": ["./shared/*"]
+    }
   },
   /**
    * `shared` holds the Zod schemas both sides use. `worker` and

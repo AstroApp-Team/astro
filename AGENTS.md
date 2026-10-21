@@ -43,6 +43,24 @@ both sides import (`realtime.ts` constants, `schemas.ts` Zod). Three tsconfig
 projects (`app`, `worker`, `node`) share strict settings from
 `tsconfig.strict.json`.
 
+`src/` is layered, and imports only point inward (`presentation` → `infrastructure`
+→ `core`):
+
+- `core/` — pure TypeScript. Models, ports (`interfaces/`), usecases. Zero imports
+  from `react`, `three`, `@react-three/*`, `@capacitor/*`, `@theatre/*`, zustand,
+  Ionic, `window`, timers, or `Date.now`. It has no framework and no runtime.
+- `infrastructure/` — adapters behind those ports: `api/` (HTTP client, query
+  client, credentials, storage + clock adapters, the usage tracker composition
+  root), `native/` (Capacitor platform, haptics, status bar), `theatre/` (project
+  singleton, dev-only Studio loader, exported animation state).
+- `presentation/` — `state/` (zustand stores), `ui/` (Ionic pages, components,
+  hooks, styles), `canvas/` (R3F: `MainCanvas`, cameras, elements, scenes, studio).
+
+Aliases `@core/*`, `@infra/*`, `@presentation/*`, `@shared/*` are declared twice:
+`compilerOptions.paths` in `tsconfig.app.json` and `resolve.alias` in
+`vite.config.ts`. Keep both in sync — tsc and the bundler are not reading each
+other.
+
 ## Things that will bite you
 
 - **React Compiler is on** (native Oxc, `react({ compiler: true })`). Do not add
@@ -59,6 +77,39 @@ projects (`app`, `worker`, `node`) share strict settings from
   `vite.config.ts`). Vite+ injects `resolve.external` into every environment and
   the Cloudflare plugin rejects that on Worker environments, so `vp test` cannot
   start with it loaded. The workers test project uses `cloudflareTest()` instead.
+- **Vitest needs the aliases declared a second time.** Root `resolve.alias` does
+  not reach a Vitest _project_ environment: Vite+ injects `resolve.external` into
+  every environment, a non-entry module goes straight to Node's resolver, and Node
+  has never heard of `@core/*`. Each entry in `test.projects` carries its own
+  `resolve: { alias: aliases }`. A test that imports an alias and fails with
+  "Cannot find package" is this, not a broken path.
+- **`@theatre/studio` stays inside the `import.meta.env.DEV` guard** in
+  `infrastructure/theatre/studioInit.ts`. It is a devDependency reached only by a
+  dynamic import inside that guard, so the production transform folds the branch
+  away and the ~770 KB editor never ships to the phone. Hoist the import to the
+  top of the file and it ships. Verified by grepping the built bundle for
+  `studio.initialize` — it is absent in prod, present in dev.
+- **`@theatre/r3f@0.7.2` declares a peer of `@react-three/fiber@^8`.** Do not
+  "fix" this by downgrading R3F: R3F 8 cannot run on the React 19 this app ships,
+  and `@theatre/r3f` only touches `useThree`/`useFrame`, which are unchanged in v9.
+  The allowance is a `peerDependencyRules.allowedVersions` entry in
+  `pnpm-workspace.yaml`.
+- **Theatre.js sheets are created at module scope** (`getSheet()` in
+  `infrastructure/theatre/project.ts`). Same identity rule as the realtime hook's
+  `model`/`sessionConfig`: a `project.sheet()` call in a component body builds a
+  new sheet per render.
+- **Mobile canvas settings are not cosmetic.** `dpr={[1, 1.5]}` (a 3x DPR is a 9x
+  fragment load and phones thermal-throttle), `antialias: false` (MSAA is the most
+  expensive thing a mobile GL context does), `failIfMajorPerformanceCaveat: false`
+  (Android WebView often reports a software GL driver, and with the default the
+  context is refused — a black rectangle, no error), and `touch-action: none` on
+  the container (otherwise a drag in the scene is a page scroll, and an iOS
+  left-edge swipe is the native back gesture). All four are in `MainCanvas`.
+- **The Studio Corner route ships in production; the Studio panel does not.**
+  `/studio-corner` is registered unconditionally — a route that only exists in dev
+  is a route nobody has seen fail. `initTheatreStudio()` gates on
+  `import.meta.env.DEV && !Capacitor.isNativePlatform()`, so on a phone the route
+  renders the sandbox and the toolbar, with the Studio button disabled.
 - **Ionic 9 uses React Router v6** — `element=` and `<Navigate>`, not `component=`
   or `<Redirect>`. Parent routes with nested children need a `/*` suffix.
 - **D1 has no BOOLEAN or DATETIME.** Use `integer({ mode: "boolean" })` and
@@ -123,6 +174,30 @@ projects (`app`, `worker`, `node`) share strict settings from
   its state to the parent whenever it changes; the parent keeps only the latest
   and posts it back into the new frame on `load`. The parent never inspects the
   state, so rejecting a stale or foreign state is the page's own job.
+
+### 3D scenes and the Studio Corner
+
+- **`/studio-corner` is the rigging sandbox.** `StudioSandboxScene` mounts three
+  `EditableNodePrefab`s against its own sheet (`StudioSandbox`), so a clip rigged
+  there cannot touch a production scene's timeline. Rig a scene by copying it into
+  the sandbox, animating it, and moving it back with only the sheet id changed.
+- **Animation state crosses into production as an export, not as the Studio.**
+  Studio → right-click the project → Export state → drop the JSON in
+  `src/infrastructure/theatre/states/`, register it in `states/index.ts`
+  (`resolveJsonModule` is on in `tsconfig.app.json`). `getProject` only accepts
+  state at construction, which is why the map is read at module scope in
+  `theatre/project.ts`.
+- **A prefab is one `editable.group` with a mesh and a drei `<Html>` inside it.**
+  Theatre animates the group's transform and `Html` re-projects the child's world
+  position each frame, so geometry and label move together. Splitting them into
+  two components is how they start drifting.
+- **`theatreKey` is also the node id in `useSceneStore`.** One string for the
+  outliner entry, the raycast target and the toolbar readout, so the three cannot
+  disagree.
+- **The store is the only 2D ↔ 3D channel.** An HTML button never reaches into a
+  mesh and a mesh never renders into a toolbar; both sides read and write
+  `useSceneStore`. Subscribe with a selector — a bare `useSceneStore()` re-renders
+  on every field, including the camera target the canvas writes 60 times a second.
 
 ## Commands
 

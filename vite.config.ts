@@ -1,6 +1,7 @@
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
 /**
@@ -14,6 +15,21 @@ import { defineConfig, lazyPlugins } from "vite-plus";
  */
 const isVitest = process.env["VITEST"] !== undefined;
 
+/**
+ * Clean-architecture aliases, mirroring `compilerOptions.paths` in
+ * tsconfig.app.json. Regex `find` rather than the string form: rollup's alias
+ * only rewrites a string key on an exact match or when followed by `/`, and the
+ * regex makes both cases explicit.
+ */
+const layer = (dir: string) => fileURLToPath(new URL(`./${dir}/`, import.meta.url));
+
+const aliases = [
+  { find: /^@core\//, replacement: layer("src/core") },
+  { find: /^@infra\//, replacement: layer("src/infrastructure") },
+  { find: /^@presentation\//, replacement: layer("src/presentation") },
+  { find: /^@shared\//, replacement: layer("shared") },
+];
+
 export default defineConfig({
   // lazyPlugins keeps these from being constructed when vp only loads this file
   // to read the lint/fmt/test metadata blocks below.
@@ -25,6 +41,20 @@ export default defineConfig({
     react({ compiler: true }),
     ...(isVitest ? [] : [cloudflare()]),
   ]),
+
+  resolve: { alias: aliases },
+
+  /**
+   * `@theatre/studio` is CJS and reaches the app only through a dynamic import
+   * inside an `import.meta.env.DEV` guard (see infrastructure/theatre/studioInit.ts).
+   * Naming it here pre-bundles it at server start; left out, the first import
+   * triggers a re-optimize and a full page reload mid-session.
+   *
+   * It is *not* in `optimizeDeps.exclude`: the 0.7 bundle is a self-contained CJS
+   * file with no `?raw` style imports, so it needs the optimizer, not an escape
+   * from it.
+   */
+  optimizeDeps: { include: ["@theatre/studio"] },
 
   staged: {
     "*": "vp check --fix",
@@ -57,6 +87,7 @@ export default defineConfig({
   test: {
     projects: [
       {
+        resolve: { alias: aliases },
         // Pure logic: Zod schemas and Hono routes exercised via app.request().
         // No Workers runtime needed, so these stay fast.
         test: {
@@ -69,6 +100,7 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: aliases },
         // Anything touching a real binding (D1) runs inside workerd.
         plugins: [
           cloudflareTest(async () => ({

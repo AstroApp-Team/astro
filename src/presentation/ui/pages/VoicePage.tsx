@@ -13,18 +13,16 @@ import {
 import { lockOpenOutline, refreshOutline, trashOutline } from "ionicons/icons";
 import { useState } from "react";
 
-import { USD_PER_SESSION_SECOND } from "../../shared/realtime.ts";
-import PasswordGate from "../components/PasswordGate.tsx";
-import VoiceSession from "../components/VoiceSession.tsx";
-import { setPassword, usePassword } from "../lib/password.ts";
-import { resetUsage, usageToUsd, useVoiceUsage } from "../lib/voice-usage.ts";
+import { USD_PER_SESSION_SECOND } from "@shared/realtime.ts";
+import { formatDuration, usageToUsd } from "@core/models/voiceUsage.ts";
+import { setPassword } from "@infra/api/credentialStore.ts";
+import { resetUsage, useVoiceUsage } from "@presentation/state/useVoiceUsageStore.ts";
+import PasswordGate from "@presentation/ui/components/PasswordGate.tsx";
+import StudioDevButton from "@presentation/ui/components/StudioDevButton.tsx";
+import VoiceSession from "@presentation/ui/components/VoiceSession.tsx";
+import { usePassword } from "@presentation/ui/hooks/usePassword.ts";
 
-function formatDuration(seconds: number): string {
-  const whole = Math.floor(seconds);
-  return `${Math.floor(whole / 60)}m ${String(whole % 60).padStart(2, "0")}s`;
-}
-
-export default function Voice() {
+export default function VoicePage() {
   /**
    * The realtime hook has no "clear messages" call — its state lives in a ref
    * inside the component. Bumping the key remounts the session, which disposes
@@ -59,6 +57,12 @@ export default function Voice() {
 
       <IonContent className="ion-padding">
         {password === "" ? <PasswordGate /> : <VoiceSession key={sessionKey} password={password} />}
+
+        {/**
+         * Dev-only. The route is registered in production too — a link that only
+         * exists in dev is a route nobody has tested.
+         */}
+        <StudioDevButton />
       </IonContent>
 
       <IonFooter>

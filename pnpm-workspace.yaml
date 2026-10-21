@@ -31,3 +31,7 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: "*"
+    # @theatre/r3f@0.7.2 declares @react-three/fiber ^8, but R3F 8 cannot run on
+    # the React 19 this app ships (Ionic 9 requires 19). R3F 9 is the only option;
+    # theatre/r3f touches just useThree/useFrame, which are unchanged in v9.
+    "@react-three/fiber": "9"

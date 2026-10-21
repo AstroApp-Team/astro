@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import {
-  parseViewEvent,
-  parseViewState,
-  VIEW_STATE_TYPE,
-  type ViewEvent,
-} from "../../shared/view.ts";
+import { parseViewEvent, parseViewState, VIEW_STATE_TYPE, type ViewEvent } from "@shared/view.ts";
 
 /**
  * The parent's side of both channels a published view has: events (things the
