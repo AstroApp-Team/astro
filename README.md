@@ -92,12 +92,17 @@ would silently drop it.
 ## Layout
 
 ```
-src/     the SPA (Ionic + React 19, React Compiler on)
-worker/  the Hono API and the page-building agent
-shared/  code both sides import — Zod schemas, realtime constants, view rules
-drizzle/ D1 schema and migrations
-android/ the Capacitor project
+src/        the SPA (Ionic + React 19, React Compiler on)
+worker/     the Hono API and the page-building agent
+shared/     code both sides import — Zod schemas, realtime constants, view rules
+drizzle/    D1 schema and migrations
+android/    the Capacitor project
+disciplina/ coursework for ENG4030 (PUC-Rio), in Portuguese — not code
 ```
+
+`disciplina/` holds what the course asks for (MVP planning, deliverable
+drafts), kept next to the code it is about. Nothing in it is built or shipped;
+see `disciplina/README.md`.
 
 `AGENTS.md` is the file to read before changing anything: it lists the traps
 this codebase has already fallen into.
