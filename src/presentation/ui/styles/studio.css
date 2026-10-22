@@ -133,12 +133,19 @@
   box-shadow: 0 0 0 1px rgb(56 189 248 / 45%);
 }
 
-/** The dev-only floating link on the voice screen. */
-.studio-dev-button {
+/** The dev-only floating links on the voice screen. */
+.studio-dev-links {
   position: fixed;
   right: 14px;
   bottom: 84px;
   z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.studio-dev-button {
   padding: 8px 12px;
   border: 1px solid rgb(148 163 184 / 35%);
   border-radius: 999px;
@@ -149,4 +156,62 @@
     system-ui,
     sans-serif;
   text-decoration: none;
+}
+
+/** The bench's scene list, shown at `/rig` with no sceneId. */
+.rig-picker {
+  padding: 20px 16px;
+  color: #cbd5e1;
+  font:
+    400 14px/1.6 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.rig-picker p {
+  margin: 0 0 16px;
+}
+
+.rig-picker code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #38bdf8;
+}
+
+.rig-picker ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rig-picker li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgb(148 163 184 / 25%);
+  border-radius: 9px;
+  background: rgb(15 23 42 / 60%);
+}
+
+.rig-picker li a {
+  color: #e2e8f0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.rig-picker li span {
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/** Header link on the bench: an icon in a toolbar slot, not a button. */
+.rig-back {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  color: inherit;
 }

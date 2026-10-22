@@ -1,5 +1,6 @@
 import { getProject, type IProject, type ISheet } from "@theatre/core";
 
+import type { SceneId } from "@core/models/scene.ts";
 import { PROJECT_ID, projectStates } from "@infra/theatre/states/index.ts";
 
 /**
@@ -30,10 +31,32 @@ export const SHEET_IDS = {
   infraMap: "InfraMapScene",
   careerJourney: "CareerJourneyScene",
   archive: "ArchiveScene",
+  sting: "StingScene",
   studioSandbox: "StudioSandbox",
 } as const;
 
 export type SheetId = (typeof SHEET_IDS)[keyof typeof SHEET_IDS];
+
+/**
+ * Scene id → the sheet that scene mounts.
+ *
+ * A `Record` keyed by `SceneId`, not a partial map: adding a scene to
+ * `SCENE_IDS` without adding it here is a compile error, which is the good
+ * failure mode. The alternative is a scene that mounts a sheet nobody rigs,
+ * which is silent — it plays at its initial values forever.
+ *
+ * This is also the table the Studio workflow reads: the string on the right is
+ * the key the exported state has to land on (`pnpm run theatre:state -- import
+ * <export> --to <that string>`).
+ */
+export const SCENE_SHEET_IDS: Record<SceneId, SheetId> = {
+  hub: SHEET_IDS.hub,
+  "infra-map": SHEET_IDS.infraMap,
+  "career-journey": SHEET_IDS.careerJourney,
+  archive: SHEET_IDS.archive,
+  sting: SHEET_IDS.sting,
+  "studio-sandbox": SHEET_IDS.studioSandbox,
+};
 
 const sheets = new Map<string, ISheet>();
 

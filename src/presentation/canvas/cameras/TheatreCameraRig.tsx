@@ -1,6 +1,19 @@
+import { PerspectiveCamera } from "@react-three/drei";
 import { editable } from "@theatre/r3f";
 
 import { SANDBOX_CAMERA, type Vec3 } from "@core/models/scene.ts";
+
+/**
+ * Theatre.js's own `editable.perspectiveCamera` wraps three's `PerspectiveCamera`,
+ * which has no `makeDefault` — that prop is a drei/R3F convention. Passing it to
+ * Theatre's component is accepted by the type and ignored at runtime, so the rig
+ * is built, animated, and never used to render. Theatre says so at boot:
+ * "This alone won't make r3f use it for rendering."
+ *
+ * The fix Theatre itself prescribes is to make drei's component editable, which
+ * keeps `makeDefault` alive.
+ */
+const EditableCamera = editable(PerspectiveCamera, "perspectiveCamera");
 
 /**
  * A Theatre.js-editable camera rig.
@@ -28,7 +41,7 @@ export function TheatreCameraRig({
   lookAt,
 }: TheatreCameraRigProps) {
   return (
-    <editable.perspectiveCamera
+    <EditableCamera
       theatreKey={theatreKey}
       makeDefault
       position={position}

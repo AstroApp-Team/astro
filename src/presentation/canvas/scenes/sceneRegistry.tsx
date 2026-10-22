@@ -5,6 +5,7 @@ import ArchiveScene from "@presentation/canvas/scenes/ArchiveScene.tsx";
 import CareerJourneyScene from "@presentation/canvas/scenes/CareerJourneyScene.tsx";
 import HubScene from "@presentation/canvas/scenes/HubScene.tsx";
 import InfraMapScene from "@presentation/canvas/scenes/InfraMapScene.tsx";
+import StingScene from "@presentation/canvas/scenes/StingScene.tsx";
 import StudioSandboxScene from "@presentation/canvas/studio/StudioSandboxScene.tsx";
 
 /**
@@ -20,5 +21,6 @@ export const SCENE_COMPONENTS: Record<SceneId, ComponentType> = {
   "infra-map": InfraMapScene,
   "career-journey": CareerJourneyScene,
   archive: ArchiveScene,
+  sting: StingScene,
   "studio-sandbox": StudioSandboxScene,
 };

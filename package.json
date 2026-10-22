@@ -9,6 +9,7 @@
     "preview": "vp preview",
     "prepare": "vp config",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "theatre:state": "node scripts/theatre-state.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply astro --local",
     "db:migrate:remote": "wrangler d1 migrations apply astro --remote",

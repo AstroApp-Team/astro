@@ -14,12 +14,7 @@ import { useNavigate } from "react-router-dom";
 
 import { SANDBOX_NODES } from "@core/models/scene.ts";
 import { StatusBarService } from "@infra/native/StatusBarService.ts";
-import {
-  hideStudioUi,
-  initTheatreStudio,
-  isStudioAvailable,
-  showStudioUi,
-} from "@infra/theatre/studioInit.ts";
+import { ensureStudio, hideStudioUi, showStudioUi } from "@infra/theatre/studioInit.ts";
 import { studioSheet } from "@infra/theatre/project.ts";
 import MainCanvas from "@presentation/canvas/MainCanvas.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
@@ -43,6 +38,7 @@ import "@presentation/ui/styles/studio.css";
 export default function StudioCornerPage() {
   const navigate = useNavigate();
   const [studioUiVisible, setStudioUiVisible] = useState(false);
+  const [studioReady, setStudioReady] = useState(false);
 
   const selectedNodeId = useSceneStore((state) => state.selectedNodeId);
   const hoveredNodeId = useSceneStore((state) => state.hoveredNodeId);
@@ -55,9 +51,29 @@ export default function StudioCornerPage() {
    * The Studio is loaded here rather than at app start: it is a devDependency, it
    * is desktop-only, and a panel that appears over the voice screen on a phone is
    * a bug users cannot dismiss.
+   *
+   * Readiness is state, not a poll. `isStudioAvailable()` is a plain function
+   * reading a module-level variable: calling it in render is false on the first
+   * paint and nothing re-renders when the dynamic import lands, so the Studio
+   * button stays disabled for the whole session. Awaiting `ensureStudio()` and
+   * storing the result is what makes the button come alive.
    */
   useEffect(() => {
-    void initTheatreStudio();
+    let cancelled = false;
+
+    void ensureStudio().then((studio) => {
+      if (cancelled || studio == null) {
+        return;
+      }
+      setStudioReady(true);
+      setStudioUiVisible(showStudioUi());
+    });
+
+    return () => {
+      cancelled = true;
+      setStudioUiVisible(false);
+      hideStudioUi();
+    };
   }, []);
 
   /** The canvas reads the active scene from the store, so the route owns it. */
@@ -86,16 +102,13 @@ export default function StudioCornerPage() {
   };
 
   const toggleStudioUi = () => {
-    if (!isStudioAvailable()) return;
-
     if (studioUiVisible) {
       hideStudioUi();
       setStudioUiVisible(false);
       return;
     }
 
-    showStudioUi();
-    setStudioUiVisible(true);
+    setStudioUiVisible(showStudioUi());
   };
 
   const selectedNode = SANDBOX_NODES.find((node) => node.theatreKey === selectedNodeId) ?? null;
@@ -130,9 +143,9 @@ export default function StudioCornerPage() {
               <button
                 type="button"
                 onClick={toggleStudioUi}
-                disabled={!isStudioAvailable()}
+                disabled={!studioReady}
                 title={
-                  isStudioAvailable()
+                  studioReady
                     ? "Show or hide the Theatre.js Studio panel"
                     : "The Studio only loads in dev, on a desktop browser"
                 }

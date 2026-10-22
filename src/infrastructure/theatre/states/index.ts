@@ -1,24 +1,28 @@
 /**
  * Exported Theatre.js project state.
  *
- * The Studio exports a project's animation state as JSON. Drop that file in this
- * folder, register it below, and production playback picks it up — the Studio is
- * a devDependency and never ships, so the *export* is the only thing that crosses
- * into the Capacitor bundle.
+ * The Studio exports a project's animation state as JSON keyed by **sheet id**.
+ * Production reads a sheet by the string in `SHEET_IDS`, so the export has to be
+ * renamed onto that id before anything plays — `src/infrastructure/theatre/
+ * states/portfolio-project.state.json` is the single canonical file that holds
+ * every rigged sheet, merged, and `pnpm run theatre:state -- import <export>
+ * --to <SheetId>` does the rename and the merge.
  *
  * Empty by default: a project with no state plays its props at their initial
  * values, which is exactly what a scene that has not been rigged in the Studio
  * yet should do.
  *
- * To wire up an export:
- *
- *   1. Studio → right-click the project → Export state → `studio-sandbox.state.json`
- *   2. Save it in this folder
- *   3. Add `import studioSandbox from "./studio-sandbox.state.json"` here and put
- *      it in the map below (`resolveJsonModule` is on in tsconfig.app.json)
+ * The whole file is imported as one state object because `getProject` takes
+ * state once, at construction, and it is keyed by project id — not per sheet.
+ * Rigging a second scene means adding a sheet to this file, not a new entry
+ * here.
  */
+
+import portfolioProjectState from "./portfolio-project.state.json";
 
 export const PROJECT_ID = "PortfolioProject";
 
 /** Project id → the state object as exported by the Studio. */
-export const projectStates: Record<string, unknown> = {};
+export const projectStates: Record<string, unknown> = {
+  [PROJECT_ID]: portfolioProjectState,
+};

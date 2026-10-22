@@ -1,0 +1,1009 @@
+{
+  "sheetsById": {
+    "StingScene": {
+      "staticOverrides": {
+        "byObject": {}
+      },
+      "sequence": {
+        "type": "PositionalSequence",
+        "length": 4,
+        "subUnitsPerUnit": 30,
+        "tracksByObject": {
+          "Sting Camera": {
+            "trackIdByPropPath": {
+              "[\"position\",\"x\"]": "trk-StingCamera-positionx",
+              "[\"position\",\"y\"]": "trk-StingCamera-positiony",
+              "[\"position\",\"z\"]": "trk-StingCamera-positionz",
+              "[\"fov\"]": "trk-StingCamera-fov"
+            },
+            "trackData": {
+              "trk-StingCamera-positionx": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting Camera.position.x",
+                "keyframes": [
+                  {
+                    "id": "kf-001",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-002",
+                    "value": 1.6,
+                    "position": 2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-003",
+                    "value": 0.4,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-StingCamera-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting Camera.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-004",
+                    "value": 1.6,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-005",
+                    "value": 5.5,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-StingCamera-positionz": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting Camera.position.z",
+                "keyframes": [
+                  {
+                    "id": "kf-006",
+                    "value": 6.5,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-007",
+                    "value": 11,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-StingCamera-fov": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting Camera.fov",
+                "keyframes": [
+                  {
+                    "id": "kf-008",
+                    "value": 62,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-009",
+                    "value": 56,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-010",
+                    "value": 48,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "MainLight": {
+            "trackIdByPropPath": {
+              "[\"position\",\"x\"]": "trk-MainLight-positionx",
+              "[\"position\",\"y\"]": "trk-MainLight-positiony",
+              "[\"intensity\"]": "trk-MainLight-intensity"
+            },
+            "trackData": {
+              "trk-MainLight-positionx": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "MainLight.position.x",
+                "keyframes": [
+                  {
+                    "id": "kf-011",
+                    "value": 6,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-012",
+                    "value": -5,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-MainLight-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "MainLight.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-013",
+                    "value": 9,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-014",
+                    "value": 6,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-MainLight-intensity": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "MainLight.intensity",
+                "keyframes": [
+                  {
+                    "id": "kf-015",
+                    "value": 1.1,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-016",
+                    "value": 2.4,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-017",
+                    "value": 1.8,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "AmbientLight": {
+            "trackIdByPropPath": {
+              "[\"intensity\"]": "trk-AmbientLight-intensity"
+            },
+            "trackData": {
+              "trk-AmbientLight-intensity": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "AmbientLight.intensity",
+                "keyframes": [
+                  {
+                    "id": "kf-018",
+                    "value": 0.15,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-019",
+                    "value": 0.6,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "Sting-Core": {
+            "trackIdByPropPath": {
+              "[\"position\",\"y\"]": "trk-Sting-Core-positiony",
+              "[\"scale\",\"x\"]": "trk-Sting-Core-scalex",
+              "[\"scale\",\"y\"]": "trk-Sting-Core-scaley",
+              "[\"scale\",\"z\"]": "trk-Sting-Core-scalez",
+              "[\"rotation\",\"y\"]": "trk-Sting-Core-rotationy"
+            },
+            "trackData": {
+              "trk-Sting-Core-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Core.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-020",
+                    "value": -2.5,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-021",
+                    "value": 1.15,
+                    "position": 1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-022",
+                    "value": 0.7,
+                    "position": 1.5,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Core-scalex": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Core.scale.x",
+                "keyframes": [
+                  {
+                    "id": "kf-023",
+                    "value": 0.05,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-024",
+                    "value": 1.18,
+                    "position": 1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-025",
+                    "value": 1,
+                    "position": 1.5,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Core-scaley": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Core.scale.y",
+                "keyframes": [
+                  {
+                    "id": "kf-026",
+                    "value": 0.05,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-027",
+                    "value": 1.18,
+                    "position": 1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-028",
+                    "value": 1,
+                    "position": 1.5,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Core-scalez": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Core.scale.z",
+                "keyframes": [
+                  {
+                    "id": "kf-029",
+                    "value": 0.05,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-030",
+                    "value": 1.18,
+                    "position": 1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-031",
+                    "value": 1,
+                    "position": 1.5,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Core-rotationy": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Core.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-034",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-035",
+                    "value": 6.283185307179586,
+                    "position": 4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "Sting-Sat-1": {
+            "trackIdByPropPath": {
+              "[\"position\",\"y\"]": "trk-Sting-Sat-1-positiony",
+              "[\"scale\",\"x\"]": "trk-Sting-Sat-1-scalex",
+              "[\"scale\",\"y\"]": "trk-Sting-Sat-1-scaley",
+              "[\"scale\",\"z\"]": "trk-Sting-Sat-1-scalez",
+              "[\"rotation\",\"y\"]": "trk-Sting-Sat-1-rotationy"
+            },
+            "trackData": {
+              "trk-Sting-Sat-1-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-1.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-036",
+                    "value": -2.5,
+                    "position": 0.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-037",
+                    "value": 1.15,
+                    "position": 1.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-038",
+                    "value": 0.7,
+                    "position": 1.8,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-1-scalex": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-1.scale.x",
+                "keyframes": [
+                  {
+                    "id": "kf-039",
+                    "value": 0.05,
+                    "position": 0.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-040",
+                    "value": 1.18,
+                    "position": 1.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-041",
+                    "value": 1,
+                    "position": 1.8,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-1-scaley": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-1.scale.y",
+                "keyframes": [
+                  {
+                    "id": "kf-042",
+                    "value": 0.05,
+                    "position": 0.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-043",
+                    "value": 1.18,
+                    "position": 1.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-044",
+                    "value": 1,
+                    "position": 1.8,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-1-scalez": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-1.scale.z",
+                "keyframes": [
+                  {
+                    "id": "kf-045",
+                    "value": 0.05,
+                    "position": 0.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-046",
+                    "value": 1.18,
+                    "position": 1.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-047",
+                    "value": 1,
+                    "position": 1.8,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-1-rotationy": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-1.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-048",
+                    "value": -1.2,
+                    "position": 0.3,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-049",
+                    "value": 0,
+                    "position": 1.8,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "Sting-Sat-2": {
+            "trackIdByPropPath": {
+              "[\"position\",\"y\"]": "trk-Sting-Sat-2-positiony",
+              "[\"scale\",\"x\"]": "trk-Sting-Sat-2-scalex",
+              "[\"scale\",\"y\"]": "trk-Sting-Sat-2-scaley",
+              "[\"scale\",\"z\"]": "trk-Sting-Sat-2-scalez",
+              "[\"rotation\",\"y\"]": "trk-Sting-Sat-2-rotationy"
+            },
+            "trackData": {
+              "trk-Sting-Sat-2-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-2.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-050",
+                    "value": -2.5,
+                    "position": 0.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-051",
+                    "value": 1.15,
+                    "position": 1.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-052",
+                    "value": 0.7,
+                    "position": 2.1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-2-scalex": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-2.scale.x",
+                "keyframes": [
+                  {
+                    "id": "kf-053",
+                    "value": 0.05,
+                    "position": 0.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-054",
+                    "value": 1.18,
+                    "position": 1.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-055",
+                    "value": 1,
+                    "position": 2.1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-2-scaley": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-2.scale.y",
+                "keyframes": [
+                  {
+                    "id": "kf-056",
+                    "value": 0.05,
+                    "position": 0.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-057",
+                    "value": 1.18,
+                    "position": 1.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-058",
+                    "value": 1,
+                    "position": 2.1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-2-scalez": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-2.scale.z",
+                "keyframes": [
+                  {
+                    "id": "kf-059",
+                    "value": 0.05,
+                    "position": 0.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-060",
+                    "value": 1.18,
+                    "position": 1.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-061",
+                    "value": 1,
+                    "position": 2.1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-2-rotationy": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-2.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-062",
+                    "value": -1.2,
+                    "position": 0.6,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-063",
+                    "value": 0,
+                    "position": 2.1,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "Sting-Sat-3": {
+            "trackIdByPropPath": {
+              "[\"position\",\"y\"]": "trk-Sting-Sat-3-positiony",
+              "[\"scale\",\"x\"]": "trk-Sting-Sat-3-scalex",
+              "[\"scale\",\"y\"]": "trk-Sting-Sat-3-scaley",
+              "[\"scale\",\"z\"]": "trk-Sting-Sat-3-scalez",
+              "[\"rotation\",\"y\"]": "trk-Sting-Sat-3-rotationy"
+            },
+            "trackData": {
+              "trk-Sting-Sat-3-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-3.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-064",
+                    "value": -2.5,
+                    "position": 0.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-065",
+                    "value": 1.15,
+                    "position": 1.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-066",
+                    "value": 0.7,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-3-scalex": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-3.scale.x",
+                "keyframes": [
+                  {
+                    "id": "kf-067",
+                    "value": 0.05,
+                    "position": 0.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-068",
+                    "value": 1.18,
+                    "position": 1.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-069",
+                    "value": 1,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-3-scaley": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-3.scale.y",
+                "keyframes": [
+                  {
+                    "id": "kf-070",
+                    "value": 0.05,
+                    "position": 0.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-071",
+                    "value": 1.18,
+                    "position": 1.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-072",
+                    "value": 1,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-3-scalez": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-3.scale.z",
+                "keyframes": [
+                  {
+                    "id": "kf-073",
+                    "value": 0.05,
+                    "position": 0.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-074",
+                    "value": 1.18,
+                    "position": 1.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-075",
+                    "value": 1,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-3-rotationy": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-3.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-076",
+                    "value": -1.2,
+                    "position": 0.9,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-077",
+                    "value": 0,
+                    "position": 2.4,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          },
+          "Sting-Sat-4": {
+            "trackIdByPropPath": {
+              "[\"position\",\"y\"]": "trk-Sting-Sat-4-positiony",
+              "[\"scale\",\"x\"]": "trk-Sting-Sat-4-scalex",
+              "[\"scale\",\"y\"]": "trk-Sting-Sat-4-scaley",
+              "[\"scale\",\"z\"]": "trk-Sting-Sat-4-scalez",
+              "[\"rotation\",\"y\"]": "trk-Sting-Sat-4-rotationy"
+            },
+            "trackData": {
+              "trk-Sting-Sat-4-positiony": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-4.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-078",
+                    "value": -2.5,
+                    "position": 1.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-079",
+                    "value": 1.15,
+                    "position": 2.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-080",
+                    "value": 0.7,
+                    "position": 2.7,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-4-scalex": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-4.scale.x",
+                "keyframes": [
+                  {
+                    "id": "kf-081",
+                    "value": 0.05,
+                    "position": 1.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-082",
+                    "value": 1.18,
+                    "position": 2.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-083",
+                    "value": 1,
+                    "position": 2.7,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-4-scaley": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-4.scale.y",
+                "keyframes": [
+                  {
+                    "id": "kf-084",
+                    "value": 0.05,
+                    "position": 1.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-085",
+                    "value": 1.18,
+                    "position": 2.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-086",
+                    "value": 1,
+                    "position": 2.7,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-4-scalez": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-4.scale.z",
+                "keyframes": [
+                  {
+                    "id": "kf-087",
+                    "value": 0.05,
+                    "position": 1.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-088",
+                    "value": 1.18,
+                    "position": 2.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-089",
+                    "value": 1,
+                    "position": 2.7,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "trk-Sting-Sat-4-rotationy": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Sting-Sat-4.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-090",
+                    "value": -1.2,
+                    "position": 1.2,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-091",
+                    "value": 0,
+                    "position": 2.7,
+                    "handles": [0.5, 0, 0.5, 1],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "revisionHistory": ["rev-example-sting"],
+  "definitionVersion": "0.4.0"
+}

@@ -9,7 +9,7 @@ import { create } from "zustand";
  * whether the dev overlay is up, and whether the native shell has finished
  * wiring itself (status bar style, haptics, permissions).
  */
-export type AppScreen = "voice" | "studio-corner";
+export type AppScreen = "voice" | "studio-corner" | "rig";
 
 export type AppStore = {
   screen: AppScreen;

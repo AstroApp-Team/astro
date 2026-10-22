@@ -24,9 +24,15 @@ export default function StudioSandboxScene() {
 
   return (
     <SheetProvider sheet={studioSheet}>
+      {/** An explicit scene background. The stage div behind the canvas is the
+          same near-black as this one, so "the canvas is painting" and "the canvas
+          is a black rectangle" are otherwise the same picture — and a 0-height
+          canvas is invisible, not black. This makes the two distinguishable. */}
+      <color attach="background" args={["#141b2d"]} />
+
       <TheatreCameraRig theatreKey="Camera" position={[0, 5, 10]} fov={50} />
 
-      <SceneLights theatreKey="MainLight" keyPosition={[5, 8, 6]} />
+      <SceneLights theatreKey="MainLight" ambientIntensity={0.7} keyPosition={[5, 8, 6]} />
 
       {/** Spatial reference: 1 unit per cell, so a position keyframe read in the
           Studio is a distance you can eyeball. */}

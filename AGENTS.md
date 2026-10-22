@@ -105,6 +105,17 @@ other.
   context is refused — a black rectangle, no error), and `touch-action: none` on
   the container (otherwise a drag in the scene is a page scroll, and an iOS
   left-edge swipe is the native back gesture). All four are in `MainCanvas`.
+- **Ionic's global CSS is imported in `main.tsx`, and it is what gives the app a
+  height.** `setupIonicReact()` does not load it. Without `structure.css`, `html`
+  and `body` have no height; without `core.css`, `.ion-page` — the class `ion-app`
+  carries — has no `position: absolute; top:0; bottom:0; display:flex`, so every
+  Ionic element computes `display: inline; height: auto`. `ion-content` gets 0px,
+  its shadow `.inner-scroll` (`position: absolute; top: calc(var(--offset-top) *
+-1)`) measures exactly the header's 56px, and a `height: 100%` canvas host
+  inside it collapses to its `min-height`. A WebGL canvas in that strip reads as a
+  black screen, not as a layout bug. Check the computed height chain
+  (`html → body → ion-app → ion-content → .inner-scroll`) before blaming the
+  canvas.
 - **The Studio Corner route ships in production; the Studio panel does not.**
   `/studio-corner` is registered unconditionally — a route that only exists in dev
   is a route nobody has seen fail. `initTheatreStudio()` gates on
@@ -177,6 +188,8 @@ other.
 
 ### 3D scenes and the Studio Corner
 
+Full rigging workflow, including the export/land step, is in `THEATRE.md`.
+
 - **`/studio-corner` is the rigging sandbox.** `StudioSandboxScene` mounts three
   `EditableNodePrefab`s against its own sheet (`StudioSandbox`), so a clip rigged
   there cannot touch a production scene's timeline. Rig a scene by copying it into
@@ -198,10 +211,29 @@ other.
   mesh and a mesh never renders into a toolbar; both sides read and write
   `useSceneStore`. Subscribe with a selector — a bare `useSceneStore()` re-renders
   on every field, including the camera target the canvas writes 60 times a second.
+- **Exported state is keyed by sheet id, and a missing key is silent.** Core looks
+  up `sheetsById["StingScene"]`, finds nothing, and plays the scene at its initial
+  values with no error. Rig on `/rig/:sceneId` (it mounts the production sheet),
+  then `pnpm run theatre:state -- import <exported.json> --to <SheetId>` renames
+  and merges into the one canonical file `states/index.ts` imports. Rigging in
+  `/studio-corner` means that rename is on you.
+- **A prop is owned by JSX or by the rig, never both.** `position` in the JSX is
+  Theatre's _initial value_; a keyframed prop overrides it. Keyframe `position.x`
+  in the Studio and also move the node in the data array, and the data edit stops
+  mattering with nothing to tell you.
+- **`useSheetPlayback` is the only place a scene starts a clip.** `SheetProvider`
+  in `@theatre/r3f@0.7.2` takes only `sheet` — no `autoPlay`. Its `autoPlay`
+  argument is an effect dependency, so it must be a module constant; an array
+  literal restarts the clip every render. Its writes live in module-scope helpers
+  because the React Compiler skips a hook that mutates its argument.
+- **`SHEET_IDS` has a partner table.** `SCENE_SHEET_IDS` in `project.ts` is a
+  `Record<SceneId, SheetId>`, so adding a scene to `SCENE_IDS` without a sheet is
+  a compile error rather than a scene that mounts a sheet nobody rigs.
 
 ## Commands
 
 `vp dev` · `vp check` · `vp test` · `vp build` · `pnpm run cf-typegen` ·
-`pnpm run db:generate` then `pnpm run db:migrate:local` · `pnpm run cap:sync`.
+`pnpm run db:generate` then `pnpm run db:migrate:local` · `pnpm run cap:sync` ·
+`pnpm run theatre:state -- import <exported.json> --to <SheetId>` (then `list`).
 
 Use `pnpx` rather than `npx` — `npx` fails on this repo's pnpm `devEngines` pin.
