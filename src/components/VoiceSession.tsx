@@ -221,6 +221,19 @@ export default function VoiceSession({ password }: { password: string }) {
     if (stream) startAudioCapture(stream);
   }, [status, isCapturing, startAudioCapture]);
 
+  /**
+   * The model must never hear itself. Wired earphones on a laptop combo jack
+   * leak a faint copy of the playback into the headset mic, the browser's gain
+   * control lifts it, and the server's VAD takes it as the user barging in: the
+   * reply is cut a second in and its own words come back as the next user turn.
+   * Browser echo cancellation does not reliably cover Web Audio playback, so
+   * the track is muted while the model speaks — a disabled track sends silence.
+   * The cost is barge-in by voice; "End conversation" still interrupts.
+   */
+  useEffect(() => {
+    for (const track of streamRef.current?.getAudioTracks() ?? []) track.enabled = !isPlaying;
+  }, [isPlaying]);
+
   /* Release the microphone if the page navigates away mid-conversation. */
   useEffect(() => {
     return () => {
