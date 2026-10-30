@@ -1,0 +1,702 @@
+/**
+ * React pages used as mesh textures.
+ *
+ * Four layers, and the order is the demonstration:
+ *
+ *   `.surface__scroll`  — the page, z-index 1: hero, press log, notes. Ordinary
+ *                         scroll, ordinary pointer events.
+ *   `.surface__overlay` — the canvas, z-index 2, `position: fixed; inset: 0`,
+ *                         `pointer-events: none`. It draws the plane, the sphere
+ *                         page and the colour sphere over the text.
+ *   `.surface__bar`     — the controls, z-index 3, pinned to the bottom.
+ *   `.surface__shield`  — the sphere mesh's screen box, z-index 2, `touch-action: none`.
+ *                         It is what makes a finger drag on the texture page scroll that
+ *                         page instead of panning this one.
+ *   `.surface-hosts`    — the pages themselves, z-index 0, parked 10 000 px to the
+ *                         left. They are the source of the textures, so they must be
+ *                         laid out; they are not the UI, so they must not be seen.
+ *
+ * `inset: 0` on the overlay is load-bearing, not tidiness: `MainCanvas` is given
+ * `eventPrefix="client"`, whose compute divides `clientX/clientY` by the canvas size
+ * with **no origin subtraction** — correct only when the canvas box starts at the
+ * viewport origin. Move the overlay and the raycast goes silent.
+ *
+ * IonContent's own overflow is off (`--overflow: hidden`) because `.surface__scroll`
+ * is the scroller. It is not IonContent's `.inner-scroll`: that lives in
+ * `ion-content`'s shadow root, so app CSS cannot size anything against it.
+ */
+
+.surface-content {
+  --overflow: hidden;
+  --background: #070b14;
+}
+
+/**
+ * The event source.
+ *
+ * `eventSource` must be an **ancestor of everything under the pointer** — R3F's
+ * listeners live here, and events reach it only by bubbling from the element the
+ * pointer landed on. `height: 100%` is what makes it a box: `ion-content`'s
+ * `.inner-scroll` is a definite-height flex child, and a relative div with auto
+ * height inside it is 0px tall.
+ */
+.surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 8%, #16203a 0%, #070b14 62%, #05070d 100%);
+}
+
+/* ── Layer 1: the page ────────────────────────────────────────────────────── */
+
+.surface__scroll {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  /* `MainCanvas` sets `touch-action: none` inline on the canvas host, which is
+     right on a rig bench where a drag is a camera gesture. Overridden inline on
+     the host for this route; the scroller states it too, because a drag here is a
+     scroll and an iOS left-edge swipe must stay the system back gesture. */
+  touch-action: pan-y;
+  padding: 0 14px 148px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 35%) transparent;
+}
+
+/**
+ * The hero keeps the top ~30% of the viewport.
+ *
+ * The plane is at x −1.7 and the sphere page at x +1.9, both in front of the text,
+ * so the band they occupy is where taps must be unambiguous. The log panel starts
+ * under them, same as on `/float`.
+ */
+.surface__hero {
+  /* Above the shield (z 2): the header's own button must stay a button, and the
+     sphere's footprint reaches this band on a short phone. */
+  position: relative;
+  z-index: 4;
+  min-height: 34%;
+  padding-top: 20px;
+  box-sizing: border-box;
+  color: #e2e8f0;
+}
+
+.surface__hero h1 {
+  margin: 0 0 10px;
+  color: #f1f5f9;
+  font:
+    700 22px/1.22 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 12px rgb(2 6 23 / 75%);
+}
+
+.surface__hero p {
+  margin: 0;
+  max-width: 48ch;
+  color: rgb(203 213 225 / 88%);
+  font:
+    400 13.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-shadow: 0 1px 10px rgb(2 6 23 / 75%);
+}
+
+/* ── Layer 1a: the press log ──────────────────────────────────────────────── */
+
+.surface__panel {
+  margin: 0 0 14px;
+  padding: 14px 14px 12px;
+  border: 1px solid rgb(148 163 184 / 20%);
+  border-radius: 14px;
+  background: rgb(8 12 22 / 80%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #e2e8f0;
+}
+
+.surface__panel h2 {
+  margin: 0 0 6px;
+  color: #f1f5f9;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface__hint {
+  margin: 0 0 12px;
+  color: #94a3b8;
+  font:
+    400 12.5px/1.55 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface__hint code,
+.surface__card code {
+  color: #cbd5e1;
+  background: rgb(15 23 42 / 70%);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font:
+    500 11.5px/1.4 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.surface__chat {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 30%) transparent;
+}
+
+.surface__chat li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgb(15 23 42 / 62%);
+  font:
+    400 12.5px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface__chat__swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: #64748b;
+}
+
+/* The action is the colour: a paint row and a spin row are instantly
+   distinguishable without reading the text. */
+.surface__chat__swatch--paint-sphere {
+  background: var(--surface-accent, hsl(199 89% 60%));
+}
+
+.surface__chat__swatch--spin-square {
+  background: hsl(159 74% 52%);
+}
+
+.surface__chat__id {
+  flex: 0 0 auto;
+  color: #64748b;
+  font:
+    500 11px/1.4 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.surface__chat__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #e2e8f0;
+}
+
+.surface__chat__source {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgb(56 189 248 / 16%);
+  color: #7dd3fc;
+  font:
+    600 10px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.surface__chat__at {
+  flex: 0 0 auto;
+  color: #64748b;
+  font:
+    500 10.5px/1.4 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+.surface__chat__empty {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.surface__table {
+  width: 100%;
+  border-collapse: collapse;
+  font:
+    400 12px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface__table th {
+  color: #64748b;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  padding: 0 6px 4px 0;
+}
+
+.surface__table td {
+  color: #e2e8f0;
+  padding: 2px 6px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.surface__foot {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font:
+    400 12px/1.55 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+/* ── Layer 1b: the notes ──────────────────────────────────────────────────── */
+
+.surface__card {
+  margin: 0 0 14px;
+  padding: 14px 14px 12px;
+  border: 1px solid rgb(148 163 184 / 16%);
+  border-radius: 14px;
+  background: rgb(8 12 22 / 72%);
+  color: #cbd5e1;
+}
+
+.surface__card h2 {
+  margin: 0 0 6px;
+  color: #f1f5f9;
+  font:
+    600 14.5px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface__card p {
+  margin: 0 0 8px;
+  font:
+    400 12.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface__card p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Layer 2: the canvas ──────────────────────────────────────────────────── */
+
+.surface__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* `.canvas-host` is already `position: relative; width: 100%; height: 100%`, so
+   pinning it to the overlay is the whole job. */
+.surface-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Layer 3: the control bar ─────────────────────────────────────────────── */
+
+.surface__bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgb(148 163 184 / 16%);
+  background: rgb(7 11 20 / 88%);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+
+.surface__bar__buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.surface__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: 1px solid rgb(148 163 184 / 24%);
+  border-radius: 10px;
+  background: rgb(30 41 59 / 70%);
+  color: #e2e8f0;
+  font:
+    600 12.5px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The accent is the sphere's colour, set inline on the bar as `--surface-accent`,
+   so the button that changes the colour is the colour. */
+.surface__btn--accent {
+  border-color: var(--surface-accent, hsl(199 89% 60%));
+  background: color-mix(in srgb, var(--surface-accent, hsl(199 89% 60%)) 22%, #0f172a);
+  color: #f8fafc;
+}
+
+.surface__readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: #94a3b8;
+  font:
+    500 11.5px/1.4 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.surface__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: hsl(199 89% 60%);
+}
+
+/* ── Layer 4: the pages, off screen ───────────────────────────────────────── */
+
+/**
+ * Parked, not hidden.
+ *
+ * `display: none` and `opacity: 0` both look like the right answer and both are
+ * wrong: a subtree the browser does not lay out has no boxes, so
+ * `getBoundingClientRect` returns 0×0 and every raycast through the texture misses.
+ * `position: fixed` keeps the hosts out of the page's flow (they add no scroll
+ * height, no gap) while the browser lays them out and measures them normally.
+ */
+.surface-hosts {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/**
+ * One parked page and its own picture, side by side in the same off-screen box.
+ *
+ * The canvas is not an offscreen canvas: it is the element the texture uploads from,
+ * and the raster's `drawImage` writes straight into it. It is stacked on top of its
+ * host because nothing here is visible — the user sees the mesh, not this.
+ */
+.surface-hosts__item {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.surface-host {
+  /* width and height arrive inline from SURFACE_SPECS, matching the raster size. */
+  position: relative;
+  overflow: hidden;
+}
+
+.surface-host__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/**
+ * The pages themselves, at their texture's pixel size.
+ *
+ * The width and height are the raster's `width`/`height`, not a layout width: the
+ * raster measures the root element, so a page that flexed to its container would
+ * raster at whatever the host happened to be, and the published rects would be in
+ * pixels the UV conversion does not use.
+ *
+ * No `backdrop-filter` anywhere below this point — an image has no backdrop, so the
+ * property renders as nothing. No external images either: an image document cannot
+ * load sub-resources.
+ */
+.surface-page {
+  box-sizing: border-box;
+  overflow: hidden;
+  color: #f1f5f9;
+  background: linear-gradient(160deg, #1b2537 0%, #0d1424 68%, #0a1120 100%);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.surface-page--square {
+  width: 512px;
+  height: 512px;
+  padding: 34px;
+}
+
+.surface-page--sphere {
+  width: 640px;
+  height: 320px;
+  padding: 26px 34px;
+}
+
+.surface-page__eyebrow {
+  margin: 0 0 14px;
+  color: #7dd3fc;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.surface-page__title {
+  margin: 0 0 12px;
+  color: #ffffff;
+  font:
+    700 44px/1.1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.015em;
+}
+
+.surface-page--sphere .surface-page__title {
+  font-size: 34px;
+  margin-bottom: 18px;
+}
+/*
+ * The sphere shows the middle half of its texture: with `SPHERE_SURFACE_ROTATION_Y`
+ * the page's centre faces the camera, and the front hemisphere is texture x 160–480 of
+ * 640. A left-aligned button starts at x 34 and is wrapped around the far side, so the
+ * part the user can see is a sliver and most taps land on nothing. Centred, it sits
+ * inside the visible band.
+ */
+.surface-page--sphere .surface-page__btn {
+  display: block;
+  width: max-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/** Inside a texture, unstyled text is 16 px black on a dark page — invisible. Every
+ class a surface page renders has to be in this file. */
+.surface-page__hint {
+  margin: 0;
+  max-width: 30ch;
+  color: #94a3b8;
+  font:
+    400 17px/1.45 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface-page__note {
+  margin: 0 0 22px;
+  max-width: 34ch;
+  color: #cbd5e1;
+  font:
+    400 19px/1.5 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.surface-page__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.surface-page__swatch {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  border: 3px solid rgb(255 255 255 / 22%);
+  background: hsl(199 89% 60%);
+}
+
+.surface-page__hex {
+  color: #e2e8f0;
+  font:
+    600 30px/1 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+}
+
+/**
+ * The button is the hit target, so its box *is* the hit box.
+ *
+ * A 96 px-tall button on a 512 px page rasterized onto a plane about a third of the
+ * viewport wide is a ~24 px target for a raycast. Halve this size and presses start
+ * landing on the gap between buttons, which reads as "the texture is buggy".
+ */
+.surface-page__btn {
+  display: inline-block;
+  margin: 0 0 26px;
+  padding: 26px 40px;
+  border: 4px solid #7dd3fc;
+  border-radius: 16px;
+  background: rgb(56 189 248 / 22%);
+  color: #ffffff;
+  font:
+    700 30px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-align: center;
+}
+
+.surface-page__btn--accent {
+  border-color: #34d399;
+  background: rgb(52 211 153 / 24%);
+}
+
+.surface-page__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.surface-page__table th {
+  color: #94a3b8;
+  font:
+    600 17px/1.6 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-align: left;
+  padding: 6px 12px 6px 0;
+  border-bottom: 2px solid rgb(148 163 184 / 22%);
+}
+
+.surface-page__table td {
+  color: #ffffff;
+  font:
+    600 22px/1.6 ui-monospace,
+    Menlo,
+    Consolas,
+    monospace;
+  text-align: right;
+  padding: 6px 0;
+  border-bottom: 2px solid rgb(148 163 184 / 22%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface__scroll {
+    scroll-behavior: auto;
+  }
+}
+
+/* ── The looping list inside a texture page ─────────────────────────────────────
+   `.surface-loop` is the window; `.surface-loop__track` is the pair of tiles that
+   translates, and each tile is a whole copy of the page — the button scrolls with it. Heights come from the core constants inline — a stylesheet that drifts
+   from them is a seam at the wrap point. */
+
+.surface-loop {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 12px;
+}
+
+.surface-loop__track {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+/** One full copy of the page: heading, button and rows. `box-sizing: border-box` is
+ load-bearing — a border on a row whose height is a constant makes the laid-out tile
+ taller than the wrap point, and the seam shows as a jump every turn. */
+.surface-loop__tile {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/** The button block. Its height is `LOOP_HEADER_HEIGHT`, inline, from the page. */
+.surface-loop__head {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 14px;
+  overflow: hidden;
+}
+
+.surface-loop__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.surface-loop__row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  font-size: 22px;
+  line-height: 1.2;
+  color: rgb(232 240 251 / 84%);
+}
+
+/* ── Layer 2a: the mesh's own touch region ───────────────────────────────
+ *
+ * `SurfaceTouchShield.tsx` writes its box from the render loop. `touch-action: none`
+ * is the entire reason it exists, and it only works from an element that is already
+ * under the finger at touchstart: a class added during pointerdown is a frame too late,
+ * the browser has already committed to panning `.surface__scroll`, and it sends
+ * `pointercancel` — the drag on the texture page never happens, with no error.
+ *
+ * z-index 2: above the story, so a touch over the mesh lands here; below the bar, so
+ * the bar's buttons stay buttons. The raycast is geometric and ignores this element
+ * entirely — a tap here bubbles to the event source and is raycast like any other.
+ */
+.surface__shield {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 2;
+  pointer-events: auto;
+  touch-action: none;
+}

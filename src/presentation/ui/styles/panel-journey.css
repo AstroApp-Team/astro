@@ -1,0 +1,60 @@
+/** The `Journey` satellite's panel. */
+
+.panel-journey__track {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-journey__dot {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid rgb(148 163 184 / 20%);
+  border-radius: 8px;
+  color: #7f8ea3;
+  font:
+    600 11px/1 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  text-align: center;
+}
+
+.panel-journey__dot--lit {
+  border-color: rgb(125 211 252 / 50%);
+  background: rgb(125 211 252 / 14%);
+  color: #bae6fd;
+}
+
+.panel-journey__step {
+  margin-bottom: 12px;
+}
+
+.panel-journey__step h3 {
+  margin: 0 0 4px;
+  color: #f1f5f9;
+  font:
+    600 14.5px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.panel-journey__step p {
+  margin: 0;
+  color: #cbd5e1;
+}
+
+.panel-journey__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.panel-journey__nav {
+  flex: 1;
+}
+
+.panel-journey__done {
+  flex: 1;
+}

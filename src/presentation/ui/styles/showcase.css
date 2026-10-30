@@ -1,0 +1,272 @@
+/**
+ * The integrated showcase page: a full-bleed WebGL scene with a React page
+ * scrolling over it.
+ *
+ * Three stacked layers inside one non-scrolling box, and the reason each one is
+ * configured the way it is:
+ *
+ *   `.showcase__stage`  — the canvas, `inset: 0`, z-index 0. It gets
+ *                         `touch-action: pan-y` inline from the page, overriding
+ *                         `MainCanvas`'s `none`: `none` is right on the rig benches,
+ *                         where a drag is a camera gesture, and wrong on a page that
+ *                         scrolls — with it, a drag that starts on the scene is
+ *                         swallowed by the canvas and iOS turns a left-edge swipe
+ *                         into the native back gesture. `pan-y` keeps the tap that
+ *                         R3F needs and hands the vertical axis back to the browser.
+ *   `.showcase__scroll` — the story, `inset: 0`, z-index 1, its *own* scroll
+ *                         container. It is `pointer-events: none` and its blocks
+ *                         are `pointer-events: auto`. That split is the whole
+ *                         reason the sphere is clickable: the gaps between cards
+ *                         are transparent to the pointer, so a tap there falls
+ *                         through to the canvas. A scroller that owned the pointer
+ *                         would swallow every 3D tap on the page.
+ *   `.showcase__bar`    — the control bar, z-index 3, pinned to the bottom of the
+ *                         page so it does not ride the scroll.
+ *
+ * The scroller is deliberately not IonContent's `.inner-scroll`: that element
+ * lives in `ion-content`'s shadow root, so app CSS cannot set `pointer-events`
+ * on it, and a shadow-root scroller is where a tap-through page goes to fail.
+ * IonContent's own overflow is switched off (`--overflow: hidden`) so the two
+ * scrollers never fight over one gesture.
+ *
+ * Where a gesture lands, and what it does:
+ *
+ *   - drag on a card or the cue strip → the story scrolls (their scrollable
+ *     ancestor is `.showcase__scroll`);
+ *   - drag on the bare band of scene → nothing scrolls: the canvas host's
+ *     scrollable ancestors are `.showcase` and `.inner-scroll`, neither of which
+ *     scrolls. That band is the scene's own area, and it is where a tap becomes
+ *     a raycast;
+ *   - wheel on the band → the page forwards `deltaY` to the story scroller from
+ *     `ShowcasePage`, because a wheel over the scene has no scrollable ancestor
+ *     either.
+ */
+
+.showcase-content {
+  /* The page scrolls in `.showcase__scroll`. IonContent scrolling both is two
+     scrollbars on one gesture. */
+  --overflow: hidden;
+  --background: #0b1120;
+}
+
+.showcase {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  background: #0b1120;
+}
+
+/* ── Layer 0: the scene ───────────────────────────────────────────────────── */
+
+.showcase__stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/**
+ * The canvas host inside the stage.
+ *
+ * `.canvas-host` is already `position: relative` at 100%×100%, which is enough
+ * here; pinning it to the stage box is what keeps a stage that ever grows
+ * padding from shrinking the canvas to nothing, which on this page reads as a
+ * black rectangle rather than a layout bug.
+ */
+.showcase-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.showcase__stage-label {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  margin: 0;
+  color: rgb(226 232 240 / 78%);
+  font:
+    500 11px/1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  text-shadow: 0 1px 3px rgb(2 6 23 / 80%);
+  /* A label over the scene must not eat a raycast. */
+  pointer-events: none;
+}
+
+/* ── Layer 1: the story ───────────────────────────────────────────────────── */
+
+.showcase__scroll {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  pointer-events: none;
+  padding: 0 12px 116px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 35%) transparent;
+}
+
+/**
+ * The empty band at the top, as a percentage of the scroller's *height*.
+ *
+ * A percentage `padding-top` would resolve against the containing block's
+ * *width* — CSS percentages always do — which on a 390px phone is 200px, not the
+ * 380px the scene needs. A child's `height: %` resolves against the scroller's
+ * definite height, which is the number this layout actually wants.
+ *
+ * The value is measured off the rig, not chosen by eye. At the end of the sting
+ * sequence — camera at y 5.5, fov 48, pitched 23.6° down by the Studio's rotation
+ * override — the core lands at 50% of the canvas height and the four satellites at
+ * 42–50%, spread across the width, with their `Html` cards at ~30–38%. A band under
+ * half that height buries the cubes under the first card, and a cube you cannot tap
+ * is a panel that never opens.
+ */
+.showcase__spacer {
+  height: 56%;
+}
+
+.showcase__cue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px dashed rgb(148 163 184 / 28%);
+  border-radius: 10px;
+  background: rgb(15 23 42 / 55%);
+  color: rgb(148 163 184 / 92%);
+  font:
+    500 11px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  /* The grab strip. Everything above it is scene, so this is the one place in
+     the upper half of the page where a drag scrolls. */
+  pointer-events: auto;
+}
+
+.showcase__card {
+  margin: 0 0 14px;
+  padding: 15px 16px;
+  border: 1px solid rgb(148 163 184 / 20%);
+  border-radius: 14px;
+  /* Translucent: the scene is behind the copy on purpose, so the scroll reads as
+     content moving over the animation rather than over a solid sheet. */
+  background: rgb(11 17 32 / 76%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #e2e8f0;
+  font:
+    400 13.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  pointer-events: auto;
+}
+
+.showcase__card h2 {
+  margin: 0 0 6px;
+  color: #f1f5f9;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.showcase__card p {
+  margin: 0 0 8px;
+}
+
+.showcase__card p:last-child {
+  margin-bottom: 0;
+}
+
+.showcase__card code {
+  color: #7dd3fc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.showcase__card em {
+  color: #cbd5e1;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.showcase__card__meta {
+  padding-top: 8px;
+  border-top: 1px solid rgb(148 163 184 / 16%);
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+/* ── Layer 2: the control bar ─────────────────────────────────────────────── */
+
+.showcase__bar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgb(148 163 184 / 22%);
+  border-radius: 14px;
+  background: rgb(15 23 42 / 88%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.showcase__replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 10px;
+  /* The colour the sphere click rolls. `--showcase-accent` is set inline on the
+     bar; the fallback is the resting accent, so the bar is never colourless if
+     the inline style is ever dropped. */
+  background: var(--showcase-accent, hsl(199 89% 60%));
+  color: #07111f;
+  font:
+    600 13px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+  transition: background-color 240ms ease;
+}
+
+.showcase__replay:disabled {
+  background: rgb(51 65 85 / 70%);
+  color: rgb(203 213 225 / 60%);
+  cursor: not-allowed;
+}
+
+.showcase__bar__readout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.showcase__swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: var(--showcase-accent, hsl(199 89% 60%));
+  transition: background-color 240ms ease;
+}

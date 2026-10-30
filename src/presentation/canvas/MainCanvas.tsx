@@ -1,6 +1,6 @@
 import { Canvas } from "@react-three/fiber";
 import { Suspense } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, RefObject } from "react";
 
 import type { SceneId } from "@core/models/scene.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
@@ -31,9 +31,43 @@ export type MainCanvasProps = {
   scene?: SceneId;
   className?: string;
   style?: CSSProperties;
+  /**
+   * Attach R3F's pointer events to this element instead of the canvas.
+   *
+   * The one prop a transparent overlay canvas needs. R3F sets `pointer-events:
+   * none` on the canvas itself when this is provided, so the canvas stops being a
+   * hit target and the page under it keeps its own clicks, links and scroll —
+   * while the raycast still runs, because the events now come from an ancestor of
+   * everything under the pointer. `eventSource` must therefore be an **ancestor of
+   * the content you want to stay clickable**, and its box must match the canvas's:
+   * R3F derives the pointer's NDC position from `offsetX/offsetY`, which are
+   * relative to the event target, so a canvas inset inside a scrolled container
+   * and an event source outside it disagree about where the pointer is.
+   */
+  eventSource?: HTMLElement | RefObject<HTMLElement | null>;
+  /**
+   * Which coordinate pair R3F derives the pointer from. Default `"offset"`.
+   *
+   * `eventSource` alone is not enough for a full-bleed overlay. R3F's default
+   * compute reads `event.offsetX`, which is relative to the event's **target** —
+   * and with an event source the target is whatever DOM element is under the
+   * pointer, so a tap on a card two hundred pixels down the page raycasts two
+   * hundred pixels off where it landed. `eventPrefix="client"` reads `clientX`
+   * instead, which R3F divides by the canvas's own size with no origin
+   * subtraction — correct exactly when the canvas's box starts at the viewport
+   * origin, i.e. when the overlay is `position: fixed; inset: 0`. That pairing is
+   * what `/float` uses: fixed overlay, client prefix, root as event source.
+   */
+  eventPrefix?: "offset" | "client" | "page" | "layer" | "screen";
 };
 
-export default function MainCanvas({ scene, className, style }: MainCanvasProps) {
+export default function MainCanvas({
+  scene,
+  className,
+  style,
+  eventSource,
+  eventPrefix,
+}: MainCanvasProps) {
   const activeScene = useSceneStore((state) => state.activeScene);
   const epoch = useSceneStore((state) => state.epoch);
 
@@ -54,6 +88,8 @@ export default function MainCanvas({ scene, className, style }: MainCanvasProps)
           alpha: true,
         }}
         camera={{ position: [0, 4, 9], fov: 55 }}
+        {...(eventSource == null ? {} : { eventSource })}
+        {...(eventPrefix == null ? {} : { eventPrefix })}
       >
         <Suspense fallback={null}>
           {/* R3F keeps GL objects in refs, not React state, so switching scenes

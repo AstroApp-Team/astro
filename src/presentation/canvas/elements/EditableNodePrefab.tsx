@@ -3,6 +3,7 @@ import { editable } from "@theatre/r3f";
 import type { ThreeEvent } from "@react-three/fiber";
 
 import type { Vec3 } from "@core/models/scene.ts";
+import { showsSelectionHighlight } from "@core/usecases/showcaseInteraction.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
 
 /**
@@ -33,7 +34,14 @@ export default function EditableNodePrefab({
   position = [0, 0, 0],
   onSelect,
 }: EditableNodePrefabProps) {
-  const isSelected = useSceneStore((state) => state.selectedNodeId === theatreKey);
+  /**
+   * Drawn-as-selected, not selected. `selectionVisuals` is off on the end-user
+   * pages, and the selector returns a primitive, so a mesh re-renders only when
+   * its own highlight flips.
+   */
+  const isSelected = useSceneStore((state) =>
+    showsSelectionHighlight(state.selectionVisuals, state.selectedNodeId, theatreKey),
+  );
   const selectNode = useSceneStore((state) => state.selectNode);
   const hoverNode = useSceneStore((state) => state.hoverNode);
 

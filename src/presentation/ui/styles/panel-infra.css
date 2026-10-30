@@ -1,0 +1,71 @@
+/** The `Infra` satellite's panel. */
+
+.panel-infra__table {
+  width: 100%;
+  margin-bottom: 10px;
+  border-collapse: collapse;
+  font:
+    500 12.5px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.panel-infra__table th {
+  padding: 0 6px 6px;
+  border-bottom: 1px solid rgb(148 163 184 / 20%);
+  color: #7f8ea3;
+  font-weight: 600;
+  font-size: 11px;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.panel-infra__table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid rgb(148 163 184 / 10%);
+  color: #e2e8f0;
+}
+
+.panel-infra__state {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font:
+    600 11px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.panel-infra__state--ok {
+  background: rgb(34 197 94 / 18%);
+  color: #86efac;
+}
+
+.panel-infra__state--warm {
+  background: rgb(250 204 21 / 16%);
+  color: #fde68a;
+}
+
+.panel-infra__state--cold {
+  background: rgb(148 163 184 / 16%);
+  color: #b6c2d4;
+}
+
+.panel-infra__foot {
+  margin: 0 0 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.panel-infra__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.panel-infra__poll {
+  flex: 1;
+}
+
+.panel-infra__done {
+  flex: 1;
+}
