@@ -19,5 +19,16 @@
   "editor.formatOnSaveMode": "file",
   "editor.codeActionsOnSave": {
     "source.fixAll.oxc": "explicit"
-  }
+  },
+  "terminal.integrated.profiles.windows": {
+    "PowerShell (Vite+)": {
+      "source": "PowerShell",
+      "args": [
+        "-NoExit",
+        "-Command",
+        ". 'C:\\Users\\Eugenio\\AppData\\Roaming\\vite-plus\\env.ps1'"
+      ]
+    }
+  },
+  "terminal.integrated.defaultProfile.windows": "PowerShell (Vite+)"
 }
