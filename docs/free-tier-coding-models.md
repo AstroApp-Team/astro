@@ -3,6 +3,10 @@
 Researched 2026-08-24, when `VIEW_MODEL_ID` moved from `openai/gpt-oss-120b` to
 `moonshotai/kimi-k2.7-code`.
 
+**Superseded 2026-10-30:** the account now has paid credits and `VIEW_MODEL_ID`
+is `deepseek/deepseek-v4.1-flash-1017`. This page stays as the record of the
+free-tier choice, and is the fallback if the credits run out.
+
 ## What the free tier actually gates
 
 `https://vercel.com/ai-gateway/models` carries a per-model `availableToFreeTier`

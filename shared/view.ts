@@ -23,10 +23,9 @@ import type { UIMessage } from "ai";
 /**
  * One document, so the whole thing has to fit in a prompt on the next edit.
  *
- * 96 KB is also near the ceiling of what `VIEW_MODEL_ID` can emit in a single
- * `write_view` (Kimi K2.7 Code caps output at 32k tokens). A page that big is
- * written in `edit_view` patches, not one call — raise this and the write is
- * what breaks first, not the prompt.
+ * The prompt is what bounds it, not the model's output cap: `VIEW_MODEL_ID`
+ * can emit far more than 96 KB in one `write_view`, but every edit re-sends
+ * the whole page as `currentHtml`.
  */
 export const MAX_VIEW_HTML_BYTES = 96 * 1024;
 

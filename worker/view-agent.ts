@@ -20,30 +20,17 @@ import {
 } from "../shared/view.ts";
 
 /**
- * Chosen from the Gateway's free-tier catalog for coding ability first. The
- * free tier gates out every frontier coder (Opus 5, GPT-5.6, Gemini 3.7, Kimi
- * K3, GLM 5.x, DeepSeek V4), and of what is left this is the only
- * code-specialised model carrying an independent third-party score: Vals AI
- * measures 78.2% SWE-bench and 67.0% Terminal-Bench 2.1, top of the open
- * weights. Artificial Analysis rates it 43 on its Intelligence Index against
- * 24 for the `openai/gpt-oss-120b` it replaced.
+ * DeepSeek V4.1 Flash, pinned to its 1017 snapshot so the loop's behaviour
+ * does not move under us when the floating `deepseek-v4.1-flash` alias does.
+ * It needs paid Gateway credits — the free tier answers 403
+ * `RestrictedModelsError` — and replaced `moonshotai/kimi-k2.7-code`, the best
+ * coder the free tier allowed (see `docs/free-tier-coding-models.md`).
  *
- * The capability is bought with latency, and TTFT is paid on *every step* of
- * the loop: 505ms p50 / 1365ms p95 here against gpt-oss-120b's 188/266, so a
- * build feels a few seconds slower. `minimax/minimax-m3` is the same trade in
- * the other direction — level on aggregate scores, 4× cheaper, 1M context, but
- * 928ms p50. Do not read Vercel's own speed numbers for this model against
- * Artificial Analysis' (49 tok/s, 2.9s): those average a different provider
- * mix, and the Gateway route is the one that matters here.
- *
- * Know that the free tier throttles the *account*, not the model: after a
- * burst of requests every model answers "rate-limited" for a long window
- * (>4 min), even with credit on the balance. A card on file lifts it — the
- * model id is not the thing to change when that error shows up.
- *
- * The full free-tier comparison is in `docs/free-tier-coding-models.md`.
+ * The Gateway serves it from Baseten with tool calling, a 1M context and a
+ * 262k output cap, at $0.30→$1.20 per M tokens and $0.007 per M on a cache
+ * hit. The `-fast` variant is twice the price.
  */
-export const VIEW_MODEL_ID = "moonshotai/kimi-k2.7-code";
+export const VIEW_MODEL_ID = "deepseek/deepseek-v4.1-flash-1017";
 
 /**
  * The coding agent's model, reached through the same AI Gateway key that mints
