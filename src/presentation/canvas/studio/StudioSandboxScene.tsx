@@ -5,6 +5,7 @@ import { studioSheet } from "@infra/theatre/project.ts";
 import { TheatreCameraRig } from "@presentation/canvas/cameras/TheatreCameraRig.tsx";
 import EditableNodePrefab from "@presentation/canvas/elements/EditableNodePrefab.tsx";
 import { SceneLights } from "@presentation/canvas/elements/SceneLights.tsx";
+import { SpawnedShapes } from "@presentation/canvas/elements/SpawnedShapes.tsx";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
 
 /**
@@ -24,9 +25,15 @@ export default function StudioSandboxScene() {
 
   return (
     <SheetProvider sheet={studioSheet}>
+      {/** An explicit scene background. The stage div behind the canvas is the
+          same near-black as this one, so "the canvas is painting" and "the canvas
+          is a black rectangle" are otherwise the same picture — and a 0-height
+          canvas is invisible, not black. This makes the two distinguishable. */}
+      <color attach="background" args={["#141b2d"]} />
+
       <TheatreCameraRig theatreKey="Camera" position={[0, 5, 10]} fov={50} />
 
-      <SceneLights theatreKey="MainLight" keyPosition={[5, 8, 6]} />
+      <SceneLights theatreKey="MainLight" ambientIntensity={0.7} keyPosition={[5, 8, 6]} />
 
       {/** Spatial reference: 1 unit per cell, so a position keyframe read in the
           Studio is a distance you can eyeball. */}
@@ -49,6 +56,13 @@ export default function StudioSandboxScene() {
           }}
         />
       ))}
+
+      {/**
+       * Everything the Studio extension's "Add Shape" menu has spawned. Inside
+       * the SheetProvider on purpose: `editable.mesh` resolves its sheet out of
+       * that context, so mounted outside it there is nothing to register into.
+       */}
+      <SpawnedShapes />
     </SheetProvider>
   );
 }

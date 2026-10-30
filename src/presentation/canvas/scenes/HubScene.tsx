@@ -5,6 +5,7 @@ import { SHEET_IDS, getSheet } from "@infra/theatre/project.ts";
 import { TheatreCameraRig } from "@presentation/canvas/cameras/TheatreCameraRig.tsx";
 import EditableNodePrefab from "@presentation/canvas/elements/EditableNodePrefab.tsx";
 import { SceneLights } from "@presentation/canvas/elements/SceneLights.tsx";
+import { SpawnedShapes } from "@presentation/canvas/elements/SpawnedShapes.tsx";
 
 /**
  * The landing scene: the entry hall the app opens on.
@@ -39,6 +40,12 @@ export default function HubScene() {
           position={node.position}
         />
       ))}
+
+      {/** Shapes spawned by the Studio's "Add Shape" tool. Inside the
+          SheetProvider on purpose: `editable.mesh` resolves its sheet out of
+          that context, so mounted outside it there is nothing to register into,
+          and the spawn silently produces a store entry and no object. */}
+      <SpawnedShapes />
     </SheetProvider>
   );
 }
