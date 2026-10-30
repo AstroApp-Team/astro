@@ -1,0 +1,68 @@
+{
+  "_how": "Written by the Studio's Save button (dev only). Hand-edit it and reload the page: `entries` become the spawned shapes, `ordinal` is the next spawn number, `sheetId` and `cameraKey` are the tools' context. An entry needs id, kind (cube | sphere | flat-square | flat-circle), theatreKey (4+ chars, unique in the sheet), and position/rotation/scale as [x,y,z] — rotation in radians. Unknown keys are dropped; a malformed entry fails the whole load, and the dev server answers 400 naming the field.",
+  "ordinal": 3,
+  "sheetId": "SurfaceScene",
+  "cameraKey": "Surface Camera",
+  "entries": [
+    {
+      "id": "sphere-0",
+      "kind": "sphere",
+      "theatreKey": "Sphere-0",
+      "position": [
+        2.4,
+        0.75,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "cube-1",
+      "kind": "cube",
+      "theatreKey": "Cube-1",
+      "position": [
+        2.11,
+        0.75,
+        2.659
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "cube-2",
+      "kind": "cube",
+      "theatreKey": "Cube-2",
+      "position": [
+        -0.944,
+        0.75,
+        4.048
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ]
+}
