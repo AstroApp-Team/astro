@@ -234,6 +234,9 @@ importers:
       '@ai-sdk/react':
         specifier: ^4.0.79
         version: 4.0.79(react@19.2.8)(zod@4.4.3)
+      '@capacitor/core':
+        specifier: 8.5.0
+        version: 8.5.0
       '@hono/zod-validator':
         specifier: 0.9.0
         version: 0.9.0(hono@4.13.3)(zod@4.4.3)
@@ -298,9 +301,6 @@ importers:
       '@capacitor/cli':
         specifier: 8.5.0
         version: 8.5.0(supports-color@10.2.2)
-      '@capacitor/core':
-        specifier: 8.5.0
-        version: 8.5.0
       '@capacitor/ios':
         specifier: 8.5.0
         version: 8.5.0(@capacitor/core@8.5.0)
