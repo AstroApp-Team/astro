@@ -32,6 +32,8 @@ export const SHEET_IDS = {
   careerJourney: "CareerJourneyScene",
   archive: "ArchiveScene",
   sting: "StingScene",
+  float: "FloatScene",
+  surface: "SurfaceScene",
   studioSandbox: "StudioSandbox",
 } as const;
 
@@ -55,6 +57,8 @@ export const SCENE_SHEET_IDS: Record<SceneId, SheetId> = {
   "career-journey": SHEET_IDS.careerJourney,
   archive: SHEET_IDS.archive,
   sting: SHEET_IDS.sting,
+  float: SHEET_IDS.float,
+  surface: SHEET_IDS.surface,
   "studio-sandbox": SHEET_IDS.studioSandbox,
 };
 

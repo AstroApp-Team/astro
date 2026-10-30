@@ -4,6 +4,8 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { defineConfig, lazyPlugins } from "vite-plus";
 
+import { studioSavePlugin } from "./scripts/studio-save-plugin.ts";
+
 /**
  * The Cloudflare plugin must not load under Vitest.
  *
@@ -39,10 +41,35 @@ export default defineConfig({
     //   react(), babel({ presets: [reactCompilerPreset()] })
     // via @rolldown/plugin-babel + babel-plugin-react-compiler.
     react({ compiler: true }),
+    // The Studio's Save button writes its two files through this middleware. It is
+    // `apply: "serve"`, so `vp build` never sees it and a shipped bundle has no
+    // endpoint to call — see scripts/studio-save-plugin.ts.
+    studioSavePlugin(),
     ...(isVitest ? [] : [cloudflare()]),
   ]),
 
   resolve: { alias: aliases },
+
+  /**
+   * Reachable from the network, because the phone is a supported client and so is a
+   * Tailscale hostname.
+   *
+   * `host: true` binds every interface, so `vp dev` is reachable from a phone on the
+   * same tailnet or Wi-Fi without a `--host` flag. `allowedHosts` is Vite's own host
+   * check, which exists to stop DNS rebinding: it accepts `localhost`, `*.localhost`
+   * and every IP address by default — so a Tailscale IP (`100.x.y.z`) already works
+   * and a MagicDNS name (`box.tailnet.ts.net`) does not. `.ts.net` is the narrow
+   * answer: MagicDNS names only, not "any hostname on the internet".
+   *
+   * The Studio's save endpoints sit behind this same server. They do not check
+   * `Host` — over a tailnet that check answers the wrong question — they require the
+   * `x-astro-studio-save` header, which a cross-origin page cannot attach without a
+   * CORS preflight this server does not answer. See `scripts/studio-save-plugin.ts`.
+   */
+  server: {
+    host: true,
+    allowedHosts: [".ts.net"],
+  },
 
   /**
    * `@theatre/studio` is CJS and reaches the app only through a dynamic import
@@ -68,6 +95,16 @@ export default defineConfig({
       // them just creates churn on every regeneration.
       "worker-configuration.d.ts",
       "drizzle/**",
+      // Written by the Studio's Save button (`scripts/studio-save-plugin.ts`),
+      // which serialises with `JSON.stringify(…, 2)`. The formatter collapses
+      // short arrays onto one line, so every Save would leave the tree "dirty to
+      // fmt" and a `vp check --fix` would fight the plugin's output forever.
+      "src/infrastructure/theatre/states/astro.local.state.json",
+      "src/infrastructure/theatre/states/astro.local.shapes.json",
+      // Written by `scripts/theatre-state.mjs`, which serialises the same way, so
+      // every `pnpm run theatre:state -- import` expands every `handles` array.
+      // Same fight, same reason.
+      "src/infrastructure/theatre/states/portfolio-project.state.json",
     ],
   },
   lint: {

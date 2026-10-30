@@ -27,11 +27,27 @@ export type SceneStore = {
    */
   epoch: number;
   lastEvent: SceneEvent | null;
+  /**
+   * Whether a selected node is *drawn* as selected.
+   *
+   * Selection itself is always recorded — `selectNode()` runs on every rig surface
+   * and on the end-user pages too, and a page's own hooks read that write. This
+   * flag only controls the highlight: the sky-coloured material on a mesh, the
+   * `--selected` card. The rigging benches want it; `/showcase` turns it off, so
+   * the scene does not advertise that its objects are selectable.
+   */
+  selectionVisuals: boolean;
 
   setActiveScene(scene: SceneId): void;
   selectNode(nodeId: string | null): void;
   hoverNode(nodeId: string | null): void;
   focusCamera(target: Vec3): void;
+  /**
+   * Turn the selection highlight on or off. Each page that mounts a canvas states
+   * what it wants on mount — see `showsSelectionHighlight` in
+   * `core/usecases/showcaseInteraction.ts` for why the two are separate switches.
+   */
+  setSelectionVisuals(on: boolean): void;
   /** Records something happened. The canvas and the UI both call this. */
   emit(name: SceneEventName, nodeId: string | null): void;
 };
@@ -43,6 +59,7 @@ export const useSceneStore = create<SceneStore>((set) => ({
   cameraTarget: [0, 5, 10],
   epoch: 0,
   lastEvent: null,
+  selectionVisuals: true,
 
   setActiveScene(scene) {
     set((state) => ({
@@ -67,6 +84,10 @@ export const useSceneStore = create<SceneStore>((set) => ({
 
   hoverNode(nodeId) {
     set({ hoveredNodeId: nodeId });
+  },
+
+  setSelectionVisuals(on) {
+    set({ selectionVisuals: on });
   },
 
   focusCamera(target) {

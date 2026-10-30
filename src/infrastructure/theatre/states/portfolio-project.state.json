@@ -25,7 +25,12 @@
                     "id": "kf-001",
                     "value": 0,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -33,7 +38,12 @@
                     "id": "kf-002",
                     "value": 1.6,
                     "position": 2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -41,7 +51,12 @@
                     "id": "kf-003",
                     "value": 0.4,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -55,7 +70,12 @@
                     "id": "kf-004",
                     "value": 1.6,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -63,7 +83,12 @@
                     "id": "kf-005",
                     "value": 5.5,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -77,7 +102,12 @@
                     "id": "kf-006",
                     "value": 6.5,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -85,7 +115,12 @@
                     "id": "kf-007",
                     "value": 11,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -99,7 +134,12 @@
                     "id": "kf-008",
                     "value": 62,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -107,7 +147,12 @@
                     "id": "kf-009",
                     "value": 56,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -115,7 +160,12 @@
                     "id": "kf-010",
                     "value": 48,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -138,7 +188,12 @@
                     "id": "kf-011",
                     "value": 6,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -146,7 +201,12 @@
                     "id": "kf-012",
                     "value": -5,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -160,7 +220,12 @@
                     "id": "kf-013",
                     "value": 9,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -168,7 +233,12 @@
                     "id": "kf-014",
                     "value": 6,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -182,7 +252,12 @@
                     "id": "kf-015",
                     "value": 1.1,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -190,7 +265,12 @@
                     "id": "kf-016",
                     "value": 2.4,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -198,7 +278,12 @@
                     "id": "kf-017",
                     "value": 1.8,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -219,7 +304,12 @@
                     "id": "kf-018",
                     "value": 0.15,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -227,7 +317,12 @@
                     "id": "kf-019",
                     "value": 0.6,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -252,7 +347,12 @@
                     "id": "kf-020",
                     "value": -2.5,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -260,7 +360,12 @@
                     "id": "kf-021",
                     "value": 1.15,
                     "position": 1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -268,7 +373,12 @@
                     "id": "kf-022",
                     "value": 0.7,
                     "position": 1.5,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -282,7 +392,12 @@
                     "id": "kf-023",
                     "value": 0.05,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -290,7 +405,12 @@
                     "id": "kf-024",
                     "value": 1.18,
                     "position": 1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -298,7 +418,12 @@
                     "id": "kf-025",
                     "value": 1,
                     "position": 1.5,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -312,7 +437,12 @@
                     "id": "kf-026",
                     "value": 0.05,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -320,7 +450,12 @@
                     "id": "kf-027",
                     "value": 1.18,
                     "position": 1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -328,7 +463,12 @@
                     "id": "kf-028",
                     "value": 1,
                     "position": 1.5,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -342,7 +482,12 @@
                     "id": "kf-029",
                     "value": 0.05,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -350,7 +495,12 @@
                     "id": "kf-030",
                     "value": 1.18,
                     "position": 1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -358,7 +508,12 @@
                     "id": "kf-031",
                     "value": 1,
                     "position": 1.5,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -372,7 +527,12 @@
                     "id": "kf-034",
                     "value": 0,
                     "position": 0,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -380,7 +540,12 @@
                     "id": "kf-035",
                     "value": 6.283185307179586,
                     "position": 4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -405,7 +570,12 @@
                     "id": "kf-036",
                     "value": -2.5,
                     "position": 0.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -413,7 +583,12 @@
                     "id": "kf-037",
                     "value": 1.15,
                     "position": 1.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -421,7 +596,12 @@
                     "id": "kf-038",
                     "value": 0.7,
                     "position": 1.8,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -435,7 +615,12 @@
                     "id": "kf-039",
                     "value": 0.05,
                     "position": 0.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -443,7 +628,12 @@
                     "id": "kf-040",
                     "value": 1.18,
                     "position": 1.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -451,7 +641,12 @@
                     "id": "kf-041",
                     "value": 1,
                     "position": 1.8,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -465,7 +660,12 @@
                     "id": "kf-042",
                     "value": 0.05,
                     "position": 0.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -473,7 +673,12 @@
                     "id": "kf-043",
                     "value": 1.18,
                     "position": 1.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -481,7 +686,12 @@
                     "id": "kf-044",
                     "value": 1,
                     "position": 1.8,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -495,7 +705,12 @@
                     "id": "kf-045",
                     "value": 0.05,
                     "position": 0.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -503,7 +718,12 @@
                     "id": "kf-046",
                     "value": 1.18,
                     "position": 1.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -511,7 +731,12 @@
                     "id": "kf-047",
                     "value": 1,
                     "position": 1.8,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -525,7 +750,12 @@
                     "id": "kf-048",
                     "value": -1.2,
                     "position": 0.3,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -533,7 +763,12 @@
                     "id": "kf-049",
                     "value": 0,
                     "position": 1.8,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -558,7 +793,12 @@
                     "id": "kf-050",
                     "value": -2.5,
                     "position": 0.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -566,7 +806,12 @@
                     "id": "kf-051",
                     "value": 1.15,
                     "position": 1.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -574,7 +819,12 @@
                     "id": "kf-052",
                     "value": 0.7,
                     "position": 2.1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -588,7 +838,12 @@
                     "id": "kf-053",
                     "value": 0.05,
                     "position": 0.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -596,7 +851,12 @@
                     "id": "kf-054",
                     "value": 1.18,
                     "position": 1.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -604,7 +864,12 @@
                     "id": "kf-055",
                     "value": 1,
                     "position": 2.1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -618,7 +883,12 @@
                     "id": "kf-056",
                     "value": 0.05,
                     "position": 0.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -626,7 +896,12 @@
                     "id": "kf-057",
                     "value": 1.18,
                     "position": 1.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -634,7 +909,12 @@
                     "id": "kf-058",
                     "value": 1,
                     "position": 2.1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -648,7 +928,12 @@
                     "id": "kf-059",
                     "value": 0.05,
                     "position": 0.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -656,7 +941,12 @@
                     "id": "kf-060",
                     "value": 1.18,
                     "position": 1.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -664,7 +954,12 @@
                     "id": "kf-061",
                     "value": 1,
                     "position": 2.1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -678,7 +973,12 @@
                     "id": "kf-062",
                     "value": -1.2,
                     "position": 0.6,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -686,7 +986,12 @@
                     "id": "kf-063",
                     "value": 0,
                     "position": 2.1,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -711,7 +1016,12 @@
                     "id": "kf-064",
                     "value": -2.5,
                     "position": 0.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -719,7 +1029,12 @@
                     "id": "kf-065",
                     "value": 1.15,
                     "position": 1.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -727,7 +1042,12 @@
                     "id": "kf-066",
                     "value": 0.7,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -741,7 +1061,12 @@
                     "id": "kf-067",
                     "value": 0.05,
                     "position": 0.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -749,7 +1074,12 @@
                     "id": "kf-068",
                     "value": 1.18,
                     "position": 1.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -757,7 +1087,12 @@
                     "id": "kf-069",
                     "value": 1,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -771,7 +1106,12 @@
                     "id": "kf-070",
                     "value": 0.05,
                     "position": 0.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -779,7 +1119,12 @@
                     "id": "kf-071",
                     "value": 1.18,
                     "position": 1.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -787,7 +1132,12 @@
                     "id": "kf-072",
                     "value": 1,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -801,7 +1151,12 @@
                     "id": "kf-073",
                     "value": 0.05,
                     "position": 0.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -809,7 +1164,12 @@
                     "id": "kf-074",
                     "value": 1.18,
                     "position": 1.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -817,7 +1177,12 @@
                     "id": "kf-075",
                     "value": 1,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -831,7 +1196,12 @@
                     "id": "kf-076",
                     "value": -1.2,
                     "position": 0.9,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -839,7 +1209,12 @@
                     "id": "kf-077",
                     "value": 0,
                     "position": 2.4,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -864,7 +1239,12 @@
                     "id": "kf-078",
                     "value": -2.5,
                     "position": 1.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -872,7 +1252,12 @@
                     "id": "kf-079",
                     "value": 1.15,
                     "position": 2.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -880,7 +1265,12 @@
                     "id": "kf-080",
                     "value": 0.7,
                     "position": 2.7,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -894,7 +1284,12 @@
                     "id": "kf-081",
                     "value": 0.05,
                     "position": 1.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -902,7 +1297,12 @@
                     "id": "kf-082",
                     "value": 1.18,
                     "position": 2.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -910,7 +1310,12 @@
                     "id": "kf-083",
                     "value": 1,
                     "position": 2.7,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -924,7 +1329,12 @@
                     "id": "kf-084",
                     "value": 0.05,
                     "position": 1.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -932,7 +1342,12 @@
                     "id": "kf-085",
                     "value": 1.18,
                     "position": 2.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -940,7 +1355,12 @@
                     "id": "kf-086",
                     "value": 1,
                     "position": 2.7,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -954,7 +1374,12 @@
                     "id": "kf-087",
                     "value": 0.05,
                     "position": 1.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -962,7 +1387,12 @@
                     "id": "kf-088",
                     "value": 1.18,
                     "position": 2.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -970,7 +1400,12 @@
                     "id": "kf-089",
                     "value": 1,
                     "position": 2.7,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -984,7 +1419,12 @@
                     "id": "kf-090",
                     "value": -1.2,
                     "position": 1.2,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   },
@@ -992,7 +1432,616 @@
                     "id": "kf-091",
                     "value": 0,
                     "position": 2.7,
-                    "handles": [0.5, 0, 0.5, 1],
+                    "handles": [
+                      0.5,
+                      0,
+                      0.5,
+                      1
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "FloatScene": {
+      "staticOverrides": {
+        "byObject": {}
+      },
+      "sequence": {
+        "type": "PositionalSequence",
+        "length": 6,
+        "subUnitsPerUnit": 30,
+        "tracksByObject": {
+          "Float Sphere": {
+            "trackIdByPropPath": {
+              "[\"position\",\"x\"]": "t-fx",
+              "[\"position\",\"y\"]": "t-fy",
+              "[\"position\",\"z\"]": "t-fz",
+              "[\"rotation\",\"y\"]": "t-ry"
+            },
+            "trackData": {
+              "t-fx": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Float Sphere.position.x",
+                "keyframes": [
+                  {
+                    "id": "kf-f001",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f002",
+                    "value": 1.5556,
+                    "position": 0.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f003",
+                    "value": 2.2,
+                    "position": 1.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f004",
+                    "value": 1.5556,
+                    "position": 2.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f005",
+                    "value": 0,
+                    "position": 3,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f006",
+                    "value": -1.5556,
+                    "position": 3.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f007",
+                    "value": -2.2,
+                    "position": 4.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f008",
+                    "value": -1.5556,
+                    "position": 5.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f009",
+                    "value": 0,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "t-fy": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Float Sphere.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-f010",
+                    "value": 1.6,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f011",
+                    "value": 2.15,
+                    "position": 0.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f012",
+                    "value": 1.6,
+                    "position": 1.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f013",
+                    "value": 1.05,
+                    "position": 2.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f014",
+                    "value": 1.6,
+                    "position": 3,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f015",
+                    "value": 2.15,
+                    "position": 3.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f016",
+                    "value": 1.6,
+                    "position": 4.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f017",
+                    "value": 1.05,
+                    "position": 5.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f018",
+                    "value": 1.6,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "t-fz": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Float Sphere.position.z",
+                "keyframes": [
+                  {
+                    "id": "kf-f019",
+                    "value": 2.2,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f020",
+                    "value": 1.5556,
+                    "position": 0.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f021",
+                    "value": 0,
+                    "position": 1.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f022",
+                    "value": -1.5556,
+                    "position": 2.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f023",
+                    "value": -2.2,
+                    "position": 3,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f024",
+                    "value": -1.5556,
+                    "position": 3.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f025",
+                    "value": 0,
+                    "position": 4.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f026",
+                    "value": 1.5556,
+                    "position": 5.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f027",
+                    "value": 2.2,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "t-ry": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Float Sphere.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-f028",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f029",
+                    "value": 0.7854,
+                    "position": 0.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f030",
+                    "value": 1.5708,
+                    "position": 1.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f031",
+                    "value": 2.3562,
+                    "position": 2.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f032",
+                    "value": 3.1416,
+                    "position": 3,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f033",
+                    "value": 3.927,
+                    "position": 3.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f034",
+                    "value": 4.7124,
+                    "position": 4.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f035",
+                    "value": 5.4978,
+                    "position": 5.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-f036",
+                    "value": 6.2832,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "SurfaceScene": {
+      "staticOverrides": {
+        "byObject": {}
+      },
+      "sequence": {
+        "type": "PositionalSequence",
+        "length": 3,
+        "subUnitsPerUnit": 30,
+        "tracksByObject": {
+          "Surface Plane": {
+            "trackIdByPropPath": {
+              "[\"rotation\",\"y\"]": "t-sp-ry"
+            },
+            "trackData": {
+              "t-sp-ry": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Surface Plane.rotation.y",
+                "keyframes": [
+                  {
+                    "id": "kf-sp-001",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-sp-002",
+                    "value": 0.9817,
+                    "position": 0.75,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-sp-003",
+                    "value": 3.1416,
+                    "position": 1.5,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-sp-004",
+                    "value": 5.3014,
+                    "position": 2.25,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-sp-005",
+                    "value": 6.2832,
+                    "position": 3,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
                     "connectedRight": true,
                     "type": "bezier"
                   }
@@ -1004,6 +2053,8 @@
       }
     }
   },
-  "revisionHistory": ["rev-example-sting"],
+  "revisionHistory": [
+    "rev-example-sting"
+  ],
   "definitionVersion": "0.4.0"
 }

@@ -1,0 +1,427 @@
+/**
+ * The reverse demonstration: a normal React page with a transparent Theatre.js
+ * canvas laid over it.
+ *
+ * `/showcase` stacks a page *over* a scene. This route inverts it, and the layer
+ * order inverts with it — three siblings inside `.float`, which is also the R3F
+ * event source:
+ *
+ *   `.float__scroll`  — the page, z-index 1. It is an ordinary scroll container
+ *                       with ordinary pointer events: it is the content, so it
+ *                       takes clicks, links and drags. The canvas above it is
+ *                       `pointer-events: none`, so nothing is stolen from it.
+ *   `.float__overlay` — the canvas, z-index 2, `position: fixed; inset: 0`. It
+ *                       draws the sphere over the text and nothing else, because
+ *                       `FloatScene` draws a sphere and nothing else.
+ *   `.float__bar`     — the controls, z-index 3, pinned to the bottom of the
+ *                       viewport so it does not ride the scroll.
+ *
+ * `inset: 0` on the overlay is load-bearing, not tidiness. `MainCanvas` is given
+ * `eventPrefix="client"`, and R3F's `client` compute divides `clientX/clientY` by
+ * the canvas's size with **no origin subtraction** — arithmetic that is only
+ * correct when the canvas's box starts at the viewport origin. Give the overlay a
+ * `top` that is not zero, and the raycast goes silent: the sphere is hit-tested
+ * hundreds of pixels above the finger, the tap appends nothing, and no error is
+ * logged.
+ *
+ * The scroller is deliberately not IonContent's `.inner-scroll` (it lives in
+ * `ion-content`'s shadow root, so app CSS cannot size the hero against it), and
+ * IonContent's own overflow is switched off with `--overflow: hidden` so two
+ * scrollers never fight over one gesture.
+ *
+ * Where a gesture lands, and what it does:
+ *
+ *   - drag anywhere in `.float__scroll` → the page scrolls. Unlike `/showcase`,
+ *     the scroller owns the pointer here: it *is* the content, and the canvas
+ *     above it is transparent to the pointer;
+ *   - wheel over the sphere → the page forwards `deltaY` to the scroller from
+ *     `FloatPage`, because the overlay is fixed and a wheel over it has no
+ *     scrollable ancestor at all;
+ *   - tap on the sphere → R3F raycasts from `.float`'s listeners. The canvas is
+ *     not a hit target, so the same tap also lands on whatever element is under
+ *     the sphere. That is the documented price of a transparent overlay.
+ */
+
+.float-content {
+  /* The page scrolls in `.float__scroll`. IonContent scrolling too is two
+     scrollbars answering one gesture. */
+  --overflow: hidden;
+  --background: #0b1120;
+}
+
+/**
+ * The event source.
+ *
+ * `eventSource` must be an **ancestor of everything under the pointer** — that is
+ * where R3F's listeners are attached, and events only reach it by bubbling from
+ * the element the pointer landed on. `height: 100%` is what makes it a box at all:
+ * `ion-content`'s `.inner-scroll` is a definite-height flex child, and a relative
+ * div with auto height inside it is 0px tall.
+ */
+.float {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  background: #0b1120;
+}
+
+/* ── Layer 1: the page ────────────────────────────────────────────────────── */
+
+.float__scroll {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  /* `MainCanvas` sets `touch-action: none` inline on the canvas host, which is
+     right on a rig bench where a drag is a camera gesture. Overridden inline on
+     the host for this route; the scroller states it too, because a drag here is a
+     scroll and an iOS left-edge swipe must stay the system back gesture. */
+  touch-action: pan-y;
+  padding: 0 14px 128px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 35%) transparent;
+}
+
+/**
+ * The hero, sized so the log panel starts below the sphere's band.
+ *
+ * A percentage `height`/`min-height` resolves against the scroller's *definite*
+ * height (a percentage `padding-top` would resolve against its *width* — CSS
+ * percentages always do), which is the number this layout wants.
+ *
+ * The number is measured off the rig, not chosen by eye: camera `[0, 1.6, 7.5]`,
+ * fov 45, orbit radius 2.2, y bob 1.05–2.15. On a 390×688 phone the sphere crosses
+ * the full viewport width and stays in roughly the 35–65% vertical band. The
+ * scroller starts under the 56px header, so 62% of its height is ≈65% of the
+ * viewport — the panel's top edge lands at the bottom of the band, which is what
+ * keeps the sphere visible and a tap on it unambiguous.
+ */
+.float__hero {
+  min-height: 62%;
+  padding-top: 20px;
+  box-sizing: border-box;
+  color: #e2e8f0;
+}
+
+.float__hero h1 {
+  margin: 0 0 10px;
+  color: #f1f5f9;
+  font:
+    700 22px/1.22 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 12px rgb(2 6 23 / 70%);
+}
+
+.float__hero p {
+  margin: 0;
+  max-width: 46ch;
+  color: rgb(203 213 225 / 88%);
+  font:
+    400 13.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-shadow: 0 1px 10px rgb(2 6 23 / 70%);
+}
+
+/* ── Layer 1a: the log the sphere writes into ─────────────────────────────── */
+
+.float__panel {
+  margin: 0 0 14px;
+  padding: 14px 14px 12px;
+  border: 1px solid rgb(148 163 184 / 20%);
+  border-radius: 14px;
+  /* Translucent, same as the cards: the sphere passes behind the panel and a
+     solid sheet here would read as the canvas being cut out of the page. */
+  background: rgb(11 17 32 / 78%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #e2e8f0;
+}
+
+.float__panel h2 {
+  margin: 0 0 6px;
+  color: #f1f5f9;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.float__hint {
+  margin: 0 0 12px;
+  color: #94a3b8;
+  font:
+    400 12.5px/1.55 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.float__chat {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 210px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 30%) transparent;
+}
+
+.float__chat li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgb(15 23 42 / 62%);
+  font:
+    400 12.5px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.float__chat__swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  /* The colour is inline from `row.hue`; the fallback keeps a row whose colour
+     is ever dropped from rendering an invisible marker. */
+  background: hsl(199 89% 60%);
+}
+
+.float__chat__id {
+  flex: 0 0 auto;
+  min-width: 2.4em;
+  color: #64748b;
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.float__chat__text {
+  flex: 1 1 auto;
+  color: #e2e8f0;
+}
+
+.float__chat__at {
+  flex: 0 0 auto;
+  color: #94a3b8;
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.float__chat__empty {
+  border: 1px dashed rgb(148 163 184 / 24%);
+  background: transparent;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.float__table {
+  width: 100%;
+  border-collapse: collapse;
+  font:
+    500 11.5px/1.35 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.float__table th {
+  padding: 6px 4px;
+  border-bottom: 1px solid rgb(148 163 184 / 22%);
+  color: #64748b;
+  font-weight: 500;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.float__table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid rgb(148 163 184 / 12%);
+  color: #cbd5e1;
+}
+
+.float__foot {
+  margin: 8px 0 0;
+  color: #64748b;
+  font:
+    400 11.5px/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+/* ── Layer 1b: the explainer cards ────────────────────────────────────────── */
+
+.float__card {
+  margin: 0 0 14px;
+  padding: 15px 16px;
+  border: 1px solid rgb(148 163 184 / 20%);
+  border-radius: 14px;
+  background: rgb(11 17 32 / 78%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #e2e8f0;
+  font:
+    400 13.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.float__card h2 {
+  margin: 0 0 6px;
+  color: #f1f5f9;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.float__card p {
+  margin: 0 0 8px;
+}
+
+.float__card p:last-child {
+  margin-bottom: 0;
+}
+
+.float__card code {
+  color: #7dd3fc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.float__card em {
+  color: #cbd5e1;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ── Layer 2: the transparent canvas ──────────────────────────────────────── */
+
+/**
+ * The overlay.
+ *
+ * `position: fixed; inset: 0` — the canvas's box *is* the viewport, which is the
+ * precondition for `eventPrefix="client"`. `pointer-events: none` — R3F also sets
+ * it on the canvas element itself when `eventSource` is provided, and setting it
+ * on the wrapper is what keeps the host div, the canvas and any future overlay
+ * child transparent to the pointer in one place.
+ */
+.float__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/**
+ * `.canvas-host` is already `position: relative` at 100%×100%; pinning it to the
+ * overlay box is what keeps a host that ever grows padding from shrinking the
+ * canvas, which on a transparent overlay reads as "the sphere is gone" rather
+ * than as a layout bug.
+ */
+.float-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Layer 3: the control bar ─────────────────────────────────────────────── */
+
+.float__bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  /* The bar is fixed to the viewport, so it sits in the notch on a phone. */
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid rgb(148 163 184 / 22%);
+  border-radius: 14px;
+  background: rgb(15 23 42 / 90%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.float__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid rgb(148 163 184 / 22%);
+  border-radius: 10px;
+  background: rgb(30 41 59 / 85%);
+  color: #e2e8f0;
+  font:
+    600 12.5px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+  transition:
+    background-color 240ms ease,
+    color 240ms ease;
+}
+
+.float__btn:disabled {
+  border-color: rgb(51 65 85 / 60%);
+  background: rgb(51 65 85 / 60%);
+  color: rgb(203 213 225 / 55%);
+  cursor: not-allowed;
+}
+
+.float__btn--accent {
+  border-color: transparent;
+  /* The accent the hit rolled. `FloatPage` sets `--float-accent` inline on the
+     bar; the fallback is the resting accent, so the bar is never colourless. */
+  background: var(--float-accent, hsl(199 89% 60%));
+  color: #07111f;
+}
+
+.float__btn--accent:disabled {
+  background: rgb(51 65 85 / 70%);
+  color: rgb(203 213 225 / 60%);
+}
+
+.float__readout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.float__swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--float-accent, hsl(199 89% 60%));
+  transition: background-color 240ms ease;
+}

@@ -11,11 +11,22 @@
   // `directory` is deliberately omitted: @cloudflare/vite-plugin fills it in
   // on the generated output wrangler.json, pointing at the client build.
   //
-  // Assets are matched before the Worker runs, so /api/* falls through to Hono
-  // on its own — no `run_worker_first` needed. SPA routes never invoke the
-  // Worker, which also means they are not billed.
+  // `run_worker_first` is not optional here, and the reason is in the asset
+  // worker: with assets + a Worker and *no* static routing, it sets
+  // `not_found_handling: "none"` for every request, so an unmatched path goes to
+  // Hono and Hono answers 404. The one exception is the
+  // `assets_navigation_prefers_asset_serving` flag (on by default after
+  // 2025-04-01), which honours SPA fallback only when the request carries
+  // `Sec-Fetch-Mode: navigate`. That is why `/rig/sting` 404s from the address
+  // bar while `/voice` works: `/` is a real asset, and React Router pushes
+  // `/voice` with no network request at all.
+  //
+  // Listing `/api/*` as static routing flips `has_static_routing` true, which
+  // applies `not_found_handling` to every non-asset path with no header
+  // required, and keeps the Worker first on the routes it actually owns.
   "assets": {
     "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
   },
   // Binding stays `DB`: worker/index.ts reads c.env.DB and the generated
   // CloudflareBindings interface declares it under that name.

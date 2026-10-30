@@ -20,6 +20,7 @@ import { useSheetPlayback } from "@infra/theatre/useSheetPlayback.ts";
 import MainCanvas from "@presentation/canvas/MainCanvas.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
+import { useShapeStore } from "@presentation/state/useShapeStore.ts";
 
 import "@presentation/ui/styles/studio.css";
 
@@ -63,6 +64,22 @@ export default function RigPage() {
     if (scene == null) return;
     setActiveScene(scene);
     setScreen("rig");
+
+    /**
+     * The sheet the Studio tools act on is this scene's own sheet, so "Aim
+     * Camera" rotates the camera that ships rather than the sandbox's.
+     */
+    useShapeStore.getState().setSheetId(SCENE_SHEET_IDS[scene]);
+
+    /**
+     * The highlight is load-bearing here: it is how you see which object the
+     * Studio's stopwatch and the toolbar readout are aimed at. Stated on mount
+     * rather than inherited, because `IonRouterOutlet` keeps the page you navigate
+     * away from mounted — coming from `/showcase`, that page's flag is what is
+     * current, and a bench that inherits it shows nothing selected.
+     */
+    useSceneStore.getState().setSelectionVisuals(true);
+
     StatusBarService.setStyle("dark");
 
     return () => {

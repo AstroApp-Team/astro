@@ -1,0 +1,131 @@
+/**
+ * The sheet a showcase panel rides on.
+ *
+ * Positioned from the bottom, above the control bar, and deliberately short: the
+ * sting's satellites sit at 42–50% of the canvas height at the end of the rig, so
+ * a sheet that grew past the lower half of the frame would cover the very cubes
+ * that open it. The upper band stays clear, which is also where the spawned sphere
+ * lives — a panel being open must not stop a sphere tap.
+ *
+ * z-index 2: above the story scroller (1), below the control bar (3), so the
+ * replay button stays pressable while a panel is open.
+ */
+
+.showcase-panel {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  /* The UA stylesheet gives a non-modal `dialog` `width: fit-content` and
+     `margin-inline: auto`, which shrinks the sheet to its content and centres it.
+     `left`/`right` are the width here, so the UA values are cleared. */
+  width: auto;
+  max-width: none;
+  margin: 0;
+  max-height: min(42%, 340px);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 12px;
+  border: 1px solid rgb(148 163 184 / 26%);
+  border-radius: 16px;
+  background: rgb(15 23 42 / 94%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 18px 44px rgb(2 6 23 / 55%);
+  color: #e2e8f0;
+  font:
+    400 13.5px/1.6 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  pointer-events: auto;
+}
+
+/**
+ * The scrim is a `<button>` covering the sheet's own box. It is a button and not a
+ * div because jsx-a11y is linted here, and because the thing that closes a panel
+ * should be reachable by keyboard.
+ */
+.showcase-panel__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.showcase-panel__head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.showcase-panel__head h2 {
+  margin: 0;
+  color: #f1f5f9;
+  font:
+    600 16px/1.25 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.showcase-panel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid rgb(148 163 184 / 24%);
+  border-radius: 9px;
+  background: rgb(30 41 59 / 80%);
+  color: #cbd5e1;
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.showcase-panel__body {
+  position: relative;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(148 163 184 / 35%) transparent;
+}
+
+/* ── Shared panel verbs ───────────────────────────────────────────────────── */
+
+.panel-voice__done,
+.panel-archive__done,
+.panel-infra__done,
+.panel-infra__poll,
+.panel-journey__done,
+.panel-journey__nav {
+  padding: 8px 14px;
+  border: 1px solid rgb(148 163 184 / 24%);
+  border-radius: 9px;
+  background: rgb(30 41 59 / 85%);
+  color: #e2e8f0;
+  font:
+    600 12.5px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.panel-voice__done:disabled,
+.panel-archive__done:disabled,
+.panel-infra__done:disabled,
+.panel-infra__poll:disabled,
+.panel-journey__done:disabled,
+.panel-journey__nav:disabled {
+  color: rgb(148 163 184 / 55%);
+  cursor: not-allowed;
+}

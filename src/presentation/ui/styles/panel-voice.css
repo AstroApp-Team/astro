@@ -1,0 +1,71 @@
+/** The `Voice` satellite's panel. */
+
+.panel-voice__lead {
+  margin: 0 0 10px;
+  color: #cbd5e1;
+}
+
+.panel-voice__arm {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgb(56 189 248 / 30%);
+  border-radius: 10px;
+  background: rgb(30 41 59 / 85%);
+  color: #94a3b8;
+  font:
+    600 13px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+.panel-voice__arm--on {
+  border-color: rgb(56 189 248 / 70%);
+  background: rgb(56 189 248 / 22%);
+  color: #7dd3fc;
+}
+
+.panel-voice__takes {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.panel-voice__take {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgb(15 23 42 / 60%);
+  color: #94a3b8;
+  font:
+    500 12.5px/1.35 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.panel-voice__take--current {
+  border-color: rgb(125 211 252 / 45%);
+  background: rgb(125 211 252 / 14%);
+  color: #e2e8f0;
+}
+
+.panel-voice__foot {
+  margin: 0 0 10px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.panel-voice__done {
+  width: 100%;
+}

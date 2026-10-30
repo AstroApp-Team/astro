@@ -12,10 +12,29 @@ export type SheetPlayback = {
   pause(): void;
   /** Pauses and puts the playhead back on zero. */
   reset(): void;
+  /**
+   * Moves the playhead and leaves playback state alone.
+   *
+   * `reset()` is seek-to-zero plus a pause; this is the seek on its own, which is
+   * what "jump the clip to a new frame while it is running" needs. A page that
+   * mutates `sequence.position` in an event handler is a component writing into an
+   * object the React Compiler is tracking, so the write stays in the adapter.
+   */
+  seek(at: number): void;
   /** Current playhead position, read once per render (not a live subscription). */
   position(): number;
   /** Length of the rigged sequence, in seconds. 0 for a sheet nobody has rigged. */
   length(): number;
+  /**
+   * The underlying sequence, for the one thing `position()` cannot do: subscribe.
+   *
+   * `position()` is a read per render by contract — a component that rendered it
+   * live would re-render 30 times a second. A page that wants a running playhead
+   * needs `onChange(sequence.pointer.position, …)`, and Theatre's public
+   * `ISequence` exposes the pointer but not the sequence object, so the adapter
+   * hands it out rather than every caller reaching through the sheet.
+   */
+  readonly sequence: ISequence;
 };
 
 /**
@@ -40,6 +59,55 @@ function playSequence(sequence: ISequence, conf: Parameters<ISequence["play"]>[0
 
 function stopSequence(sequence: ISequence): void {
   sequence.pause();
+}
+
+/**
+ * The same writes, exported for a page's effects.
+ *
+ * A page that owns playback (see `/float`) needs these inside an effect, and an
+ * effect's dependency list is where that choice shows up: written as
+ * `playback.seek(...)` with `playback` left out of the deps, `exhaustive-deps`
+ * fires, and suppressing it costs the whole component its React Compiler pass.
+ * Passed a `sequence` — the sheet's own object, stable for the sheet's lifetime —
+ * the deps are honest and nothing has to be suppressed. The write stays in
+ * `infrastructure/` either way.
+ */
+export function seekSequence(sequence: ISequence, at: number): void {
+  seek(sequence, at);
+}
+
+/** Plays forever, alternating. The loop a rigged scene usually wants. */
+export function loopSequence(sequence: ISequence, range?: PlayRange): void {
+  playSequence(sequence, {
+    iterationCount: Number.POSITIVE_INFINITY,
+    direction: "alternateReverse",
+    ...(range == null ? {} : { range }),
+  });
+}
+
+/**
+ * Plays a window once, forward, at `rate` (1 by default).
+ *
+ * Exported for the same reason as `seekSequence`: a page that owns playback needs
+ * it inside an effect, and `playback.play(...)` puts the playback adapter — a fresh
+ * object of closures every render — into the dependency list. `sequence` is the
+ * sheet's own object and never changes, so the deps stay honest and no
+ * `exhaustive-deps` suppression is needed.
+ */
+export function playRange(sequence: ISequence, range: PlayRange, rate?: number): void {
+  playSequence(sequence, {
+    range,
+    ...(rate == null ? {} : { rate }),
+  });
+}
+
+export function pauseSequence(sequence: ISequence): void {
+  stopSequence(sequence);
+}
+
+/** Length of a sequence, in seconds. 0 for a sheet nobody has rigged. */
+export function sequenceLength(sequence: ISequence): number {
+  return val(sequence.pointer.length);
 }
 
 /**
@@ -84,11 +152,7 @@ export function useSheetPlayback(sheet: ISheet, autoPlay: PlayRange | null = nul
       });
     },
     loop(range) {
-      playSequence(sequence, {
-        iterationCount: Number.POSITIVE_INFINITY,
-        direction: "alternateReverse",
-        ...(range == null ? {} : { range }),
-      });
+      loopSequence(sequence, range);
     },
     pause() {
       stopSequence(sequence);
@@ -97,11 +161,15 @@ export function useSheetPlayback(sheet: ISheet, autoPlay: PlayRange | null = nul
       stopSequence(sequence);
       seek(sequence, 0);
     },
+    seek(at) {
+      seek(sequence, at);
+    },
     position() {
       return sequence.position;
     },
     length() {
-      return val(sequence.pointer.length);
+      return sequenceLength(sequence);
     },
+    sequence,
   };
 }

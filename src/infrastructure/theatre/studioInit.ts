@@ -47,7 +47,42 @@ export async function initTheatreStudio(): Promise<void> {
   if (import.meta.env.DEV && !Capacitor.isNativePlatform() && !isStudioInitialized) {
     const mod = await import("@theatre/studio");
     const studio = unwrapStudio(mod);
-    studio.initialize();
+
+    /**
+     * Register the Scene Tools extension **before** `initialize()`.
+     *
+     * The Studio's toolbar component reads extensions out of its state atom, so a
+     * late `extend()` does land — one paint of the toolbar later, with the chrome
+     * already laid out without it. Registering first is what makes the buttons
+     * present on the first paint.
+     *
+     * This import points *outward* (infrastructure → presentation), against the
+     * layering rule, and it is the one place in the project that does. The
+     * extension is Studio UI: its panes are React components, and React components
+     * belong in `presentation/`. Keeping the import inside the same
+     * `import.meta.env.DEV` guard as `@theatre/studio` is what makes the
+     * inversion cheap — the production transform folds the branch away, so
+     * `presentation/canvas/studio/shapeTools/` (and `react-dom/client`, and the
+     * menu overlay) never reaches the phone.
+     */
+    const { registerSceneToolsExtension } =
+      await import("@presentation/canvas/studio/shapeTools/extension.ts");
+    registerSceneToolsExtension(studio);
+
+    /**
+     * `usePersistentStorage: false` — the Scene Tools Save button is the persistence.
+     *
+     * Theatre's own autosave writes the Studio's state to `localStorage` and
+     * restores it on the next load, *after* `getProject()` has read the state file.
+     * Left on, it wins every argument: a hand-edit of
+     * `states/astro.local.state.json` is overwritten by the browser's snapshot the
+     * moment the page reloads, so editing the file looks like it did nothing. With
+     * it off, the file on disk is the only thing that survives a reload, and the
+     * Save button is the thing that writes it.
+     *
+     * The trade is explicit: nothing is saved automatically. Rig, press Save.
+     */
+    studio.initialize({ usePersistentStorage: false });
     isStudioInitialized = true;
     studioInstance = studio;
   }
