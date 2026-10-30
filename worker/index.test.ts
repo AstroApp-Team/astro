@@ -71,6 +71,34 @@ describe("worker routing", () => {
     expect(res.status).toBe(500);
   });
 
+  /**
+   * `.dev.vars` is gitignored, so a fresh clone has no `APP_PASSWORD` and the
+   * binding arrives `undefined` even though the generated types call it a
+   * string. A compare against `undefined` throws, and a thrown TypeError is a
+   * 500 that names nothing — indistinguishable from the Worker being down.
+   */
+  it("names the binding when the password secret is missing", async () => {
+    // `as unknown as` is the point of this test: the generated types promise a
+    // string, the runtime hands over undefined, and the Worker must survive it.
+    const unconfigured = { ...env, APP_PASSWORD: undefined } as unknown as typeof env;
+
+    for (const path of ["/api/auth", "/api/realtime/setup", "/api/view"]) {
+      const res = await app.request(
+        path,
+        {
+          method: "POST",
+          body: JSON.stringify({ password: PASSWORD, request: "draw a spiral" }),
+          headers: { "Content-Type": "application/json" },
+        },
+        unconfigured,
+      );
+      expect(res.status, path).toBe(500);
+      expect(await res.json<{ error: string }>(), path).toMatchObject({
+        error: "APP_PASSWORD is not configured on this Worker",
+      });
+    }
+  });
+
   it("returns the token and a model-pinned socket url", async () => {
     vi.stubGlobal(
       "fetch",

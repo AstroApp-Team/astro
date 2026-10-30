@@ -42,6 +42,19 @@ function passwordMatches(candidate: string, expected: string): boolean {
 }
 
 /**
+ * `APP_PASSWORD` is a secret, so a fresh checkout does not have one: `.dev.vars`
+ * is gitignored and `.dev.vars.example` is the only copy in the repo. With the
+ * binding missing, `passwordMatches` reads `undefined.length` and throws, which
+ * answers 500 with nothing naming the cause — a missing secret reads exactly like
+ * a backend outage. Resolve it to a string first and answer 500 naming the
+ * binding, the same way the Gateway key already does.
+ */
+function appPassword(env: CloudflareBindings): string | undefined {
+  const password = env.APP_PASSWORD;
+  return typeof password === "string" && password.length > 0 ? password : undefined;
+}
+
+/**
  * Routes MUST stay chained. Breaking the chain into separate `api.get(...)`
  * statements silently destroys RPC type inference — the client still compiles,
  * it just degrades to `any`.
@@ -52,7 +65,11 @@ const api = new Hono<AppEnv>()
   /** Lets the UI check the password before it opens a billable session. */
   .post("/auth", zValidator("json", PasswordSchema), (c) => {
     const { password } = c.req.valid("json");
-    if (!passwordMatches(password, c.env.APP_PASSWORD)) {
+    const expected = appPassword(c.env);
+    if (expected === undefined) {
+      return c.json({ error: "APP_PASSWORD is not configured on this Worker" }, 500);
+    }
+    if (!passwordMatches(password, expected)) {
       return c.json({ error: "Wrong password" }, 401);
     }
     return c.json({ ok: true } as const);
@@ -66,7 +83,11 @@ const api = new Hono<AppEnv>()
    * owns this fetch and sends no custom headers.
    */
   .post("/realtime/setup", async (c) => {
-    if (!passwordMatches(c.req.query(PASSWORD_QUERY_PARAM) ?? "", c.env.APP_PASSWORD)) {
+    const expected = appPassword(c.env);
+    if (expected === undefined) {
+      return c.json({ error: "APP_PASSWORD is not configured on this Worker" }, 500);
+    }
+    if (!passwordMatches(c.req.query(PASSWORD_QUERY_PARAM) ?? "", expected)) {
       return c.json({ error: "Wrong password" }, 401);
     }
 
@@ -115,7 +136,11 @@ const api = new Hono<AppEnv>()
   .post("/view", zValidator("json", ViewRequestSchema), (c) => {
     const { password, request, currentHtml } = c.req.valid("json");
 
-    if (!passwordMatches(password, c.env.APP_PASSWORD)) {
+    const expected = appPassword(c.env);
+    if (expected === undefined) {
+      return c.json({ error: "APP_PASSWORD is not configured on this Worker" }, 500);
+    }
+    if (!passwordMatches(password, expected)) {
       return c.json({ error: "Wrong password" }, 401);
     }
 
