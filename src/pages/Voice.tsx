@@ -13,7 +13,6 @@ import {
 import { lockOpenOutline, refreshOutline, trashOutline } from "ionicons/icons";
 import { useState } from "react";
 
-import { USD_PER_SESSION_SECOND } from "../../shared/realtime.ts";
 import PasswordGate from "../components/PasswordGate.tsx";
 import VoiceSession from "../components/VoiceSession.tsx";
 import { setPassword, usePassword } from "../lib/password.ts";
@@ -66,11 +65,14 @@ export default function Voice() {
           <div className="usage-meter">
             <div>
               <strong>${usd.toFixed(4)}</strong>
-              <IonNote> spent · {formatDuration(usage.seconds)} connected</IonNote>
+              <IonNote>
+                {" "}
+                spent · voice ${usage.voiceUsd.toFixed(4)} · pages ${usage.viewUsd.toFixed(4)}
+              </IonNote>
             </div>
             <IonNote className="usage-meter__detail">
-              {usage.sessions} session{usage.sessions === 1 ? "" : "s"} · $
-              {(USD_PER_SESSION_SECOND * 60).toFixed(2)}/min while the session is open
+              {usage.sessions} session{usage.sessions === 1 ? "" : "s"} ·{" "}
+              {formatDuration(usage.seconds)} connected
             </IonNote>
           </div>
           <IonButtons slot="end">

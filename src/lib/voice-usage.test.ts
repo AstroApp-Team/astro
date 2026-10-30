@@ -1,25 +1,54 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { USD_PER_SESSION_SECOND } from "../../shared/realtime.ts";
 import {
-  costForSeconds,
+  addViewCost,
+  addVoiceCost,
   getUsage,
   resetUsage,
   startSessionClock,
   stopSessionClock,
+  usageToUsd,
 } from "./voice-usage.ts";
 
 /**
  * The meter is the only thing standing between a forgotten open session and a
  * surprise bill, so the arithmetic and the clock are tested directly.
  */
-describe("costForSeconds", () => {
-  it("prices a minute at the Gateway's published rate", () => {
-    expect(costForSeconds(60)).toBeCloseTo(USD_PER_SESSION_SECOND * 60, 12);
+describe("the cost total", () => {
+  afterEach(() => resetUsage());
+
+  it("adds both models' costs into one total and keeps them apart", () => {
+    resetUsage();
+
+    addVoiceCost(0.005478);
+    addVoiceCost(0.001251);
+    addViewCost(0.0000243);
+
+    expect(getUsage().voiceUsd).toBeCloseTo(0.006729, 12);
+    expect(getUsage().viewUsd).toBeCloseTo(0.0000243, 12);
+    expect(usageToUsd(getUsage())).toBeCloseTo(0.0067533, 12);
   });
 
-  it("costs nothing before a session opens", () => {
-    expect(costForSeconds(0)).toBe(0);
+  it("ignores a cost that is not a positive number", () => {
+    resetUsage();
+
+    addVoiceCost(Number.NaN);
+    addViewCost(-1);
+
+    expect(usageToUsd(getUsage())).toBe(0);
+  });
+
+  it("does not price connected time — an open session with no turns costs nothing", async () => {
+    vi.useFakeTimers();
+    resetUsage();
+
+    startSessionClock();
+    await vi.advanceTimersByTimeAsync(60_000);
+    stopSessionClock();
+
+    expect(getUsage().seconds).toBeCloseTo(60, 2);
+    expect(usageToUsd(getUsage())).toBe(0);
+    vi.useRealTimers();
   });
 });
 

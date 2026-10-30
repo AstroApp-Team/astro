@@ -1,6 +1,6 @@
 # Astro
 
-A voice-to-voice conversation with xAI's Grok voice model that can also _draw_:
+A voice-to-voice conversation with Google's Gemini 3.8 Live that can also _draw_:
 ask for something visual and a coding agent builds a live web page next to the
 conversation while you keep talking.
 
@@ -37,10 +37,10 @@ pnpm exec wrangler secret put AI_GATEWAY_API_KEY
 pnpm exec wrangler secret put APP_PASSWORD
 ```
 
-> **Voice bills by wall-clock time, not by speech.** An idle open socket costs
-> the same as a conversation, which is why the footer shows a running meter and
-> the session hangs itself up when the tab is hidden or after two minutes of
-> silence. Those guards are the point, not a bug.
+> **Both models bill by the token.** The footer adds up what the voice model
+> and the page-building agent actually cost. Every voice turn re-bills the whole
+> conversation so far, which is why the session hangs itself up when the tab is
+> hidden or after two minutes of silence. Those guards are the point, not a bug.
 
 ## Everyday commands
 

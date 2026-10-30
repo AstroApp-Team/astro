@@ -2,7 +2,7 @@ import { MockLanguageModelV4, mockValues } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
 
 import { sealViewHtml, type ViewProgress } from "../shared/view.ts";
-import { buildView } from "./view-agent.ts";
+import { buildView, gatewayCostUsd } from "./view-agent.ts";
 
 /**
  * The loop is driven through `MockLanguageModelV4` — the SDK's own seam — so
@@ -56,6 +56,7 @@ describe("buildView", () => {
       ]),
       request: "show me the answer",
       onProgress: () => {},
+      onCost: () => {},
     });
 
     expect(view.title).toBe("The answer");
@@ -81,6 +82,7 @@ describe("buildView", () => {
       request: "make it red",
       currentHtml: GOOD_PAGE,
       onProgress: (update) => progress.push(update),
+      onCost: () => {},
     });
 
     expect(view.html).toContain("<h1>red</h1>");
@@ -100,6 +102,7 @@ describe("buildView", () => {
       request: "make it red",
       currentHtml: GOOD_PAGE,
       onProgress: (update) => progress.push(update),
+      onCost: () => {},
     });
 
     expect(view.html).toContain("<h1>red</h1>");
@@ -124,6 +127,7 @@ describe("buildView", () => {
       request: "change x to y",
       currentHtml: twice,
       onProgress: () => {},
+      onCost: () => {},
     });
 
     expect(view.html).not.toContain("<p>x</p>");
@@ -145,6 +149,7 @@ describe("buildView", () => {
       request: "make it red",
       currentHtml: sealed,
       onProgress: () => {},
+      onCost: () => {},
     });
 
     const metas = view.html.match(/Content-Security-Policy/g) ?? [];
@@ -173,6 +178,7 @@ describe("buildView", () => {
       ]),
       request: "show me the answer",
       onProgress: (update) => progress.push(update),
+      onCost: () => {},
     });
 
     expect(view.html).not.toContain("cdn.example.com");
@@ -194,7 +200,47 @@ describe("buildView", () => {
         request: "make it red",
         currentHtml: GOOD_PAGE,
         onProgress: () => {},
+        onCost: () => {},
       }),
     ).rejects.toThrow(/without publishing/);
+  });
+
+  it("reports what every step cost, including a run that never publishes", async () => {
+    /**
+     * The bill arrives per step because a failed build spends money too — a
+     * total reported only on success would hide exactly the expensive runs.
+     */
+    const billed = (turn: ReturnType<typeof calls>) => ({
+      ...turn,
+      providerMetadata: { gateway: { cost: "0.0000243" } },
+    });
+    const costs: number[] = [];
+
+    await expect(
+      buildView({
+        model: new MockLanguageModelV4({
+          doGenerate: async () => billed(calls("edit_view", { oldText: "blue", newText: "red" })),
+        }),
+        request: "make it red",
+        currentHtml: GOOD_PAGE,
+        onProgress: () => {},
+        onCost: (usd) => costs.push(usd),
+      }),
+    ).rejects.toThrow(/without publishing/);
+
+    expect(costs.length).toBeGreaterThan(1);
+    expect(costs.every((usd) => usd === 0.0000243)).toBe(true);
+  });
+});
+
+describe("gatewayCostUsd", () => {
+  it("reads the Gateway's decimal-string cost", () => {
+    expect(gatewayCostUsd({ gateway: { cost: "0.0000243" } })).toBe(0.0000243);
+  });
+
+  it("treats a missing or malformed cost as unknown, not free", () => {
+    expect(gatewayCostUsd(undefined)).toBeNull();
+    expect(gatewayCostUsd({ gateway: {} })).toBeNull();
+    expect(gatewayCostUsd({ gateway: { cost: "n/a" } })).toBeNull();
   });
 });

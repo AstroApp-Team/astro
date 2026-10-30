@@ -92,11 +92,16 @@ export function describeProgress(progress: ViewProgress): string {
 
 /**
  * The stream from `/api/view`, typed end to end: `data-progress` is transient
- * (status, not history), `data-view` is the finished document.
+ * (status, not history), `data-view` is the finished document, and
+ * `data-cost` is one step's bill, sent as each step ends so a build that
+ * fails is still paid for on screen.
  *
  * `UIMessage`'s first parameter is metadata, which this stream has none of.
  */
-export type ViewUIMessage = UIMessage<never, { progress: ViewProgress; view: View }>;
+export type ViewUIMessage = UIMessage<
+  never,
+  { progress: ViewProgress; view: View; cost: { usd: number } }
+>;
 
 const EXTERNAL_URL_PATTERNS: [RegExp, string][] = [
   [

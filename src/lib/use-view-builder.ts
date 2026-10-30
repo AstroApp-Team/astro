@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { describeProgress, type View, type ViewUIMessage } from "../../shared/view.ts";
 import { viewUrl } from "./api.ts";
+import { addViewCost } from "./voice-usage.ts";
 
 /**
  * Built once: `useChat` resolves the transport per request through its own
@@ -58,6 +59,7 @@ export function useViewBuilder({ password }: { password: string }) {
     transport,
     onData: (part) => {
       if (part.type === "data-progress") setStatus(describeProgress(part.data));
+      if (part.type === "data-cost") addViewCost(part.data.usd);
 
       if (part.type === "data-view") {
         setView(part.data);

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
-import { PASSWORD_QUERY_PARAM, RENDER_VIEW_TOOL_NAME } from "../shared/realtime.ts";
+import { PASSWORD_QUERY_PARAM, RENDER_VIEW_TOOL_NAME, VOICE_MODEL_ID } from "../shared/realtime.ts";
 import app from "./index.ts";
 
 /**
@@ -84,7 +84,7 @@ describe("worker routing", () => {
     expect(body.token).toBe("vcst_abc");
     // The server's model id is the one that counts: it rides on the URL, and
     // the browser opens exactly this socket.
-    expect(body.url).toContain("ai-model-id=spacexai%2Fgrok-voice-think-fast-2.0");
+    expect(body.url).toContain(`ai-model-id=${encodeURIComponent(VOICE_MODEL_ID)}`);
     expect(body.url.startsWith("wss://")).toBe(true);
   });
 
@@ -118,7 +118,7 @@ describe("worker routing", () => {
   /**
    * The one seam the unit tests cannot see: `prepareSendMessagesRequest` in
    * use-view-builder.ts builds this body, and `ViewRequestSchema` has to accept
-   * it. If they drift, every render fails with a Zod dump that Grok then reads
+   * it. If they drift, every render fails with a Zod dump that the voice then reads
    * out loud.
    */
   const view = (body: object) =>

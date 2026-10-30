@@ -137,7 +137,25 @@ type BuildOptions = {
    * that otherwise looks like a stalled request for ten or twenty seconds.
    */
   onProgress: (progress: ViewProgress) => void;
+  /**
+   * What each step cost, in USD, as the Gateway billed it. Called per step
+   * rather than once at the end because a run that fails still spent money.
+   */
+  onCost: (usd: number) => void;
 };
+
+/**
+ * The Gateway reports every call's actual charge in its provider metadata —
+ * the invoice figure, so nothing here has to know the model's rates. It is a
+ * decimal string; anything else (a mock, another provider) counts as unknown.
+ */
+export function gatewayCostUsd(providerMetadata: unknown): number | null {
+  const cost = (providerMetadata as { gateway?: { cost?: unknown } } | undefined)?.gateway?.cost;
+  if (typeof cost !== "string" && typeof cost !== "number") return null;
+
+  const usd = Number(cost);
+  return Number.isFinite(usd) && usd >= 0 ? usd : null;
+}
 
 /**
  * Runs the loop and returns the published document.
@@ -157,6 +175,7 @@ export async function buildView({
   request,
   currentHtml,
   onProgress,
+  onCost,
 }: BuildOptions): Promise<View> {
   let draft = currentHtml ?? "";
 
@@ -287,6 +306,10 @@ export async function buildView({
       const output = toolOutput.output as { problems?: string[]; problem?: string } | undefined;
       const problems = output?.problems ?? (output?.problem != null ? [output.problem] : null);
       if (problems != null && problems.length > 0) onProgress({ phase: "fixing", problems });
+    },
+    onStepEnd: ({ providerMetadata }) => {
+      const usd = gatewayCostUsd(providerMetadata);
+      if (usd != null) onCost(usd);
     },
   });
 

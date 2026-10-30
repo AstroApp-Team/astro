@@ -32,7 +32,7 @@ Cloudflare Worker serving a Hono API and a React 19 SPA (Ionic) from static
 assets. The same client bundle is packaged natively by Capacitor. Server state
 is TanStack Query, validation is Zod.
 
-The app is a voice-to-voice conversation with xAI's Grok voice model, over the
+The app is a voice-to-voice conversation with Google's Gemini 3.8 Live, over the
 AI SDK's experimental realtime API routed through the Vercel AI Gateway. The
 browser holds the WebSocket; the Worker only mints short-lived client secrets.
 Drizzle + D1 is wired up and migrated but nothing reads it yet — it stays so the
@@ -101,15 +101,21 @@ projects (`app`, `worker`, `node`) share strict settings from
   opens are dropped on the floor.
 - **The hook owns the setup fetch**, so no custom headers are possible — that is
   why the shared password rides in the query string on `/api/realtime/setup`.
-- **Realtime bills by wall-clock session time, not by speech.** The Gateway's
-  `/v1/models` entry publishes `realtime_session_duration_cost_per_second`, so
-  an idle open socket costs the same as a conversation. The footer meter is a
-  clock for that reason, and `VoiceSession` hangs up on its own when the tab is
-  hidden or two minutes pass with no speech — that is the billing guard, not a
-  bug to "fix".
+- **Both models bill by the token, and the footer adds up what each reports.**
+  Gemini Live puts `usageMetadata` on the raw `response-done`; `voiceTurnUsd`
+  prices it, and its rules (unitemized prompt tokens billed as text, thinking
+  billed as output, tool-call output free) were matched to the Gateway balance
+  to the cent — re-measure against `/v1/credits` before changing them. The
+  coding agent's cost is the Gateway's own figure from each step's
+  `providerMetadata.gateway.cost`, streamed as `data-cost`. Every turn
+  re-bills the whole conversation, so `VoiceSession` still hangs up when the
+  tab is hidden or two minutes pass with no speech — that guard is not a bug to
+  "fix".
+- **Voice names are per provider.** `VOICE_NAME` is a Gemini voice (`Kore`);
+  xAI's `eve` means nothing to it.
 - **The AI Gateway needs a card on file** before it services any request, and
   `getSpendReport()` (the real invoice) is a paid-plan feature — which is why
-  the cost is metered client-side against the published rate.
+  the cost is metered client-side.
 - **Set both audio formats explicitly.** Leave them out and the provider picks
   its own while the browser captures/plays at `sampleRate` — a mismatch is
   garbled audio, not an error.

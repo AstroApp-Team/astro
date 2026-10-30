@@ -11,11 +11,12 @@ import {
   RENDER_VIEW_TOOL_NAME,
   VOICE_MODEL_ID,
   VOICE_NAME,
+  voiceTurnUsd,
 } from "../../shared/realtime.ts";
 import { realtimeSetupUrl } from "../lib/api.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
-import { startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
+import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
 
 /**
  * Both of these are compared by identity inside the hook: a fresh object on
@@ -65,8 +66,9 @@ const sessionConfig = {
  * the hook keeps its store in a ref, so a remount is what starts a fresh one.
  */
 /**
- * Billing runs on wall-clock time, so an unattended open session is a leak.
- * Two guards close it: leaving the tab, and going quiet for this long.
+ * An unattended open session is a leak: the microphone keeps streaming into a
+ * conversation whose whole history is re-billed on every turn. Two guards
+ * close it: leaving the tab, and going quiet for this long.
  */
 const IDLE_TIMEOUT_MS = 2 * 60_000;
 const IDLE_CHECK_MS = 5_000;
@@ -93,10 +95,10 @@ export default function VoiceSession({ password }: { password: string }) {
      * every call in the turn has answered. Returning nothing leaves the model
      * waiting on a result that never arrives, so the failure path returns too.
      *
-     * It answers immediately and lets the build run on: a voice session bills
-     * by wall-clock second, and holding the model for the twenty seconds the
-     * coding agent needs would buy nothing but silence. `useViewBuilder`
-     * reports back through `reportToVoice` when there is actually news.
+     * It answers immediately and lets the build run on: holding the model for
+     * the twenty seconds the coding agent needs would buy nothing but silence.
+     * `useViewBuilder` reports back through `reportToVoice` when there is
+     * actually news.
      */
     onToolCall: ({ toolCall }) => {
       if (toolCall.toolName !== RENDER_VIEW_TOOL_NAME) {
@@ -116,6 +118,12 @@ export default function VoiceSession({ password }: { password: string }) {
       };
     },
     onEvent: (event) => {
+      /* Gemini states each turn's token usage on its raw `response-done`. */
+      if (event.type === "response-done") {
+        const usd = voiceTurnUsd(event.raw);
+        if (usd != null) addVoiceCost(usd);
+      }
+
       if (
         event.type === "speech-started" ||
         event.type === "audio-delta" ||
@@ -190,10 +198,9 @@ export default function VoiceSession({ password }: { password: string }) {
   }, [viewEvent]);
 
   /**
-   * The Gateway bills by the second the session is open, so the meter runs off
-   * the connection itself. Stopping on unmount matters: the Clear button
-   * remounts this component, and a clock left running would keep charging for a
-   * socket that no longer exists.
+   * Connected time, shown beside the cost. Stopping on unmount matters: the
+   * Clear button remounts this component, and a clock left running would keep
+   * counting a socket that no longer exists.
    */
   useEffect(() => {
     if (status !== "connected") return;
@@ -264,9 +271,9 @@ export default function VoiceSession({ password }: { password: string }) {
   });
 
   /**
-   * The two ways an open session quietly costs money: the tab goes to the
-   * background (another app, a locked phone) or it is left connected in an
-   * empty room. Both hang up rather than keep the meter running.
+   * The two ways a session is left open with nobody in it: the tab goes to the
+   * background (another app, a locked phone) or it stays connected in an empty
+   * room. Both hang up rather than keep streaming the microphone.
    */
   useEffect(() => {
     if (status !== "connected") return;
@@ -279,11 +286,10 @@ export default function VoiceSession({ password }: { password: string }) {
     };
 
     const onVisibilityChange = () => {
-      if (document.hidden)
-        hangUp("Hung up when the tab went to the background — it bills by the second.");
+      if (document.hidden) hangUp("Hung up when the tab went to the background.");
     };
 
-    /* Closing the tab kills the socket; this banks the last seconds locally. */
+    /* Closing the tab kills the socket; this banks the last seconds of the clock. */
     const onPageHide = () => stopSessionClock();
 
     const idleTimer = setInterval(() => {

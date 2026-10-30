@@ -7,17 +7,17 @@
 import type { Experimental_RealtimeToolDefinition } from "ai";
 
 /**
- * xAI's flagship voice-to-voice model — "Grok voice 2" — reached through the
- * Vercel AI Gateway, which is why the id carries the `spacexai/` prefix.
+ * Google's Gemini 3.8 Live, reached through the Vercel AI Gateway, which
+ * normalizes its Live API into the same realtime events every provider emits.
  *
  * Only the id used *server-side* actually selects a model: it is baked into the
  * WebSocket URL that comes back with the token (`?ai-model-id=...`). The
  * browser's copy just names the same session.
  */
-export const VOICE_MODEL_ID = "spacexai/grok-voice-think-fast-2.0";
+export const VOICE_MODEL_ID = "google/gemini-3.8-live";
 
-/** One of xAI's built-in voices. */
-export const VOICE_NAME = "eve";
+/** One of Gemini's prebuilt voices. xAI's names (`eve`) do not carry over. */
+export const VOICE_NAME = "Kore";
 
 /**
  * PCM16 mono at 24 kHz. Stated explicitly: with no audio config the session
@@ -32,26 +32,73 @@ export const AUDIO_BYTES_PER_SAMPLE = 2;
 export const REALTIME_TOKEN_TTL_SECONDS = 60;
 
 /**
- * The Gateway's own published rates for this model, from
- * `curl https://ai-gateway.vercel.sh/v1/models` → `pricing`:
- *
- *   realtime_session_duration_cost_per_second: 0.001334   ($0.08/min)
- *   realtime_client_message_cost:              0.004
- *
- * Note what the meter is charging for: **wall-clock time connected**, not
- * minutes of speech. Silence costs the same as talking, so leaving a session
- * open is the expensive mistake.
- *
- * The Gateway's `getSpendReport()` would be the actual invoice, but it needs a
- * paid plan — so the footer counts seconds locally and prices them here.
+ * The Gateway's published rates for this model, in USD per token, from
+ * `curl https://ai-gateway.vercel.sh/v1/models` → `pricing`. Gemini Live bills
+ * by the token, split by modality — audio costs four times what text does on
+ * the way in and nearly three times on the way out.
  */
-export const USD_PER_SESSION_SECOND = 0.001334;
+export const VOICE_USD_PER_TOKEN = {
+  textInput: 0.75e-6,
+  audioInput: 3e-6,
+  textOutput: 4.5e-6,
+  audioOutput: 12e-6,
+} as const;
 
 /**
- * Charged per text message the client sends. This UI is voice-only and never
- * calls `sendTextMessage`, so it contributes nothing today.
+ * What one turn cost, from the `usageMetadata` Gemini attaches to the raw
+ * `response-done` event. Returns null for any event without one, so the caller
+ * can hand it every event.
+ *
+ * Checked against the Gateway balance, which moved by exactly this amount for
+ * a spoken turn ($0.005478) and a tool-call turn ($0.001251):
+ *
+ * - every prompt token is billed, including the ones `promptTokensDetails`
+ *   does not itemize, at the text rate;
+ * - output is billed by `responseTokensDetails` only — a tool call reports a
+ *   `responseTokenCount` with no breakdown, and those tokens were free;
+ * - thinking tokens are billed as text output, though `totalTokenCount`
+ *   leaves them out.
+ *
+ * The prompt is the *whole* conversation so far, re-billed on every turn, so a
+ * long session costs more per turn as it goes.
  */
-export const USD_PER_CLIENT_TEXT_MESSAGE = 0.004;
+export function voiceTurnUsd(raw: unknown): number | null {
+  const usage = (raw as { usageMetadata?: unknown } | null)?.usageMetadata;
+  if (typeof usage !== "object" || usage === null) return null;
+
+  const u = usage as {
+    promptTokenCount?: unknown;
+    thoughtsTokenCount?: unknown;
+    promptTokensDetails?: unknown;
+    responseTokensDetails?: unknown;
+  };
+
+  const prompt = count(u.promptTokenCount);
+  const audioIn = modalityCount(u.promptTokensDetails, "AUDIO");
+  const audioOut = modalityCount(u.responseTokensDetails, "AUDIO");
+  const textOut = modalityCount(u.responseTokensDetails, "TEXT");
+
+  const rate = VOICE_USD_PER_TOKEN;
+  return (
+    audioIn * rate.audioInput +
+    Math.max(prompt - audioIn, 0) * rate.textInput +
+    audioOut * rate.audioOutput +
+    (textOut + count(u.thoughtsTokenCount)) * rate.textOutput
+  );
+}
+
+function count(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function modalityCount(details: unknown, modality: string): number {
+  if (!Array.isArray(details)) return 0;
+  let total = 0;
+  for (const detail of details as { modality?: unknown; tokenCount?: unknown }[]) {
+    if (detail?.modality === modality) total += count(detail.tokenCount);
+  }
+  return total;
+}
 
 /**
  * `experimental_useRealtime` fetches the setup endpoint itself and does not let
