@@ -25,18 +25,22 @@ integration, retargeting, IK, physics, networking.
 
 ## 1. Vocabulary
 
-| Term          | Meaning                                                                        |
-| ------------- | ------------------------------------------------------------------------------ |
-| Machine       | One loaded definition plus its runtime instance state.                         |
-| Input         | A named, typed external parameter (`number`, `boolean`, `trigger`).            |
-| Layer         | An independently running state graph with a weight, blend mode and mask.       |
-| State         | A node in a layer that produces a _sample_ (clip, blend space, direct blend).  |
-| Sample        | Output of a state at time `t`: bone transforms + morph weights (both sparse).  |
-| Mask          | A filter over bones and morph targets limiting what a layer may write.         |
-| Transition    | A directed edge with conditions, optional exit time, fade and interruption.    |
-| Pose          | Per-bone local transform (position, quaternion, scale) for the whole skeleton. |
-| Morph weights | Per-morph-target scalar, addressed by `(meshId, targetName)`.                  |
-| Marker        | A named point on a clip timeline that emits an event when crossed.             |
+| Term          | Meaning                                                                         |
+| ------------- | ------------------------------------------------------------------------------- |
+| Machine       | One loaded definition plus its runtime instance state.                          |
+| Input         | A named, typed external parameter (`number`, `boolean`, `trigger`).             |
+| Layer         | An independently running state graph with a weight, blend mode and mask.        |
+| State         | A node in a layer that produces a _sample_ (clip, blend space, direct blend).   |
+| Sample        | Output of a state at time `t`: bone transforms + morph weights (both sparse).   |
+| Mask          | A filter over bones and morph targets limiting what a layer may write.          |
+| Transition    | A directed edge with conditions, optional exit time, fade and interruption.     |
+| Pose          | Per-bone local transform (position, quaternion, scale) for the whole skeleton.  |
+| Morph weights | Per-morph-target scalar, addressed by `(meshId, targetName)`.                   |
+| Marker        | A named point on a clip timeline that emits an event when crossed.              |
+| Timeline      | A standalone clip definition: clip, duration, play style and speed (§5).        |
+| Cursor        | One running instance of a timeline: `{ timelineId, time, direction }`.          |
+| Constraint    | A declarative relation that adjusts a pose channel from rig/pointer state (§6). |
+| Pointer state | The per-frame raycast snapshot constraints and listeners read (§6.2).           |
 
 ## 2. Black-box input contract
 
@@ -149,10 +153,13 @@ Mask = {
 ### 4.1 Step 1 — Input ingestion
 
 1. Snapshot inputs: freeze booleans/numbers for this frame (writes made from event
-   callbacks during `update` land in the _next_ snapshot).
+   callbacks during `update` land in the _next_ snapshot). Snapshot the **pointer
+   state** in the same step — hit point, normal, drag delta, hover and validity per
+   pointer id (§6.2) — so a pointer-driven constraint is as reproducible as an
+   input-driven one.
 2. Advance number smoothing by `dt`.
 3. Age triggers; expire those past `ttl`.
-4. Apply **listener-driven** input mutations queued since the last frame (§7.2).
+4. Apply **listener-driven** input mutations queued since the last frame (§9.2).
 5. Apply external `setInput` calls made since the last frame (already in the snapshot
    if made before `update`; documented as such).
 
@@ -174,18 +181,18 @@ For each layer, find the transition that fires:
 1. Candidate set, **in this order**:
    1. **Any State** transitions (global interrupts), in declaration order.
    2. Transitions from the **current state** (or from the _to_ state if mid-transition
-      and interruption policy allows, §6), in declaration order.
+      and interruption policy allows, §8), in declaration order.
    3. The Entry transition if the layer has just started.
 2. A candidate is **eligible** iff:
    - its `from` matches (or is `any`), and it is not a self-transition unless
      `allowSelf: true`;
-   - **Exit Time** is satisfied (§5.2);
-   - its **condition tree** evaluates true (§5.1) against the frame snapshot.
+   - **Exit Time** is satisfied (§7.2);
+   - its **condition tree** evaluates true (§7.1) against the frame snapshot.
 3. The **first eligible** wins. Authors control precedence by ordering; Any State
    always out-ranks normal edges. `priority` on a transition (default 0) can reorder
    within its group (higher first).
 4. On a win: **consume** every `trigger` referenced by the winning transition's
-   conditions; start the crossfade (§6); queue `onExit` (from) / `onEnter` (to).
+   conditions; start the crossfade (§8); queue `onExit` (from) / `onEnter` (to).
 5. If none fires, nothing changes. Never evaluate more than **one** new transition per
    layer per frame, but allow a **zero-duration chain** of up to `maxChainDepth`
    (default 4) when a transition has `duration: 0` and lands on a state whose own
@@ -198,17 +205,20 @@ For each layer, produce a **layer sample** (sparse bones + sparse morphs):
 
 - **Clip state:** sample clip at `time`; sample morph curve at the same time.
 - **1D / 2D blend space:** compute barycentric/inverse-distance weights from the bound
-  inputs, sample the contributing children, combine (§8.2). Children's _normalized_
-  times are synchronised to a leader (§8.2) so footsteps stay aligned.
-- **Direct blend:** evaluate each entry independently (§8.3).
+  inputs, sample the contributing children, combine (§10.2). Children's _normalized_
+  times are synchronised to a leader (§10.2) so footsteps stay aligned.
+- **Direct blend:** evaluate each entry independently (§10.3).
 - **Crossfade in flight:** `layerSample = blend(fromSample, toSample, ease(t/duration))`
-  using the transition's easing (§6.1).
+  using the transition's easing (§8.1).
 
 ### 4.5 Step 5 — Layer & mask compositing
 
 Start from the **base pose**: bind pose + morph defaults. For each layer in priority
 order, apply it into the accumulator per channel with the mode, `layer.weight` and the
 resolved mask weight from §3. Skip layers with zero effective weight.
+
+The composited pose is then handed to the **constraint pass** (§6), which runs before
+the final output step and may adjust any channel a constraint targets.
 
 ### 4.6 Step 6 — Final output
 
@@ -228,9 +238,262 @@ Callbacks run **after** state is consistent; any `setInput` inside a callback ap
 next frame. Dispatch is synchronous; a throwing listener is isolated and reported, it
 does not abort other listeners or the frame.
 
-## 5. States, nodes and conditions
+## 5. Timelines (independent clip definitions)
 
-### 5.1 Condition evaluation
+A **timeline** is a named, standalone animation definition. It is the unit an author
+creates, edits, previews and reuses — _not_ a state. States reference timelines; the
+state machine decides _when_ a timeline plays, the timeline decides _how_ it plays.
+
+The separation is the point. Today the same walk cycle is authored once but referenced by
+a locomotion state, a blend-space child, a hit-react layer and a facial overlay, each with
+its own speed and its own cursor. Inlining "clip + speed + loop" into every state means the
+clip's play style is retyped at each use site and drifts. A timeline gives it one home.
+
+```ts
+interface TimelineDef {
+  id: string;
+  name?: string;
+  clip?: string; // skeletal clip asset id
+  morphCurve?: string; // keyframed morph asset id
+  duration: number; // seconds; the authority for normalised time
+  playStyle: PlayStyle;
+  speed?: number | { input: string; scale?: number; offset?: number };
+  startAt?: number | "random"; // normalised 0..1
+  markers?: MarkerDef[];
+  events?: { time: number; name: string; data?: Record<string, unknown> }[];
+  syncGroup?: string; // opt-in phase lock with other timelines
+  additiveRef?: "bindPose" | { clip: string; time: number };
+}
+
+type PlayStyle =
+  | "once" // play to the end, then hold (or stop, per the state's onComplete)
+  | "loop" // wrap to 0
+  | "pingPong" // back-n-forth: reverse at each end
+  | "clampForever"; // play to the end and clamp; equivalent to `once` with hold
+
+interface PingPongOptions {
+  count?: number; // round trips before clamping; omit for endless
+  mirror?: boolean; // mirror the pose on the reverse leg (default false)
+  easeAtTurns?: boolean; // decelerate into each turn (default false)
+}
+```
+
+`pingPong` may be written as the string above or as `{ kind: "pingPong" } & PingPongOptions`.
+
+### 5.1 Play styles
+
+| Style          | At the end           | Time direction | Typical use                              |
+| -------------- | -------------------- | -------------- | ---------------------------------------- |
+| `once`         | hold last frame      | forward only   | attack, jump, emote                      |
+| `loop`         | wrap to 0            | forward only   | idle, run, cycle                         |
+| `pingPong`     | reverse              | both           | breathing, sway, inspection turn         |
+| `clampForever` | clamp; keep sampling | forward only   | aim pose held while the input stays high |
+
+- **Back-n-forth is a time-direction rule, not a mirrored clip.** The reverse leg plays the
+  same authored keys backwards unless `mirror` is set. Mirroring flips the pose across the
+  skeleton's sagittal plane _in addition_ to reversing time; it is a separate flag because
+  a mirrored run cycle and a reversed run cycle are different animations.
+- `count` bounds the round trips. A `pingPong` with `count: 1` ends where a `once` ends; the
+  difference is the return leg. Once exhausted, the style clamps.
+- `easeAtTurns` inserts a deceleration into each turn. It changes _timing_, never the pose,
+  so it cannot make a clip's first and last keys disagree.
+
+### 5.2 Play speed
+
+`speed` is a multiplier on `dt`, resolved per frame in step 2 (§4.2):
+
+- `1` = authored speed. `0.5` = half speed. `2` = double.
+- **Negative speed plays backwards.** A negative `once` runs end → start and holds frame 0;
+  a negative `loop` wraps downward. Direction is per instance, so two states can play the
+  same timeline in opposite directions at once.
+- `0` freezes time. A frozen clip still samples (its pose is valid), so it is a legal
+  transition source — unlike a paused engine clock.
+- A `speed` bound to an input is read from the **smoothed** value (§2.2), so a speed driven
+  by `moveSpeed` cannot jitter the clip's phase between frames.
+- **Scrubbing wins over speed.** A state with `scrub` ignores the timeline's `speed` and
+  drives normalised time from the input. That is how `aimPitch` drives an aim clip without
+  a transition.
+
+### 5.3 Cursors, instances and sharing
+
+A timeline is **data**; a **cursor** is runtime state. Each state that references a
+timeline owns its own cursor — `{ timelineId, time, direction }` — so the same walk cycle
+on a locomotion layer and on a hit-react layer are independent.
+
+- **No implicit sharing.** Two states referencing one timeline never share time, even
+  within a layer. The definition cannot express "these two states are the same playhead"
+  except through `syncGroup`.
+- **`syncGroup` is opt-in and phase-locks cursors.** Blend-space children normally share a
+  leader's normalised time (§10.2); `syncGroup` extends that to timelines across states:
+  the first-started cursor in the group is the leader and the rest follow its normalised
+  time, adjusted for their own duration. Footstep alignment is the reason this exists.
+- A cursor survives a transition only when the transition declares `syncTime: true`
+  (§8.1). Otherwise the `to` state starts at its `startAt`.
+- **Timelines do not nest.** A timeline is one clip plus its play style. A composite is a
+  blend space or a layer; nesting timelines would need a sub-cursor tree and a second time
+  authority per level, which this version does not pay for. The `type` discriminant leaves
+  room to add it.
+
+### 5.4 Markers and events on a timeline
+
+Markers are authored relative to the timeline's duration and fire when the cursor crosses
+them, using the previous and new normalised time so a wrap or a reversal cannot skip one
+(§4.2).
+
+- A marker fires **in either direction** by default, because a reversed clip whose marker
+  fired only forwards would drop its footstep on the return leg. `forwardOnly: true` opts
+  out for one-shot effects.
+- The same marker may fire twice in one frame when the cursor crosses it twice (a short
+  `pingPong` at high speed). The event queue keeps both, in crossing order, and the frame's
+  `maxChainDepth` bound (§4.3) does not apply to markers — only to transitions.
+- Timeline events are the same mechanism with a payload; the state's own `markers` list may
+  add to or override the timeline's.
+
+## 6. Studio constraints
+
+A **constraint** is a declarative relation authored in the Studio that adjusts a target
+channel from other channels, from rig geometry, or from the pointer — without writing a
+custom solver. The example that motivates the whole section: _"the x value of this should
+be 80% of the distance to that bone."_
+
+Constraints are authored next to the rig, serialized into the same definition file, and
+evaluated after layer compositing so they read the pose the state machine actually
+produced. They are **pure functions of (pose, inputs, pointer snapshot, rig description)**:
+given the same frame snapshot they produce the same adjustment. Nothing reads live DOM or
+the renderer.
+
+```ts
+interface ConstraintDef {
+  id: string;
+  name?: string;
+  enabled?: boolean; // default true
+  order?: number; // default 0; tie-break only (see 6.3)
+  target: ConstraintTarget; // what this writes
+  kind: ConstraintKind; // discriminated union, below
+  weight?: number; // 0..1, default 1
+  mask?: string | MaskDef; // limit which bones/morphs it may touch
+  clamp?: { min?: number; max?: number }; // applied to the computed value
+  exposeAs?: string; // publish the computed value as a number input
+  breakOnCycle?: boolean; // default true
+}
+
+type ConstraintTarget =
+  | { bone: string; channel: "x" | "y" | "z" | "rx" | "ry" | "rz" | "scale" }
+  | { morph: MorphRef }
+  | { pose: string }; // a named pose's channel
+
+type ConstraintKind =
+  | { type: "proportional"; source: Ref; measure: Measure; factor: number; offset?: number }
+  | { type: "aim"; source: Ref; up?: [number, number, number]; cone?: number; weight?: number }
+  | {
+      type: "follow";
+      source: Ref;
+      offset?: [number, number, number];
+      damping?: number;
+      stiffness?: number;
+    }
+  | { type: "limit"; source: Ref; epsilon?: number }
+  | {
+      type: "copy";
+      source: Ref;
+      axis?: "x" | "y" | "z";
+      scale?: number;
+      offset?: number;
+      mirror?: boolean;
+    }
+  | {
+      type: "pointer";
+      pointer: PointerRef;
+      behaviour: "follow" | "aim" | "proportional";
+      params?: Record<string, number>;
+    };
+
+type Ref =
+  | { bone: string; channel: "x" | "y" | "z" | "rx" | "ry" | "rz" | "scale" }
+  | { input: string }
+  | { pointer: PointerRef }
+  | { world: [number, number, number] };
+
+type Measure =
+  | "distance" // Euclidean, world units
+  | "axisDelta" // signed projection on an axis, world units
+  | "angle" // radians between two bone axes
+  | "heightAbovePlane"; // signed distance to a named plane
+
+interface PointerRef {
+  mesh?: string; // restrict the hit to one mesh
+  surface?: string; // or to a named surface
+  coordinateSpace?: "world" | "local" | "screen"; // default "world"
+  pointerId?: number; // default primary
+  onMiss?: "hold" | "release" | "snapToRest"; // default "hold"
+}
+```
+
+### 6.1 Constraint kinds
+
+| Kind             | Reads                                                     | Writes                                            | Typical authoring phrase                        |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------- |
+| **proportional** | a scalar measured between a source and a reference        | one channel of the target                         | "x should be 80% of the distance to that bone"  |
+| **aim**          | a direction from the target bone to a source              | the target bone's rotation                        | "this always looks at the hand"                 |
+| **follow**       | a source's transform, plus an offset                      | position and/or rotation of the target            | "this trails that bone, damped"                 |
+| **limit**        | another channel or a range                                | the target channel, clamped                       | "this must never go past 45°"                   |
+| **copy**         | another channel                                           | the target channel, scaled/offset/mirrored        | "the left arm mirrors the right"                |
+| **pointer**      | the pointer raycast hit: point, normal, drag delta, hover | per its `behaviour` (follow / aim / proportional) | "this handle follows the finger while dragging" |
+
+`proportional` in full: `value = offset + factor × measure(source, reference)`. With
+`measure: "distance"`, `factor: 0.8` and `offset: 0`, "x is 80% of the distance to that
+bone" is exactly `target.bone.x = 0.8 × |source − reference|`. `axisDelta` gives a signed
+projection instead of a length — the version used for "the panel's x should sit 80% of the
+way between the shoulder and the hand" needs both a source and a reference per axis.
+
+### 6.2 Pointer and touch constraints
+
+A pointer constraint is a _constraint source_, not a separate pipeline. The pointer state is
+captured in step 1 (§4.1) and carried with the frame, so a pointer-driven pose is as
+reproducible as an input-driven one; replaying a recorded pointer path reproduces the pose.
+
+- **Hit fields.** `hitPoint` (world), `hitNormal` (world), `hitUV`, `dragDelta` (world
+  units since the drag started, computed against the hit surface's plane), `hover`
+  (boolean), `valid` (boolean).
+- **Miss behaviour** is explicit, never a silent zero: `hold` keeps the last valid value,
+  `release` zeroes the constraint's weight for the frame, `snapToRest` drives the target
+  toward its rest pose.
+- **Touch is the same pointer.** `pointerId` selects one; a second finger is a separate
+  snapshot that a second constraint may read. Two constraints on one channel are a load-time
+  error, so multi-touch cannot fight over a single target silently.
+- **Drag is measured on a plane**, chosen by `coordinateSpace`: `world` projects onto the
+  camera-facing plane at the grab point, `local` onto the hit mesh's tangent plane, `screen`
+  maps to NDC. Screen-space drags are resolution-dependent and are documented as such.
+- A pointer constraint **does not consume the pointer**: the mesh's own listeners (§9.2)
+  still fire. It reads the hit; it does not claim it.
+- `ready to be inserted` means the Studio ships this table plus the six kinds above; a scene
+  attaches one by writing a `ConstraintDef`, and nothing else in the app changes. A new kind
+  is a new `type` in the union plus its evaluator — the definition format does not move.
+
+### 6.3 Evaluation order and interaction with layers
+
+Constraints run **after** layer compositing (§4.5) and **before** final output (§4.6), over
+a working copy of the composited pose. Consequences:
+
+- **Constraints are not masked by layer masks.** They see the final pose. A constraint may
+  carry its own `mask` to limit which bones it writes, but a layer's mask does not hide a
+  constraint from itself.
+- **Constraints beat additive layers**, because they run later. A pose constraint on a bone
+  an additive layer also writes is the documented way to keep that bone clamped.
+- **Order matters only among independent constraints.** Dependencies are declared by the
+  `Ref`s a constraint reads; the load-time validator builds the dependency graph. A cycle is
+  an **error** when `breakOnCycle` is true (the default), and a runtime warning plus a
+  frozen last-good value when it is false. Independent constraints run in `order`, then
+  declaration order — deterministic, but the order cannot change a well-formed result.
+- **`exposeAs` is the bridge to the state machine.** A constraint's computed value can be
+  published as a number input so conditions (§7.1) read "the pose is 80% extended". A
+  constraint that reads an input it also exposes is a cycle and is rejected at load.
+- Constraints never trigger transitions. If a constraint's value should cause one, expose
+  it and put a condition on the exposed input.
+
+## 7. States, nodes and conditions
+
+### 7.1 Condition evaluation
 
 ```text
 Condition = Comparison | Group
@@ -248,7 +511,7 @@ Op         = "equals" | "notEquals" | "greaterThan" | "lessThan"
 - Optional **hysteresis** on a comparison (`hysteresis: 0.05`) prevents flapping at a
   threshold: it must cross `value ± hysteresis` to flip back.
 
-### 5.2 Exit time
+### 7.2 Exit time
 
 - `exitTime`: normalized `0..1` of the **from state's** loop-local progress. The
   transition becomes eligible once `progress ≥ exitTime`.
@@ -259,7 +522,7 @@ Op         = "equals" | "notEquals" | "greaterThan" | "lessThan"
   `exitTimeMode: "firstLoopOnly" | "everyLoop"` (default `everyLoop`).
 - Blend spaces use the **leader** child's progress.
 
-### 5.3 State kinds
+### 7.3 State kinds
 
 **Clip state** — plays one skeletal clip and/or one morph curve:
 
@@ -274,7 +537,7 @@ Op         = "equals" | "notEquals" | "greaterThan" | "lessThan"
 | `markers`           | Derived from the clip's authored markers (plus optional definition overrides).                                                                                             |
 | `rootMotion`        | `none` \| `extract` \| `apply`.                                                                                                                                            |
 
-**Blend states** — 1D, 2D and Direct (§8).
+**Blend states** — 1D, 2D and Direct (§10).
 
 **Routing nodes:**
 
@@ -285,9 +548,9 @@ Op         = "equals" | "notEquals" | "greaterThan" | "lessThan"
 - **Any State** — not a real state. Its outgoing transitions are tested every frame
   from every state (except those flagged `excludeFrom`). Typical: `hit`, `death`.
 
-## 6. Transitions, crossfading and interruption
+## 8. Transitions, crossfading and interruption
 
-### 6.1 Crossfade
+### 8.1 Crossfade
 
 ```text
 Fade = { duration: seconds, easing: Easing, mode: "fixed" | "normalized" }
@@ -305,7 +568,7 @@ Easing = "linear" | "easeIn" | "easeOut" | "easeInOut" | "smoothstep"
 - **Fade synchronisation** options: `syncTime` (start `to` at the same normalized time
   as `from`, for walk→run) or `startAt` on the target state.
 
-### 6.2 Interruption behaviour
+### 8.2 Interruption behaviour
 
 What happens when a transition becomes eligible **while another is in flight**:
 
@@ -325,14 +588,14 @@ What happens when a transition becomes eligible **while another is in flight**:
 - A queued transition re-checks its conditions at dequeue time; if no longer valid it is
   dropped (reported), unless it is `queue: "force"`.
 
-### 6.3 Transition record
+### 8.3 Transition record
 
 Each active transition tracks `{ from, to, elapsed, duration, easing, source: live|frozen,
 policy }`. Exposed read-only through `getActiveTransition(layer)`.
 
-## 7. Events and 3D listeners
+## 9. Events and 3D listeners
 
-### 7.1 State and timeline events
+### 9.1 State and timeline events
 
 | Event                 | Emitted when                                                        | Payload                               |
 | --------------------- | ------------------------------------------------------------------- | ------------------------------------- |
@@ -351,7 +614,7 @@ policy }`. Exposed read-only through `getActiveTransition(layer)`.
 - Markers crossed by a **scrub** (input-driven time) fire only when `scrubEvents: true`
   (default false — scrubbing backwards or jittering would spam them).
 
-### 7.2 3D mesh listeners (Rive listener equivalent)
+### 9.2 3D mesh listeners (Rive listener equivalent)
 
 Declarative bindings from **pointer interactions on a 3D target** to **input mutations**
 — no application glue.
@@ -385,9 +648,9 @@ Action = { set: input, to: number | boolean }          // number/boolean
 - Listeners can be toggled at runtime (`setListenersEnabled(false)`), e.g. while a
   cutscene plays.
 
-## 8. Blend nodes
+## 10. Blend nodes
 
-### 8.1 Common behaviour
+### 10.1 Common behaviour
 
 - Children reference clips/morph curves and a **position** in blend-space coordinates.
 - All children are time-**synchronised** by normalised time to a `leader` child
@@ -396,7 +659,7 @@ Action = { set: input, to: number | boolean }          // number/boolean
 - Weights always sum to 1 for pose blending; bones touched by only some children
   blend only among those that touch them.
 
-### 8.2 1D and 2D blend spaces
+### 10.2 1D and 2D blend spaces
 
 **1D** — one input `x`. Children at sorted positions `p0 < p1 < …`. Clamp outside the
 range; linearly interpolate between the two neighbours. (`idle@0, walk@1.5, run@4`.)
@@ -417,7 +680,7 @@ range; linearly interpolate between the two neighbours. (`idle@0, walk@1.5, run@
   can drive a facial pad (morphs only) while another drives legs (bones only).
 - Node-level `scrub` is supported in 2D (time driven by input) for pose-pad usage.
 
-### 8.3 Direct morph/pose blend node
+### 10.3 Direct morph/pose blend node
 
 Maps **N inputs → N independent targets**, not interpolation between neighbours.
 
@@ -439,7 +702,7 @@ DirectEntry = {
   states (`damageLevel` → corrective shapes + a decal pose).
 - Because it has no time axis, `exitTime` is meaningless on it (validation rejects it).
 
-## 9. Declarative state machine schema (TypeScript-style)
+## 11. Declarative state machine schema (TypeScript-style)
 
 ```ts
 // ── Root ────────────────────────────────────────────────────────────────
@@ -450,6 +713,8 @@ interface MachineDefinition {
   inputs: InputDef[];
   groups?: { morph?: Record<string, MorphRef[]>; bones?: Record<string, string[]> };
   masks?: Record<string, MaskDef>;
+  timelines?: TimelineDef[]; // §5 — standalone clip definitions
+  constraints?: ConstraintDef[]; // §6 — authored in the Studio
   layers: LayerDef[];
   listeners?: ListenerDef[];
 }
@@ -660,11 +925,11 @@ type ListenerAction =
     };
 ```
 
-### 9.1 Load-time validation (all errors name a JSON path)
+### 11.1 Load-time validation (all errors name a JSON path)
 
 - Unique ids (inputs, layers, states per layer, masks); every reference resolves
   (`input`, `to`, `from`, `mask`, `group`, asset ids via a provided resolver).
-- Condition ↔ input **type match** (§5.1); `trigger` only with `fired`.
+- Condition ↔ input **type match** (§7.1); `trigger` only with `fired`.
 - Every layer has a reachable path from Entry; unreachable states are **warnings**;
   a state with no outgoing path that is not terminal is a warning.
 - **Cycle check on zero-duration, unconditional edges** (guaranteed infinite loop) is an
@@ -676,8 +941,16 @@ type ListenerAction =
 - Masks acyclic in `extends`/`subtract`.
 - Unknown bone / morph names (checked against the _rig description_ when supplied) are
   errors; without a rig description they are deferred to bind time.
+- **Timelines** (§5): unique ids; `duration > 0`; every `speed` bound to a `number` input;
+  `pingPong.count ≥ 1` when present; markers inside `[0, duration]`; `syncGroup` members
+  agree on `duration` within tolerance when they are expected to stay in step.
+- **Constraints** (§6): unique ids; `target` resolves to a known bone/morph/pose; every
+  `Ref` resolves; the dependency graph is acyclic when `breakOnCycle` is true (the
+  default), and a cycle is a load **error** naming the path; no two enabled constraints
+  write the same channel; `exposeAs` names a declared `number` input and the constraint
+  does not read it; `pointer` constraints require a `PointerRef` whose mesh/surface exists.
 
-### 9.2 Example (condensed)
+### 11.2 Example (condensed)
 
 ```jsonc
 {
@@ -776,7 +1049,7 @@ type ListenerAction =
 }
 ```
 
-## 10. Programmatic control API
+## 12. Programmatic control API
 
 Consumer-facing and renderer-agnostic. Everything below is the **entire** public
 surface; nothing exposes clips, bones or morph indices.
@@ -882,7 +1155,7 @@ interface PointerHit {
 }
 ```
 
-### 10.1 Usage sketch
+### 12.1 Usage sketch
 
 ```ts
 const machine = createMachine(heroDefinition, { assets });
@@ -900,7 +1173,7 @@ if (input.jumpPressed) machine.fire("jump");
 const out = machine.update(dt); // → apply to skeleton/mesh via adapter
 ```
 
-### 10.2 API guarantees
+### 12.2 API guarantees
 
 - **Idempotent writes:** setting the same value is cheap and does not re-trigger anything.
 - **Order independence within a frame:** calls to `setNumber`/`setBoolean`/`fire`
@@ -913,24 +1186,31 @@ const out = machine.update(dt); // → apply to skeleton/mesh via adapter
   runs headlessly — states, transitions, events and input behaviour are testable
   without a renderer, skeleton or WebGL.
 
-## 11. Edge cases and decisions
+## 13. Edge cases and decisions
 
-| Case                                             | Decision                                                                                                                 |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Trigger fired while no transition can consume it | Stays pending until `ttl`, then `triggerExpired`. Prevents "lost jump", avoids "ghost jump".                             |
-| Two layers want the same non-shared trigger      | Lowest `priority` number layer wins; the other never sees it.                                                            |
-| Any State and normal edge both eligible          | Any State wins; reorder with `priority`.                                                                                 |
-| Transition target equals current state           | Ignored unless `allowSelf` (restart).                                                                                    |
-| Clip shorter than fade                           | Fade clamped to `min(duration, clipDuration)` for `once` clips and warned at load.                                       |
-| Additive layer with weight 0                     | Skipped entirely (no ref pose computation).                                                                              |
-| Mask excludes a channel the state writes         | Channel ignored; state still plays and still emits markers.                                                              |
-| Marker time exactly at loop boundary             | Fires once per loop (half-open interval `(prev, now]`).                                                                  |
-| Large `dt` crossing multiple markers/loops       | All markers fire in order; at most one transition resolves per frame.                                                    |
-| Entry has no eligible transition                 | Definition error (unconditional fallback is mandatory).                                                                  |
-| Listener target not hit-testable                 | Warning at load if mesh unknown to `rig`; silently idle otherwise.                                                       |
-| Hot-reloading a definition                       | `machine.reload(def)` keeps inputs and active state ids where they still exist, else falls to Entry. _(Open — see §12.)_ |
+| Case                                             | Decision                                                                                                                                     |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trigger fired while no transition can consume it | Stays pending until `ttl`, then `triggerExpired`. Prevents "lost jump", avoids "ghost jump".                                                 |
+| Two layers want the same non-shared trigger      | Lowest `priority` number layer wins; the other never sees it.                                                                                |
+| Any State and normal edge both eligible          | Any State wins; reorder with `priority`.                                                                                                     |
+| Transition target equals current state           | Ignored unless `allowSelf` (restart).                                                                                                        |
+| Clip shorter than fade                           | Fade clamped to `min(duration, clipDuration)` for `once` clips and warned at load.                                                           |
+| Additive layer with weight 0                     | Skipped entirely (no ref pose computation).                                                                                                  |
+| Mask excludes a channel the state writes         | Channel ignored; state still plays and still emits markers.                                                                                  |
+| Marker time exactly at loop boundary             | Fires once per loop (half-open interval `(prev, now]`).                                                                                      |
+| Large `dt` crossing multiple markers/loops       | All markers fire in order; at most one transition resolves per frame.                                                                        |
+| Entry has no eligible transition                 | Definition error (unconditional fallback is mandatory).                                                                                      |
+| Listener target not hit-testable                 | Warning at load if mesh unknown to `rig`; silently idle otherwise.                                                                           |
+| Hot-reloading a definition                       | `machine.reload(def)` keeps inputs and active state ids where they still exist, else falls to Entry. _(Open — see §14.)_                     |
+| `pingPong` clip inside a crossfade               | The fade factor is independent of play direction; a turn mid-fade must not invert the blend. Reversal only changes the cursor's `direction`. |
+| Timeline referenced by two states                | Independent cursors, never shared implicitly; `syncGroup` is the only way to phase-lock them.                                                |
+| Constraint cycle                                 | Load error when `breakOnCycle`; runtime warning + frozen last-good value otherwise.                                                          |
+| Pointer misses its mesh                          | `onMiss` decides: `hold` (last value), `release` (weight 0 this frame), `snapToRest`. Never a silent zero.                                   |
+| Two constraints write one channel                | Load error; multi-touch on one target must be split into distinct channels or masked apart.                                                  |
+| Constraint reads an input it exposes             | Rejected at load — that is a cycle across the input boundary.                                                                                |
+| Constraint targets an additive layer's bone      | Constraints run after compositing, so the constraint wins; mask the additive layer instead if the layer should own it.                       |
 
-## 12. Open questions (to decide before implementation planning)
+## 14. Open questions (to decide before implementation planning)
 
 1. **Root motion** — in scope for v1 or deferred? It shapes `MachineOutput`.
 2. **Retargeting** — does the machine see canonical bone names only, or does the adapter
@@ -950,3 +1230,23 @@ const out = machine.update(dt); // → apply to skeleton/mesh via adapter
    forwarding as `infrastructure/` and `presentation/canvas/` adapters, honouring the
    existing inward-only import rule. Interaction with Theatre.js sheets (which today own
    transform tracks) needs an explicit ownership rule per prop, as with `/float`.
+9. **What is a "clip" in this repo?** The spec assumes skeletal clips and morph curves.
+   This app's rigs are Theatre.js sequences (keyframed object transforms), and three.js
+   `AnimationClip`s (GLTF skeletal) would be a second asset kind. The `AssetResolver`
+   port can hide the difference, but the first implementation has to pick one: Theatre
+   sequences keep the existing Studio workflow, GLTF clips are the only way to animate a
+   skeleton. Decide before writing the resolver.
+10. **Constraint solver ownership** — constraints run after compositing (§6.3), but an IK
+    chain or a two-bone solve needs iterations and a target. Are IK constraints in v1, or
+    only the six kinds listed? A solver that runs after compositing and before output is
+    the cheap answer; a solver that feeds back into layer compositing is the expensive
+    one.
+11. **Timeline ↔ Theatre.js sequence mapping** — if a timeline is a Theatre sequence, its
+    `duration` is the sequence's duration and its markers are Theatre markers. If it is a
+    GLTF clip, `duration` comes from the clip. The schema's `duration` field duplicates
+    information in both cases; decide whether it is authoritative or derived.
+12. **Pointer constraints in headless replay** — pointer state is snapshotted per frame
+    (§6.2), so a recorded pointer path replays deterministically. But the machine has no
+    concept of "record": does the host replay `PointerHit`s, or does the definition's
+    pointer constraints read a recorded stream? The former is smaller and keeps the core
+    pure.
