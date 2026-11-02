@@ -1,0 +1,298 @@
+/*
+ * `/machine` — the demo bench for the animation state machine.
+ *
+ * Nothing here is shared with the character pages on purpose: this is a debugging surface,
+ * not the app's visual language, and borrowing `astro.css` tokens would make the two look
+ * like one feature that drifted. The dark ground is the mirror of the overlay pages: there
+ * the canvas is transparent and the page is the subject; here the canvas *is* the subject, so
+ * it gets a ground of its own and the panel sits next to it.
+ *
+ * Height chain: IonContent must not be the scroller (the grid is), same rule as
+ * `showcase.css` / `float.css` — `--overflow: hidden` keeps the shadow `.inner-scroll` from
+ * grabbing the scrollbar and leaving the canvas measuring a strip.
+ */
+
+.machine-content {
+  --overflow: hidden;
+  --machine-line: rgb(255 255 255 / 12%);
+  --machine-dim: rgb(226 232 240 / 62%);
+  --machine-ink: rgb(226 232 240 / 92%);
+  --machine-accent: #fb8a5b;
+
+  /* Ionic paints the host from `--background` and the shadow scroller from it too; a plain
+     `background:` on the host loses to Ionic's own rule and leaves a white page with the
+     light ink below on top of it. */
+  --background: #0b1020;
+
+  display: block;
+  color: var(--machine-ink);
+  background:
+    radial-gradient(circle at 20% 0%, rgb(251 138 91 / 14%), transparent 46%),
+    radial-gradient(circle at 90% 100%, rgb(56 189 248 / 10%), transparent 52%), #0b1020;
+}
+
+.machine {
+  display: grid;
+  gap: 16px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1040px;
+  min-height: 100%;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 16px
+    calc(env(safe-area-inset-bottom, 0px) + 28px);
+
+  /* Mobile: one column, canvas first — the thing being debugged is what you scroll to. */
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 860px) {
+  .machine {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    grid-template-areas:
+      "head head"
+      "canvas side"
+      "log log";
+    align-items: start;
+  }
+
+  /* The panel and the readout are one column, not two grid rows: with two rows the canvas
+     spanning both of them halves its own height and leaves a gap under the panel. */
+  .machine__side {
+    grid-area: side;
+  }
+
+  .machine__head {
+    grid-area: head;
+  }
+
+  .machine-canvas {
+    grid-area: canvas;
+    height: 520px;
+  }
+
+  .machine__log {
+    grid-area: log;
+  }
+}
+
+.machine__head h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.machine__head p {
+  margin: 6px 0 0;
+  max-width: 60ch;
+  color: var(--machine-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* The R3F host: a fixed box on mobile, not `height: 100%` — an IonContent child has no
+   height to inherit, and a canvas with no height renders as nothing at all. */
+.machine-canvas {
+  position: relative;
+  width: 100%;
+  height: 340px;
+  overflow: hidden;
+  border: 1px solid var(--machine-line);
+  border-radius: 14px;
+  background: #0b1020;
+}
+
+.machine__side {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.machine__side > * {
+  min-width: 0;
+}
+
+.machine__panel,
+.machine__readout,
+.machine__log {
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid var(--machine-line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 4%);
+}
+
+.machine__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.machine__btn {
+  padding: 8px 12px;
+  border: 1px solid var(--machine-line);
+  border-radius: 10px;
+  color: var(--machine-ink);
+  font: inherit;
+  font-size: 13px;
+  background: rgb(255 255 255 / 6%);
+  cursor: pointer;
+}
+
+.machine__btn:active {
+  background: rgb(255 255 255 / 12%);
+}
+
+.machine__btn--accent {
+  border-color: transparent;
+  color: #1a1005;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ffb066, var(--machine-accent));
+}
+
+.machine__slider {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.machine__slider span {
+  display: flex;
+  justify-content: space-between;
+  color: var(--machine-dim);
+}
+
+.machine__slider b {
+  color: var(--machine-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.machine__slider input {
+  width: 100%;
+  accent-color: var(--machine-accent);
+}
+
+.machine__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.machine__toggle input {
+  accent-color: var(--machine-accent);
+}
+
+.machine__state {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) 56px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.machine__state__layer {
+  overflow: hidden;
+  color: var(--machine-dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.machine__state__name {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.machine__bar {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 10%);
+}
+
+.machine__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffb066, var(--machine-accent));
+
+  /* The bar is a rounded 1 % step from the store, so no transition here — it would smear
+     the value the panel is supposed to be a readout of. */
+}
+
+.machine__state__meta {
+  color: var(--machine-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.machine__stats {
+  margin: 10px 0 0;
+  color: var(--machine-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.machine__error {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px solid rgb(248 113 113 / 42%);
+  border-radius: 10px;
+  color: #fecaca;
+  font-size: 12px;
+  background: rgb(248 113 113 / 12%);
+}
+
+.machine__empty {
+  margin: 0;
+  color: var(--machine-dim);
+  font-size: 12px;
+}
+
+.machine__log__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.machine__log__head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.machine__log ol {
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  font-size: 12px;
+  list-style: none;
+}
+
+.machine__log li {
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 4%);
+  font-variant-numeric: tabular-nums;
+}
+
+.machine__log__kind {
+  flex: 0 0 84px;
+  color: var(--machine-accent);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
