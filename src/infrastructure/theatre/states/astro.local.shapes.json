@@ -1,68 +1,172 @@
 {
-  "_how": "Written by the Studio's Save button (dev only). Hand-edit it and reload the page: `entries` become the spawned shapes, `ordinal` is the next spawn number, `sheetId` and `cameraKey` are the tools' context. An entry needs id, kind (cube | sphere | flat-square | flat-circle), theatreKey (4+ chars, unique in the sheet), and position/rotation/scale as [x,y,z] — rotation in radians. Unknown keys are dropped; a malformed entry fails the whole load, and the dev server answers 400 naming the field.",
-  "ordinal": 3,
-  "sheetId": "SurfaceScene",
-  "cameraKey": "Surface Camera",
-  "entries": [
-    {
-      "id": "sphere-0",
-      "kind": "sphere",
-      "theatreKey": "Sphere-0",
-      "position": [
-        2.4,
-        0.75,
-        0
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ]
-    },
-    {
-      "id": "cube-1",
-      "kind": "cube",
-      "theatreKey": "Cube-1",
-      "position": [
-        2.11,
-        0.75,
-        2.659
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ]
-    },
-    {
-      "id": "cube-2",
-      "kind": "cube",
-      "theatreKey": "Cube-2",
-      "position": [
-        -0.944,
-        0.75,
-        4.048
-      ],
-      "rotation": [
-        0,
-        0,
-        0
-      ],
-      "scale": [
-        1,
-        1,
-        1
-      ]
-    }
-  ]
+  "_how": "Written by the Studio's Save button (dev only). Hand-edit it and reload the page: `shapesBySheet` maps a sheet id (e.g. SurfaceScene) to the shapes that scene renders, `ordinal` is the next spawn number (one global counter, shared by every sheet), `sheetId` and `cameraKey` are the tools' context. A shape needs id, kind (cube | sphere | flat-square | flat-circle), theatreKey (4+ chars, unique in the sheet), and position/rotation/scale as [x,y,z] — rotation in radians. A file in the old single-`entries` layout is migrated automatically on load: everything lands in its `sheetId` bucket. Unknown keys are dropped; a malformed entry fails the whole load, and the dev server answers 400 naming the field.",
+  "ordinal": 8,
+  "sheetId": "FloatScene",
+  "cameraKey": "Float Camera",
+  "shapesBySheet": {
+    "SurfaceScene": [
+      {
+        "id": "sphere-0",
+        "kind": "sphere",
+        "theatreKey": "Sphere-0",
+        "position": [
+          2.4,
+          0.75,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "id": "cube-1",
+        "kind": "cube",
+        "theatreKey": "Cube-1",
+        "position": [
+          2.11,
+          0.75,
+          2.659
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "id": "cube-2",
+        "kind": "cube",
+        "theatreKey": "Cube-2",
+        "position": [
+          -0.944,
+          0.75,
+          4.048
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      }
+    ],
+    "FloatScene": [
+      {
+        "id": "flat-square-3",
+        "kind": "flat-square",
+        "theatreKey": "Flat-Square-3",
+        "position": [
+          -4.34,
+          0.75,
+          2.051
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      },
+      {
+        "id": "flat-square-4",
+        "kind": "flat-square",
+        "theatreKey": "Flat-Square-4",
+        "position": [
+          -4.813,
+          0.75,
+          -2.375
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      },
+      {
+        "id": "flat-square-5",
+        "kind": "flat-square",
+        "theatreKey": "Flat-Square-5",
+        "position": [
+          -1.239,
+          0.75,
+          -5.747
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      },
+      {
+        "id": "flat-square-6",
+        "kind": "flat-square",
+        "theatreKey": "Flat-Square-6",
+        "position": [
+          4.03,
+          0.75,
+          -4.907
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      },
+      {
+        "id": "flat-square-7",
+        "kind": "flat-square",
+        "theatreKey": "Flat-Square-7",
+        "position": [
+          6.787,
+          0.75,
+          0.114
+        ],
+        "rotation": [
+          -1.5707963267948966,
+          0,
+          0
+        ],
+        "scale": [
+          1.4,
+          1.4,
+          1.4
+        ]
+      }
+    ]
+  }
 }
