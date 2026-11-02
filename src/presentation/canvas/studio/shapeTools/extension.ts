@@ -135,8 +135,11 @@ function runClear(): void {
  * forever.
  */
 function buildToolset(studio: IStudio): ToolsetConfig {
-  const { shapes, cameraKey } = useShapeStore.getState();
-  const lastShape = shapes[shapes.length - 1] ?? null;
+  const { shapes, sheetId, cameraKey } = useShapeStore.getState();
+  // The toolbar acts on the active sheet: the labels count the shapes that
+  // route renders, and "last" is the last spawn in that bucket.
+  const activeShapes = shapes[sheetId] ?? [];
+  const lastShape = activeShapes[activeShapes.length - 1] ?? null;
 
   return [
     {
@@ -172,7 +175,7 @@ function buildToolset(studio: IStudio): ToolsetConfig {
     },
     {
       type: "Flyout",
-      label: `Shapes (${shapes.length})`,
+      label: `Shapes (${activeShapes.length})`,
       items: [
         ...SHAPE_MENU.map((spec) => ({
           label: `Add ${spec.label}`,
@@ -204,7 +207,7 @@ function buildToolset(studio: IStudio): ToolsetConfig {
           },
         },
         {
-          label: `Clear ${shapes.length} spawned shape${shapes.length === 1 ? "" : "s"}`,
+          label: `Clear ${activeShapes.length} spawned shape${activeShapes.length === 1 ? "" : "s"}`,
           onClick: () => useShapeStore.getState().clearShapes(),
         },
         {

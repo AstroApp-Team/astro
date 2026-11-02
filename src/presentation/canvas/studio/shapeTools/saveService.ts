@@ -75,18 +75,26 @@ export function describeSave(outcome: SaveOutcome, action: "save" | "clear" = "s
 function shapesPayload(): SavedShapes {
   const { shapes, sheetId, cameraKey } = useShapeStore.getState();
   return {
-    // The counter is module-scope state in the store, not a field of it.
+    // The counter is module-scope state in the store, not a field of it — and it
+    // is one global counter: the file must not let a second sheet restart it.
     ordinal: useShapeStore.getState().spawnOrdinal(),
     sheetId,
     cameraKey,
-    entries: shapes.map((shape) => ({
-      id: shape.id,
-      kind: shape.kind,
-      theatreKey: shape.theatreKey,
-      position: shape.position,
-      rotation: shape.rotation,
-      scale: shape.scale,
-    })),
+    // The store's buckets are the file's, verbatim: an inert bucket (a sheet
+    // nothing mounts) round-trips instead of being deleted by the save.
+    shapesBySheet: Object.fromEntries(
+      Object.entries(shapes).map(([sheetKey, entries]) => [
+        sheetKey,
+        entries.map((shape) => ({
+          id: shape.id,
+          kind: shape.kind,
+          theatreKey: shape.theatreKey,
+          position: shape.position,
+          rotation: shape.rotation,
+          scale: shape.scale,
+        })),
+      ]),
+    ),
   };
 }
 

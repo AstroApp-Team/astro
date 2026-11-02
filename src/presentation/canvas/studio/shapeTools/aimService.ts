@@ -209,7 +209,13 @@ export function aimCameraAt(studio: IStudio, targetKey: string | null = null): A
  * The palette pane's per-row button: "look at the thing I just made".
  */
 export function aimCameraAtShapeId(studio: IStudio, shapeId: string): AimOutcome {
-  const shape = useShapeStore.getState().shapes.find((candidate) => candidate.id === shapeId);
+  // Shapes are partitioned by sheet, and the id is global (its ordinal is), so
+  // the search is a pass over every bucket.
+  const shapes = useShapeStore.getState().shapes;
+  const shape =
+    Object.values(shapes)
+      .flatMap((entries) => entries)
+      .find((candidate) => candidate.id === shapeId) ?? null;
 
   if (shape == null) {
     return { ok: false, reason: `No spawned shape with id "${shapeId}".` };

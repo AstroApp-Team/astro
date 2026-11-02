@@ -32,9 +32,31 @@ export type AimRecord = {
   distance: number;
 };
 
+/**
+ * The bucket a scene with no saved shapes renders.
+ *
+ * Module scope, so a selector that falls back to it returns a stable reference —
+ * a fresh `[]` per render would re-render every subscriber of the store.
+ */
+export const EMPTY_SHAPES: SpawnedShape[] = [];
+
 export type ShapeStore = {
-  /** Everything the menu has spawned, in spawn order. */
-  shapes: SpawnedShape[];
+  /**
+   * Everything the menu has spawned, **partitioned by sheet id**, in spawn order
+   * per sheet.
+   *
+   * One flat array used to mean a shape spawned on `/surface` rendered on every
+   * route: `<SpawnedShapes />` is mounted inside every scene's `SheetProvider`,
+   * and it used to read the whole list. The partition is the fix — each scene
+   * renders only the bucket matching its sheet, and the toolbar spawns into the
+   * active sheet (`sheetId`) on purpose.
+   *
+   * Keyed by plain `string`, not `SheetId`: the file is hand-editable, and a
+   * bucket whose key is not a sheet this app mounts is inert (nothing renders
+   * it) but must still round-trip through Save — narrowing the store to known
+   * ids would silently delete it on the next save.
+   */
+  shapes: Record<string, SpawnedShape[]>;
   /**
    * The sheet the tools act on.
    *
@@ -93,6 +115,26 @@ const seed = readLocalShapesSeed();
 let spawnOrdinal = seed.ordinal;
 
 /**
+ * The seed, cut into the store's per-sheet shape.
+ *
+ * Every bucket the file names gets a slot — including ones no scene mounts —
+ * because dropping an unknown key here would be a data loss on the next Save,
+ * and an inert bucket is the correct home for it until it is not.
+ */
+function seedBuckets(): Record<string, SpawnedShape[]> {
+  const buckets: Record<string, SpawnedShape[]> = {};
+  for (const [sheetId, entries] of Object.entries(seed.shapesBySheet)) {
+    buckets[sheetId] = entries;
+  }
+  return buckets;
+}
+
+/** One number for the readout: shapes across every sheet. */
+function seedShapeCount(): number {
+  return Object.values(seedBuckets()).reduce((total, entries) => total + entries.length, 0);
+}
+
+/**
  * The saved sheet id, narrowed to one this app mounts.
  *
  * The file is hand-editable, so a typo is expected; falling back to the sandbox is
@@ -106,15 +148,15 @@ function seedSheetId(value: string): SheetId {
 }
 
 export const useShapeStore = create<ShapeStore>((set, get) => ({
-  shapes: seed.entries,
+  shapes: seedBuckets(),
   sheetId: seedSheetId(seed.sheetId),
   cameraKey: seed.cameraKey,
   lastAim: null,
   aimCount: 0,
   toolStatus:
-    seed.entries.length === 0
+    seedShapeCount() === 0
       ? "No tool has run yet."
-      : `Restored ${seed.entries.length} saved shape${seed.entries.length === 1 ? "" : "s"}.`,
+      : `Restored ${seedShapeCount()} saved shape${seedShapeCount() === 1 ? "" : "s"}.`,
   lastSavedAt: null,
 
   addShape(kind) {
@@ -129,31 +171,64 @@ export const useShapeStore = create<ShapeStore>((set, get) => ({
       scale: spawnScaleFor(kind),
     };
 
+    // The active sheet is the spawn target: the page that owns the route wrote
+    // it here on mount, and the pane's Sheet select overrides it. A shape that
+    // landed in the wrong bucket would be invisible on the route the user is on.
     set((state) => ({
-      shapes: [...state.shapes, shape],
-      toolStatus: `Spawned ${spec.label} as "${shape.theatreKey}".`,
+      shapes: {
+        ...state.shapes,
+        [state.sheetId]: [...(state.shapes[state.sheetId] ?? EMPTY_SHAPES), shape],
+      },
+      toolStatus: `Spawned ${spec.label} as "${shape.theatreKey}" in ${state.sheetId}.`,
     }));
 
     return shape;
   },
 
   removeShape(id) {
-    const next = get().shapes.filter((shape) => shape.id !== id);
+    // The id is global across sheets (the ordinal in it is), so one pass over
+    // every bucket finds it; a shape nobody spawned is reported, not invented.
+    const { shapes } = get();
+    let found = false;
+    const next: Record<string, SpawnedShape[]> = {};
+    for (const [sheetId, entries] of Object.entries(shapes)) {
+      const kept = entries.filter((candidate) => candidate.id !== id);
+      if (kept.length !== entries.length) found = true;
+      next[sheetId] = kept;
+    }
+    if (!found) {
+      set({ toolStatus: `No spawned shape with id "${id}".` });
+      return;
+    }
     set({ shapes: next, toolStatus: `Removed ${id}.` });
   },
 
   removeLastShape() {
-    const { shapes } = get();
-    const last = shapes[shapes.length - 1];
+    // "Last" means the last spawn **in the active sheet** — the toolbar acts on
+    // one sheet, and a global last could delete a shape on a route the user is
+    // not looking at.
+    const { shapes, sheetId } = get();
+    const entries = shapes[sheetId] ?? EMPTY_SHAPES;
+    const last = entries[entries.length - 1];
     if (last == null) {
-      set({ toolStatus: "Nothing to remove." });
+      set({ toolStatus: `Nothing to remove on ${sheetId}.` });
       return;
     }
-    set({ shapes: shapes.slice(0, -1), toolStatus: `Removed ${last.theatreKey}.` });
+    set({
+      shapes: { ...shapes, [sheetId]: entries.slice(0, -1) },
+      toolStatus: `Removed ${last.theatreKey}.`,
+    });
   },
 
   clearShapes() {
-    set({ shapes: [], toolStatus: "Removed every spawned shape." });
+    // The active sheet's bucket only: the pane is pointed at one sheet, and a
+    // clear that reaches into other sheets would delete shapes on routes the
+    // user has not opened.
+    const { sheetId } = get();
+    set((state) => ({
+      shapes: { ...state.shapes, [sheetId]: [] },
+      toolStatus: `Removed every spawned shape on ${sheetId}.`,
+    }));
   },
 
   setSheetId(sheetId) {

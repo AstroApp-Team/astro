@@ -19,7 +19,7 @@ import {
   STUDIO_SAVE_FILES,
 } from "@presentation/canvas/studio/shapeTools/saveService.ts";
 import { PANE_CSS } from "@presentation/canvas/studio/shapeTools/paneStyles.ts";
-import { useShapeStore } from "@presentation/state/useShapeStore.ts";
+import { EMPTY_SHAPES, useShapeStore } from "@presentation/state/useShapeStore.ts";
 
 /**
  * The Scene Tools pane — the same two tools as the toolbar, in a dockable panel
@@ -36,8 +36,11 @@ import { useShapeStore } from "@presentation/state/useShapeStore.ts";
  * the same shapes the canvas is rendering.
  */
 export default function ShapePalettePane({ studio, paneId }: { studio: IStudio; paneId: string }) {
-  const shapes = useShapeStore((state) => state.shapes);
   const sheetId = useShapeStore((state) => state.sheetId);
+  // The pane lists the active sheet's bucket: the Sheet select above is the
+  // spawn target, so the list below is what that sheet renders. Shapes saved
+  // for other sheets stay put and save back untouched.
+  const shapes = useShapeStore((state) => state.shapes[sheetId] ?? EMPTY_SHAPES);
   const cameraKey = useShapeStore((state) => state.cameraKey);
   const lastAim = useShapeStore((state) => state.lastAim);
   const toolStatus = useShapeStore((state) => state.toolStatus);

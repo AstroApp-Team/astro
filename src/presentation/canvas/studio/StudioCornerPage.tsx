@@ -23,7 +23,7 @@ import { aimCameraAt } from "@presentation/canvas/studio/shapeTools/aimService.t
 import { openShapeMenuFromElement } from "@presentation/canvas/studio/shapeTools/shapeMenuController.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
-import { useShapeStore } from "@presentation/state/useShapeStore.ts";
+import { EMPTY_SHAPES, useShapeStore } from "@presentation/state/useShapeStore.ts";
 
 import "@presentation/ui/styles/studio.css";
 
@@ -55,7 +55,9 @@ export default function StudioCornerPage() {
 
   const addShape = useShapeStore((state) => state.addShape);
   const toolStatus = useShapeStore((state) => state.toolStatus);
-  const shapeCount = useShapeStore((state) => state.shapes.length);
+  // The sandbox bucket: this page states its sheet on mount, so the readout
+  // counts the shapes the sandbox route renders.
+  const shapeCount = useShapeStore((state) => (state.shapes[state.sheetId] ?? EMPTY_SHAPES).length);
   const lastAim = useShapeStore((state) => state.lastAim);
   const setSheetId = useShapeStore((state) => state.setSheetId);
 

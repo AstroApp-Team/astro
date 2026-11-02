@@ -70,6 +70,16 @@ export async function initTheatreStudio(): Promise<void> {
     registerSceneToolsExtension(studio);
 
     /**
+     * The Machine extension registers here too, inside the same dev guard, for the same
+     * reason: its pane is React, it reads the exported project state, and it is authoring
+     * surface rather than app surface. Hoisting either import above the guard ships the
+     * editor to the phone.
+     */
+    const { registerMachineToolsExtension } =
+      await import("@presentation/canvas/studio/machineTools/extension.ts");
+    registerMachineToolsExtension(studio);
+
+    /**
      * `usePersistentStorage: false` — the Scene Tools Save button is the persistence.
      *
      * Theatre's own autosave writes the Studio's state to `localStorage` and
