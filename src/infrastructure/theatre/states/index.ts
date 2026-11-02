@@ -101,10 +101,28 @@ export const projectStates: Record<string, unknown> = {
  * because "my shapes vanished" is exactly the silent failure this file exists to
  * prevent.
  */
+/**
+ * Old files carried one flat `entries` list, which every scene rendered. A file
+ * in that layout is migrated on load: everything lands in the file's `sheetId`
+ * bucket, which is where the shapes were being worked on (the tools' context).
+ * A hand-edit that half-migrates a file keeps whichever shape parses first —
+ * `shapesBySheet` wins, because it is the newer layout.
+ */
+export function migrateLegacyShapes(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+
+  const value = raw as Record<string, unknown>;
+  if (value["shapesBySheet"] != null) return value;
+  if (!Array.isArray(value["entries"])) return value;
+
+  const sheetId = typeof value["sheetId"] === "string" ? value["sheetId"] : "StudioSandbox";
+  return { ...value, shapesBySheet: { [sheetId]: value["entries"] } };
+}
+
 export function readLocalShapesSeed(): SavedShapes {
   if (!import.meta.env.DEV) return emptySavedShapes();
 
-  const parsed = SavedShapesSchema.safeParse(astroLocalShapes);
+  const parsed = SavedShapesSchema.safeParse(migrateLegacyShapes(astroLocalShapes));
   if (!parsed.success) {
     console.warn(
       `[studio-save] ${LOCAL_SHAPES_FILE} is not readable as saved shapes:`,

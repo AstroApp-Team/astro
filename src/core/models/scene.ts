@@ -17,6 +17,8 @@ export const SCENE_IDS = [
   "archive",
   "sting",
   "float",
+  "astro",
+  "astro-v2",
   "surface",
   "studio-sandbox",
 ] as const;
@@ -57,7 +59,9 @@ export type SceneEventName =
   | "node-deselected"
   | "node-focus-requested"
   | "scene-changed"
-  | "sequence-played";
+  | "sequence-played"
+  /** A press that reached a mesh and passed its press gate. Carries the node's key. */
+  | "node-pressed";
 
 export type SceneEvent = { name: SceneEventName; at: number; nodeId: string | null };
 
@@ -137,6 +141,87 @@ export const FLOAT_CAMERA: { position: Vec3; fov: number } = {
  * be moved to. Widen it in the Studio and the taps scatter further.
  */
 export const FLOAT_AUTOPLAY: [from: number, to: number] = [0, 6];
+
+/**
+ * Astro's node: one plane, painted with the character.
+ *
+ * The character is a flat vector drawing rather than a mesh — see
+ * `infrastructure/astro/astroTexture.ts` — so the one editable object is the
+ * plane the texture is mapped onto, and its `theatreKey` is the id the page, the
+ * outliner and the raycast target all share.
+ *
+ * `position` is Theatre's *initial* value; the landed `AstroScene` rig keyframes
+ * `position.xyz` into a slow drift, so the number below is the drift's centre.
+ */
+export const ASTRO_NODES: SceneNode[] = [
+  { theatreKey: "Astro", label: "Astro", status: "active", position: [0, 1.6, 0] },
+];
+
+/**
+ * Framing for the astro scene: the float camera, because the character's size was
+ * measured against it.
+ *
+ * `astroTexture.ts` pins the body at `1.1` world units so that at `fov 45`, `z 7.5`
+ * it is ~120 px of body on a 390×688 phone — the reference size the style guide
+ * names. Moving this camera rescales the only number that was measured, so the
+ * two files have to change together.
+ */
+export const ASTRO_CAMERA: { position: Vec3; fov: number } = {
+  position: [0, 1.6, 7.5],
+  fov: 45,
+};
+
+/**
+ * Astro v2's editable object: the whole character, one group.
+ *
+ * One node, not one per part — the body, the two eye prisms and the halo shell are
+ * children of it, so the rig animates *Astro* rather than keeping four tracks in
+ * sync. `theatreKey` is the group's, and `"Astro V2"` cannot collide with v1's
+ * `"Astro"`: both sheets hold one object and neither can see the other's.
+ *
+ * `position` is Theatre's initial value. There is no landed clip for v2 yet, so the
+ * character stands still where JSX puts it and the *shaders* supply the motion — the
+ * wave, the hue rotation, the breathing scale. That is deliberate: the look had to be
+ * fitted first, and a clip baked before the look would have to be re-rigged after.
+ * `pnpm run theatre:state -- import <export> --to AstroV2Scene` lands one later.
+ */
+export const ASTRO_V2_NODES: SceneNode[] = [
+  { theatreKey: "Astro V2", label: "Astro V2", status: "active", position: [0, 1.6, 0] },
+];
+
+/**
+ * Astro v2's framing: v1's camera exactly.
+ *
+ * The body is sized from `astro.ts`'s `1.1` world units, which was measured against
+ * this lens, so sharing the camera is what makes the two versions the same size on
+ * screen and their screenshots diffable.
+ */
+export const ASTRO_V2_CAMERA: { position: Vec3; fov: number } = {
+  position: ASTRO_CAMERA.position,
+  fov: ASTRO_CAMERA.fov,
+};
+
+/**
+ * The astro scene's drift: a slow eight-second loop.
+ *
+ * A module constant for the usual reason (`useSheetPlayback`'s effect dependency),
+ * and one more: the page seeks inside this range when the character is tapped, so
+ * this range is the set of places the character can be moved to. Slower than the
+ * float circuit on purpose — the character is calm, and `05-motion.md` forbids a
+ * bouncy one.
+ */
+export const ASTRO_AUTOPLAY: [from: number, to: number] = [0, 8];
+
+/**
+ * Astro v2's loop: the same eight seconds, on its own sheet.
+ *
+ * A module constant for the usual reason — it is a `useSheetPlayback` effect
+ * dependency — and one more: the page seeks inside this range, so this range is the set
+ * of playhead positions the page can move to. Nothing is keyframed on `AstroV2Scene`
+ * yet, so today it only sets the sequence's length; landing a clip makes it a real loop
+ * without the page changing.
+ */
+export const ASTRO_V2_AUTOPLAY: [from: number, to: number] = [0, 8];
 
 /**
  * The `/surface` scene's objects: two pages and the sphere one of them paints.
