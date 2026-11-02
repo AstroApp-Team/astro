@@ -2,6 +2,8 @@ import type { ComponentType } from "react";
 
 import type { SceneId } from "@core/models/scene.ts";
 import ArchiveScene from "@presentation/canvas/scenes/ArchiveScene.tsx";
+import AstroScene from "@presentation/canvas/scenes/AstroScene.tsx";
+import AstroV2Scene from "@presentation/canvas/scenes/AstroV2Scene.tsx";
 import CareerJourneyScene from "@presentation/canvas/scenes/CareerJourneyScene.tsx";
 import FloatScene from "@presentation/canvas/scenes/FloatScene.tsx";
 import HubScene from "@presentation/canvas/scenes/HubScene.tsx";
@@ -25,6 +27,8 @@ export const SCENE_COMPONENTS: Record<SceneId, ComponentType> = {
   archive: ArchiveScene,
   sting: StingScene,
   float: FloatScene,
+  astro: AstroScene,
+  "astro-v2": AstroV2Scene,
   surface: SurfaceScene,
   "studio-sandbox": StudioSandboxScene,
 };

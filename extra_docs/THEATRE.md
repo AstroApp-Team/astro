@@ -107,13 +107,14 @@ desktop-perfect clip reads differently there.
 
 ## Which bench to use
 
-| Route               | Sheet                     | Use it when                                                                                                        |
-| ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `/rig/<scene>`      | the scene's **own** sheet | the rig is going to production. Export needs no rename.                                                            |
-| `/studio-corner`    | `StudioSandbox`           | an experiment that must not touch a production timeline. Export needs `--from StudioSandbox --to <SheetId>`.       |
-| `/showcase/<scene>` | the scene's **own** sheet | seeing the rig as an end user does. Read-only: no Studio, no toolbar, scrolling React over the canvas.             |
-| `/float`            | `FloatScene`              | the inversion: a React page with a transparent canvas **over** it. See "The overlay page (`/float`)".              |
-| `/surface`          | `SurfaceScene`            | React pages used **as** mesh textures, and presses that go through a texture. See "The texture page (`/surface`)". |
+| Route               | Sheet                     | Use it when                                                                                                                                                                 |
+| ------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/rig/<scene>`      | the scene's **own** sheet | the rig is going to production. Export needs no rename.                                                                                                                     |
+| `/studio-corner`    | `StudioSandbox`           | an experiment that must not touch a production timeline. Export needs `--from StudioSandbox --to <SheetId>`.                                                                |
+| `/showcase/<scene>` | the scene's **own** sheet | seeing the rig as an end user does. Read-only: no Studio, no toolbar, scrolling React over the canvas.                                                                      |
+| `/float`            | `FloatScene`              | the inversion: a React page with a transparent canvas **over** it. See "The overlay page (`/float`)".                                                                       |
+| `/astro`            | `AstroScene`              | the same inversion as `/float` with a **character** instead of a sphere: a flat vector drawing on a plane, face owned by the store. See "The character overlay (`/astro`)". |
+| `/surface`          | `SurfaceScene`            | React pages used **as** mesh textures, and presses that go through a texture. See "The texture page (`/surface`)".                                                          |
 
 ## The integrated page (`/showcase`)
 
@@ -241,6 +242,66 @@ over a scene; `/float` is a scene over a page, and every layer is inverted with 
   sphere crosses the full viewport width and stays in roughly the 35–65% vertical
   band on a 390×688 phone — which is why the hero text is in the top ~30% and the
   log panel starts below the band.
+
+## The character overlay (`/astro`)
+
+`presentation/ui/pages/AstroPage.tsx` is `/float`'s arrangement with Astro in place of the
+sphere: hero, expression picker, tap log, table and bar are the page, and `AstroScene`
+draws one thing over them. The wiring — `eventSource`, `eventPrefix="client"`, a
+`position: fixed; inset: 0` overlay, the control gate on mesh presses, `lastEvent` as the
+mesh → page signal, `selectionVisuals: false` on mount — is copied wholesale, because that
+wiring is the part that is easy to get silently wrong and there was no reason to rediscover
+it. What differs is what the character _is_:
+
+- **The character is a plane wearing a canvas texture, not a mesh.**
+  `infrastructure/astro/astroTexture.ts` draws each of the 12 states of the stylesheet into
+  a 2D canvas (halo, rim bloom, body gradient, features, glyph) and caches the
+  `CanvasTexture` per state, so the scene is `<planeGeometry>` +
+  `<meshBasicMaterial map transparent depthWrite={false} toneMapped={false}>` and a
+  re-render costs a `Map.get`. `ASTRO_PLANE_SIZE` is exactly the halo (`2 D = 1.8 R`):
+  smaller crops the glow into a visible edge, larger makes empty corners part of the tap
+  target.
+- **There is no light rig on this scene, on purpose.** The stylesheet's whole lighting
+  model is the halo plus the flush blurred `#FF8B00` rim bloom, and both are baked into the
+  texture. A `meshStandardMaterial` would add a second, contradictory lighting model on top
+  of them.
+- **The rig owns `position`; the store owns the face.** `useAstroStore.expression` is a
+  texture swap, and a keyframed expression on the sheet would win over the page's picker
+  silently. `scripts/astro-rig-export.mjs` therefore keyframes `Astro.position.{x,y,z}`
+  only — 8 s, five keys per axis, ±0.7 in x, ±0.22 in y, ±0.3 in z — and deliberately no
+  `rotation` track: the character is a flat plane, and a keyframed turn shows the page its
+  edge and the drawing disappears. Land it with
+  `node scripts/astro-rig-export.mjs --out /tmp/astro.export.json` then
+  `node scripts/theatre-state.mjs import /tmp/astro.export.json --to AstroScene`.
+- **`ASTRO_CAMERA` is measured, not chosen.** `astroTexture.ts` pins the body at 1.1 world
+  units so that at `fov 45`, `z 7.5` it is ~120 px of body on a 390×688 phone — the
+  reference size in `extra_docs/style/03-astro-form.md`. Moving the camera rescales the one
+  number that was measured, so the two files change together.
+- **A reaction needs an exit, and the predicate lives in core.** `isTransient`
+  (`core/usecases/astroExpression.ts`) is the single list of states that end on their own;
+  the page arms one `setTimeout` keyed on `expression` for `ASTRO_REACTION_MS.max` and the
+  store's `settle()` returns to `resting`. `resting` is tracked separately because
+  `isTransient("happy")` is true and a reaction that returns to itself never ends.
+- **The pointer only moves a resting character.** `POINTER_FOLLOW_STATES` in `AstroPage.tsx`
+  is `idle` plus the three `look-*` placements: `lookTowards` snaps to one of the sheet's
+  seven eye placements rather than interpolating (the sheet has no in-between drawings), and
+  a mouse must not overwrite `doze` or an in-flight reaction or those states become
+  unreachable with a pointer. Touch is excluded — on a phone every scroll is a pointer move.
+- **Rig it on `/rig/astro`.** `RigPage` reads `SCENE_SHEET_IDS.astro`, so the bench mounts
+  this exact sheet and the import needs no rename.
+- **The bar's accent rolls over Astro's own poles, not the hue wheel.** `rollAstroAccent`
+  (`core/usecases/astroInteraction.ts`) draws from `ASTRO_ACCENTS` — `bodyTop`, `bodyMid`,
+  `bodyBottom`, `glow`. Reusing `/showcase`'s `randomAccentColor` here paints a cyan Nudge
+  button, which is a colour the stylesheet does not print; the Nudge button and the active
+  chip keep the sheet's `137deg` body gradient with a cream caption.
+- **`.astro__hero` is `min-height: 58vh`, not `%`.** Its parent is the scroller's content
+  box, so a percentage resolves against a content-driven height and collapses to `auto`
+  (measured: 292 px instead of 399 px). 58vh puts the panel's top edge at ~66% of the
+  viewport, just under the band the drift covers, so the halo does not cross the text.
+- **Verify with `scripts/visual-probe.mjs`.** It is not in `vp test`; it launches headless
+  Chromium and prints the height chain, the canvas backing-store size, and the tap →
+  log → seek loop. `/tmp/chromedeps` + `/tmp/pw` (playwright-core) are rebuildable; the
+  script's header has the commands.
 
 ## The texture page (`/surface`)
 
@@ -455,6 +516,75 @@ something else.
 studio.extend(config)                        // 1. register — before initialize()
 studio.initialize({ usePersistentStorage: false })  // 2. paint the toolbar; the files are the persistence
 ```
+
+## Rigging a clip for the state machine
+
+The machine's clips are Theatre timelines. The bridge is a second dev-only extension,
+`astro.machine-tools` (`presentation/canvas/studio/machineTools/extension.ts`), registered
+beside the scene tools inside the same `import.meta.env.DEV` guard — hoisting its import
+ships the pane to the phone.
+
+1. **Rig the timeline.** `/rig/<scene>` mounts the scene's production sheet, so the
+   keyframes land where the scene will read them. A cycle is what the machine wants: a
+   `position` orbit, a bob, a `rotation` turn — the same tracks any scene animates.
+2. **Press Save to disk**, then reload. The pane reads the _exported_ project state, not the
+   live Studio session, because that is the state the app ships; a Save is what makes a new
+   track visible to it.
+3. **Open the Machine pane** (the graph icon in the global toolbar). Every
+   `"<SheetId>/<ObjectKey>"` clip the state contains is one row, with its duration, its
+   channels, and the bone it will write to.
+4. **Add as layer.** The pane writes `withClipLayer(definition, { clipId })` into
+   `localStorage["astro.machine.definition"]` — an _override_, not the shipped file — and
+   `/machine` prefers it on the next load. Pressing add twice edits one layer instead of
+   stacking two that fight over the same bones; **Remove** deletes it, and the last layer
+   cannot be removed because the loader requires one.
+5. **Reload `/machine`.** The clip layer is listed in the readout with its progress; the
+   character is now driven by the timeline, not by the demo clip.
+6. **Download definition** when it is right, and move the JSON into
+   `src/infrastructure/theatre/animationStateMachine/definitions/`. That is the durable
+   copy; the override is the fast loop.
+
+Two limits worth knowing before hunting a bug:
+
+- **The bone map is in the app, not in the pane.** `THEATRE_BONE_MAP`
+  (`presentation/canvas/machine/machineAuthoring.ts`) maps a Theatre object onto the rig's
+  bone — `"Float Sphere" → head`, and so on. An unmapped object writes under its own key and
+  the rig reports "no bone", which is the honest failure, not a silent one.
+- **The pane is not a graph editor.** Transitions, conditions and additive blends stay in
+  the JSON. The pane's job is only the part that needs a timeline: turning a rig into a
+  playable layer. A typo in the JSON is still a red `/machine` naming the path.
+
+## The machine editor
+
+`/editor?editor` (dev builds only) is the graphical authoring surface for the state machine.
+It edits `src/infrastructure/theatre/animationStateMachine/definitions/machine-demo.definition.json`
+— the same file `/machine` plays — and it is the only place a definition is written from the UI.
+
+- **Four zones**: header (layers, stage mode, transport, save/discard, undo/redo), left sidebar
+  (inputs, listeners, layers with solo/mute), centre (viewport over stage), right inspector
+  (one deck per selection: state, transition, layer, input, listener, timeline, markers). The
+  timeline strip and the telemetry lane sit under the stage.
+- **The graph is deterministic before it is arranged.** `layoutLayer` ranks states by longest
+  path from the entries and stacks siblings by id, so a definition loaded from disk is readable
+  without anyone having placed it; dragging writes a point into
+  `definitions/machine-demo.machine.editor.json` and that point wins. Drag from a card's output
+  port onto another card to author a transition, click an edge to edit its condition, duration
+  and easing.
+- **One selection, one deck.** `encodeSelection` writes the selection into `?sel=`, and a reload
+  reopens the same card. Deleting a state removes its edges with it and the button says how many
+  (`stateLinkCounts`); renaming a state rewrites every reference (`renameState`), which is a
+  refactor, not a field edit.
+- **Invalid drafts are refused, not rendered.** `apply` validates every command, `addState`
+  inherits a clip reference, and the keyboard is `Space` (play), `Delete` (delete selection),
+  `Cmd/Ctrl+S` (save), `Cmd/Ctrl+Z` / `Shift` (undo/redo), `1/2/3` (graph / timeline / split).
+- **Save posts both files** to `/__astro-editor/save` in `scripts/studio-save-plugin.ts`
+  (atomic rename, `x-astro-editor-save: 1`). The workspace file is git-ignored; the definition
+  file is formatter-ignored for the same reason the Theatre states are (it is written by
+  `JSON.stringify(…, 2)`).
+- **The preview is a machine, not a Theatre sequence**: it steps its own instance, paints the
+  rig through `applyMachineOutput`, and a structural edit rebuilds it. A _numeric_ edit while
+  playing is held back (the header says "preview is behind") because `createMachine` has no
+  hot-swap — pause to apply it.
 
 ## Saving your work (dev) vs landing a rig
 

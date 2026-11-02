@@ -14,6 +14,7 @@ import {
   SHAPES_FILE_HINT,
   StudioSavePayloadSchema,
   THEATRE_STATE_DEFINITION_VERSION,
+  countSavedShapes,
   emptySavedShapes,
   emptyTheatreState,
 } from "../shared/studio-save.ts";
@@ -52,6 +53,19 @@ const SHAPES_FILE = resolve(ROOT, "src/infrastructure/theatre/states/astro.local
 
 /** The prefix all three endpoints live under. */
 const MOUNT = "/__astro-studio";
+
+/** The machine editor's write endpoint (§4.3). Dev-only, like the Studio's. */
+const EDITOR_SAVE_ENDPOINT = "/__astro-editor/save";
+const EDITOR_FILE_ENDPOINT = "/__astro-editor/file";
+const EDITOR_HEADER = "x-astro-editor-save";
+const DEFINITION_FILE = resolve(
+  ROOT,
+  "src/infrastructure/theatre/animationStateMachine/definitions/machine-demo.definition.json",
+);
+const EDITOR_FILE = resolve(
+  ROOT,
+  "src/infrastructure/theatre/animationStateMachine/definitions/machine-demo.machine.editor.json",
+);
 
 /**
  * Answer only a request that carries the studio-save header.
@@ -143,6 +157,51 @@ async function handle(
   server: ViteDevServer,
 ) {
   const path = (req.url ?? "").split("?")[0] ?? "";
+
+  if (path === EDITOR_FILE_ENDPOINT) {
+    /* The workspace file only. The definition is a bundled module, so the app already has it;
+       node positions and splits are the part a fresh browser has never seen. */
+    json(res, 200, { file: readJson(EDITOR_FILE), savedAt: savedAt() });
+    return;
+  }
+
+  if (path === EDITOR_SAVE_ENDPOINT) {
+    /* Two files, two writers: the definition is the machine, the editor file is the
+       workspace. Both go through the same atomic rename, because Vite watches the
+       definition and a half-written JSON is a module the app imports at load. */
+    if (req.method !== "POST") {
+      json(res, 405, { error: `${req.method} is not allowed on ${path}` });
+      return;
+    }
+    if (req.headers[EDITOR_HEADER] !== "1") {
+      json(res, 403, { error: `editor save requires ${EDITOR_HEADER}: 1` });
+      return;
+    }
+    let body: string;
+    try {
+      body = await readBody(req, MAX_STUDIO_SAVE_BYTES);
+    } catch (cause) {
+      json(res, 413, { error: (cause as Error).message });
+      return;
+    }
+    let parsed: { definition?: unknown; editor?: unknown };
+    try {
+      parsed = JSON.parse(body) as { definition?: unknown; editor?: unknown };
+    } catch {
+      json(res, 400, { error: "the body is not JSON" });
+      return;
+    }
+    if (parsed.definition == null) {
+      json(res, 400, { error: "the body has no definition" });
+      return;
+    }
+    writeJson(DEFINITION_FILE, parsed.definition);
+    if (parsed.editor != null) writeJson(EDITOR_FILE, parsed.editor);
+    invalidate(server);
+    json(res, 200, { ok: true, files: [DEFINITION_FILE, EDITOR_FILE] });
+    return;
+  }
+
   const wantsSave = path === STUDIO_SAVE_ENDPOINT;
   const wantsLoad = path === STUDIO_LOAD_ENDPOINT;
   const wantsClear = path === STUDIO_CLEAR_ENDPOINT;
@@ -232,7 +291,8 @@ async function handle(
     ok: true,
     savedAt: savedAt(),
     sheets: Object.keys(state.sheetsById).length,
-    shapes: shapes.entries.length,
+    // Shapes now live in per-sheet buckets; the readout wants one number.
+    shapes: countSavedShapes(shapes),
     files: [STATE_FILE, SHAPES_FILE],
   });
 }

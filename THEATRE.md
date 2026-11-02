@@ -159,6 +159,21 @@ From `@theatre/r3f`'s editable config:
 - **`autoPlay` must be a module constant.** An array literal in a component body
   is a new array every render, and the clip restarts under the playhead.
 - **No manual memoization.** React Compiler is on.
+- **`/astro-v2` is the same overlay wiring with the character rebuilt as
+  geometry, and nothing on it is keyframeable except the group.**
+  `scenes/AstroV2Scene.tsx` mounts `AstroV2Character` — a sphere body, two sunken
+  eye prisms, a halo shell — each a `ShaderMaterial` (`canvas/astroV2/materials.ts`),
+  so there is no light rig and no texture to swap. What the rig may land is the
+  group's `position` (`pnpm run theatre:state -- import <export> --to AstroV2Scene`);
+  the face is `useAstroStore.expression`, and the look-dev tunables are
+  `useAstroStore.tunables`. A keyframed face or a keyframed `waveAmp` would win
+  over the page's pickers silently — the clip owns a prop or the store does.
+- **A `ShaderMaterial`'s uniforms must be module-scope objects, not render-time
+  literals.** `astroV2/materials.ts` creates each `ShaderMaterial` once and
+  exports it, and `AstroV2Character` writes those same uniform objects every
+  frame. Build the `uniforms` object in a component body and R3F constructs a new
+  material per render: every write goes to a dead uniform map, the shader
+  recompiles, and the page reads as "the sliders do nothing".
 - **Don't hand-edit the state JSON** beyond what `theatre:state` does. Its shape
   (`sheetsById` → `tracksByObject` → `trackIdByPropPath`, keyframe `handles`,
   `definitionVersion: "0.4.0"`) is readable, and a wrong `definitionVersion`

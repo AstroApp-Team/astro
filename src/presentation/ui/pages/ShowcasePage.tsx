@@ -29,7 +29,7 @@ import { useSheetPlayback } from "@infra/theatre/useSheetPlayback.ts";
 import MainCanvas from "@presentation/canvas/MainCanvas.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
-import { useShapeStore } from "@presentation/state/useShapeStore.ts";
+import { EMPTY_SHAPES, useShapeStore } from "@presentation/state/useShapeStore.ts";
 import ShowcasePanelHost from "@presentation/ui/components/showcasePanels/ShowcasePanelHost.tsx";
 import {
   SHOWCASE_PANELS,
@@ -208,7 +208,9 @@ function ShowcaseStage({ scene }: ShowcaseStageProps) {
 
   const sequence = playback.sequence;
 
-  const shapes = useShapeStore((state) => state.shapes);
+  // This scene's bucket only: shapes are partitioned by sheet, and the card
+  // below lists what *this* scene mounts.
+  const shapes = useShapeStore((state) => state.shapes[sheetId] ?? EMPTY_SHAPES);
   const lastEvent = useSceneStore((state) => state.lastEvent);
   const selectedNodeId = useSceneStore((state) => state.selectedNodeId);
 

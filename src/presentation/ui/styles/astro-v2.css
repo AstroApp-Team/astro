@@ -1,0 +1,292 @@
+/**
+ * Astro v2 — the character over the page, and the look-dev panel under it.
+ *
+ * Layout is the stylesheet's, not a layout of convenience: the spark, its halo and its
+ * face are the page's hero, so the page is arranged to keep a clear band for the
+ * character and put its own text above and below that band. Three layers, in source
+ * order in `AstroV2Page.tsx`:
+ *
+ * 1. `.astro__scroll` — the page, `position: relative`, the scroller.
+ * 2. `.astro__overlay` — `position: fixed; inset: 0`, transparent, `pointer-events: none`.
+ * 3. `.astro__bar` — also fixed, `z-index: 3`, so its buttons stay reachable *through*
+ *    the overlay's layer ordering.
+ *
+ * The two facts that make the 3D half work are in `astro.css`'s header, and they apply
+ * here unchanged: `inset: 0` (because `eventPrefix="client"` divides by the canvas size
+ * with no origin subtraction) and the canvas never being a hit target (because a hit
+ * target eats the page's clicks). What differs on v2 is only what is on the page.
+ *
+ * `--overflow: hidden` on the content and `height: 100%` on `.astro` are the Ionic
+ * height chain: a `height: 100%` canvas host inside an `IonContent` that owns its
+ * scroller measures the scroller, not the viewport, and the render collapses into a
+ * strip. `.astro__scroll` scrolls instead.
+ */
+
+.astro-content {
+  --overflow: hidden;
+  --background: #1a0703;
+}
+
+.astro {
+  position: relative;
+  height: 100%;
+  /* The sheet's spark sits on a near-black warm brown, not on pure black. */
+  background: radial-gradient(120% 90% at 50% 42%, #2a0d05 0%, #16060a 55%, #0b0406 100%);
+  color: #ffe9d8;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The scroller. `-webkit-overflow-scrolling` is gone from modern WebKit; the gesture is
+   native and smooth unless a layer above takes the pointer. */
+.astro__scroll {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 20px calc(96px + env(safe-area-inset-bottom, 0px));
+  /* Scroll chaining from a nested scroller onto the body is a jump; this page has no
+     reason to bound its own scroll. */
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+}
+
+.astro__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── layer 1a: the page ─────────────────────────────────────────────────────── */
+
+.astro__hero {
+  /* Top ~30% of a phone: the character's orbit occupies roughly 35–65%, so text that
+     reaches the middle competes with the spark for the eye. */
+  max-width: 46rem;
+  padding: 28px 0 8px;
+}
+
+.astro__hero h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.6rem, 5vw, 2.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.astro__hero h1 em {
+  font-style: normal;
+  color: var(--astro-accent, #ff8b00);
+}
+
+.astro__hero p,
+.astro__hint {
+  margin: 0 0 10px;
+  max-width: 42rem;
+  color: #e4bda4;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.astro__hero code,
+.astro__foot code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #ffffff14;
+  color: #ffcf9e;
+  font-size: 0.86em;
+}
+
+.astro__panel {
+  max-width: 46rem;
+  margin: 0 0 14px;
+  padding: 16px 16px 14px;
+  border: 1px solid #ffffff14;
+  border-radius: 18px;
+  background: #1c0a05cc;
+  backdrop-filter: blur(6px);
+}
+
+.astro__panel h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 6px;
+  font-size: 0.98rem;
+  letter-spacing: 0.01em;
+}
+
+.astro__states {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+
+.astro__state {
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid #ffffff1f;
+  border-radius: 9px;
+  background: #ffffff0a;
+  color: #ffdcc2;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.astro__state--active {
+  border-color: var(--astro-accent, #ff8b00);
+  background: color-mix(in srgb, var(--astro-accent, #ff8b00) 22%, transparent);
+  color: #fff3e6;
+}
+
+.astro__readout {
+  margin: 0;
+  color: #c8997c;
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+}
+
+.astro__readout strong {
+  color: #ffe2c7;
+  font-weight: 600;
+}
+
+/* ── layer 1b: the look-dev panel ───────────────────────────────────────────── */
+
+.astro__tuner .astro__sliders {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.astro__slider {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr 3.2rem;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.76rem;
+  color: #e4bda4;
+}
+
+.astro__slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--astro-accent, #ff8b00);
+}
+
+.astro__slider code {
+  color: #ffcf9e;
+  font-size: 0.72rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.astro__foot {
+  max-width: 42rem;
+  padding: 4px 0 12px;
+  color: #a97a5f;
+  font-size: 0.78rem;
+}
+
+/* ── layer 2: the character ─────────────────────────────────────────────────── */
+
+/* Load-bearing. `eventPrefix="client"` divides `clientX/clientY` by the canvas's size
+   with no origin subtraction, so the canvas box must start at the viewport origin. */
+.astro__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* `.canvas-host` is already `position: relative`, 100% × 100%; this pins that box to
+   the overlay (and so to the viewport). */
+.astro-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── layer 3: the bar ───────────────────────────────────────────────────────── */
+
+.astro__bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid #ffffff12;
+  background: linear-gradient(#1a070399, #1a0703e6);
+  backdrop-filter: blur(8px);
+}
+
+.astro__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid #ffffff1f;
+  border-radius: 9px;
+  background: #ffffff0d;
+  color: #ffdcc2;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.astro__btn--accent {
+  border-color: transparent;
+  background: linear-gradient(137deg, var(--astro-accent, #ff8b00), #fe3402);
+  color: #1a0703;
+  font-weight: 600;
+}
+
+.astro__swatch {
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--astro-accent, #ff8b00);
+  box-shadow: 0 0 12px var(--astro-accent, #ff8b00);
+}
+
+.astro__bar .astro__readout {
+  margin-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Desktop: the bench gets a wider column and the hero stops being a phone block. */
+@media (min-width: 900px) {
+  .astro__scroll {
+    padding-right: 32px;
+    padding-left: 32px;
+  }
+
+  .astro__hero {
+    padding-top: 48px;
+  }
+
+  .astro__panel {
+    display: inline-block;
+    width: calc(50% - 8px);
+    margin-right: 14px;
+    vertical-align: top;
+  }
+
+  .astro__panel.astro__tuner {
+    width: calc(50% - 8px);
+    margin-right: 0;
+  }
+}

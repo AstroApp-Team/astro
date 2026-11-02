@@ -33,6 +33,8 @@ export const SHEET_IDS = {
   archive: "ArchiveScene",
   sting: "StingScene",
   float: "FloatScene",
+  astro: "AstroScene",
+  astroV2: "AstroV2Scene",
   surface: "SurfaceScene",
   studioSandbox: "StudioSandbox",
 } as const;
@@ -58,6 +60,8 @@ export const SCENE_SHEET_IDS: Record<SceneId, SheetId> = {
   archive: SHEET_IDS.archive,
   sting: SHEET_IDS.sting,
   float: SHEET_IDS.float,
+  astro: SHEET_IDS.astro,
+  "astro-v2": SHEET_IDS.astroV2,
   surface: SHEET_IDS.surface,
   "studio-sandbox": SHEET_IDS.studioSandbox,
 };

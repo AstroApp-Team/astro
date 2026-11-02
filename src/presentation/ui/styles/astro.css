@@ -1,0 +1,516 @@
+/**
+ * Astro over a React page — the character version of `/float`.
+ *
+ * The layer order is `/float`'s, because that wiring is the thing being reused:
+ * three siblings inside `.astro`, which is also the R3F **event source**.
+ *
+ *   `.astro__scroll`  — the page, z-index 1. An ordinary scroll container with
+ *                       ordinary pointer events: it is the content, so it takes
+ *                       clicks, links and drags.
+ *   `.astro__overlay` — the canvas, z-index 2, `position: fixed; inset: 0`. It
+ *                       draws the character over the text and nothing else.
+ *   `.astro__bar`     — the controls, z-index 3, pinned to the bottom of the
+ *                       viewport so it does not ride the scroll.
+ *
+ * `inset: 0` on the overlay is load-bearing, not tidiness. `MainCanvas` is given
+ * `eventPrefix="client"`, and R3F's `client` compute divides `clientX/clientY` by
+ * the canvas's size with **no origin subtraction** — arithmetic that is only
+ * correct when the canvas's box starts at the viewport origin. Give the overlay a
+ * `top` that is not zero and the raycast goes silent: the character is hit-tested
+ * hundreds of pixels above the finger, the tap appends nothing, and no error is
+ * logged.
+ *
+ * The scroller is deliberately not IonContent's `.inner-scroll` (it lives in
+ * `ion-content`'s shadow root, so app CSS cannot size the hero against it), and
+ * IonContent's own overflow is switched off with `--overflow: hidden` so two
+ * scrollers never fight over one gesture.
+ *
+ * Where a gesture lands, and what it does:
+ *
+ *   - drag anywhere in `.astro__scroll` → the page scrolls;
+ *   - wheel over the character → the page forwards `deltaY` to the scroller from
+ *     `AstroPage`, because the overlay is fixed and a wheel over it has no
+ *     scrollable ancestor at all;
+ *   - tap on the character → R3F raycasts from `.astro`'s listeners. The canvas is
+ *     not a hit target, so the same tap also lands on whatever element is under
+ *     the character. That is the documented price of a transparent overlay.
+ *
+ * Palette from `extra_docs/style/01-colour.md`: `--astro-ink` #1A152C is the
+ * dark surface, `--astro-sand` #EDCA99 the muted text on it. The orange is the
+ * character's own colour and only appears as the bar accent, so the page never
+ * competes with the drawing.
+ */
+
+.astro-content {
+  /* The page scrolls in `.astro__scroll`. IonContent scrolling too is two
+     scrollbars answering one gesture. */
+  --overflow: hidden;
+  --background: #1a152c;
+}
+
+/**
+ * The event source.
+ *
+ * `eventSource` must be an **ancestor of everything under the pointer** — that is
+ * where R3F's listeners are attached, and events only reach it by bubbling from
+ * the element the pointer landed on. `height: 100%` is what makes it a box at all:
+ * `ion-content`'s `.inner-scroll` is a definite-height flex child, and a relative
+ * div with auto height inside it is 0px tall.
+ */
+.astro {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  background: #1a152c;
+}
+
+/* ── Layer 1: the page ────────────────────────────────────────────────────── */
+
+.astro__scroll {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  /* The bar is `position: fixed`, so it does not take part in this scroller's
+     layout; without this the last picker row scrolls under it and becomes
+     unclickable. Bar height (~55px from its own padding) + its 12px offset +
+     a 20px breath. */
+  padding-bottom: calc(87px + env(safe-area-inset-bottom, 0px));
+  /* `MainCanvas` sets `touch-action: none` inline on the canvas host, which is
+     right on a rig bench where a drag is a camera gesture. The page overrides it
+     inline for this route; the scroller states it too, because a drag here is a
+     scroll and an iOS left-edge swipe must stay the system back gesture. */
+  touch-action: pan-y;
+  padding: 0 14px 128px;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(237 202 153 / 28%) transparent;
+}
+
+/**
+ * The hero, sized so the log panel starts below the character.
+ *
+ * Measured off the rig, not chosen by eye: camera `[0, 1.6, 7.5]`, fov 45, the
+ * body pinned to 1.1 world units at the drift's centre (`astroTexture.ts`). On a
+ * 390×688 phone the character is ~120 px of body with a halo twice that, and the
+ * drift keeps the body inside roughly the 30–70% vertical band. The scroller
+ * starts under the 56px header, so a 58% hero leaves the panel's top edge below
+ * the band — which is what keeps the character visible and a tap unambiguous.
+ *
+ * A percentage `min-height` resolves against the scroller's *definite* height (a
+ * percentage `padding-top` would resolve against its *width* — CSS percentages
+ * always do), which is the number this layout wants.
+ */
+.astro__hero {
+  /* Viewport units, not `%`: the hero's parent is the scroller's content box,
+     whose height is content-driven, so a percentage here resolves against a
+     circular reference and collapses to `auto`. 58vh puts the panel's top edge
+     at ~66% of the viewport, just below the 35–65% band the character's drift
+     covers — the text stays clear of the halo instead of catching its edge. */
+  min-height: 58vh;
+  padding-top: 20px;
+  box-sizing: border-box;
+  color: #fefbf5;
+}
+
+.astro__hero h1 {
+  margin: 0 0 10px;
+  color: #fefbf5;
+  font:
+    700 22px/1.22 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 14px rgb(26 21 44 / 80%);
+}
+
+.astro__hero h1 em {
+  color: #edca99;
+  font-style: normal;
+}
+
+.astro__hero p {
+  margin: 0;
+  max-width: 46ch;
+  color: rgb(254 251 245 / 82%);
+  font:
+    400 13.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-shadow: 0 1px 10px rgb(26 21 44 / 70%);
+}
+
+.astro__hero code {
+  color: #edca99;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+/* ── Layer 1a: the expression picker ──────────────────────────────────────── */
+
+.astro__panel {
+  margin: 0 0 14px;
+  padding: 14px 14px 12px;
+  border: 1px solid rgb(237 202 153 / 18%);
+  border-radius: 14px;
+  /* Translucent: the character passes behind the panel and a solid sheet here
+     would read as the canvas being cut out of the page. */
+  background: rgb(26 21 44 / 80%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #fefbf5;
+}
+
+.astro__panel h2 {
+  margin: 0 0 6px;
+  color: #fefbf5;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.astro__hint {
+  margin: 0 0 12px;
+  color: rgb(237 202 153 / 78%);
+  font:
+    400 12.5px/1.55 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+/**
+ * The twelve states, as chips.
+ *
+ * `grid` rather than `flex-wrap` so the three columns line up: the state names
+ * are two words long and unevenly sized, and a ragged wrap reads as a tag cloud
+ * instead of a picker.
+ */
+.astro__states {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.astro__state {
+  padding: 8px 6px;
+  border: 1px solid rgb(237 202 153 / 20%);
+  border-radius: 9px;
+  background: rgb(58 58 58 / 55%);
+  color: #fefbf5;
+  font:
+    500 11.5px/1.25 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease;
+}
+
+.astro__state--active {
+  border-color: transparent;
+  /* The branded gradient from the stylesheet's body, so the picker's selection
+     reads as part of the character. Cream caption is the sheet's own rule for
+     this gradient. */
+  background: linear-gradient(137deg, #ff8b00 0%, #fa6b2f 54%, #fe3402 100%);
+  color: #fefbf5;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgb(26 21 44 / 30%);
+}
+
+.astro__state:focus-visible {
+  outline: 2px solid #edca99;
+  outline-offset: 2px;
+}
+
+/* ── Layer 1b: the log the character writes into ──────────────────────────── */
+
+.astro__chat {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 210px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(237 202 153 / 28%) transparent;
+}
+
+.astro__chat li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  background: rgb(58 58 58 / 55%);
+  font:
+    400 12.5px/1.4 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.astro__chat__id {
+  flex: 0 0 auto;
+  min-width: 2.4em;
+  color: rgb(237 202 153 / 62%);
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.astro__chat__text {
+  flex: 1 1 auto;
+  color: #fefbf5;
+}
+
+.astro__chat__face {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgb(255 139 0 / 18%);
+  color: #edca99;
+  font:
+    500 10.5px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.astro__chat__at {
+  flex: 0 0 auto;
+  color: rgb(237 202 153 / 62%);
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.astro__chat__empty {
+  border: 1px dashed rgb(237 202 153 / 22%);
+  background: transparent;
+  color: rgb(237 202 153 / 70%);
+  font-style: italic;
+}
+
+.astro__table {
+  width: 100%;
+  border-collapse: collapse;
+  font:
+    500 11.5px/1.35 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.astro__table th {
+  padding: 6px 4px;
+  border-bottom: 1px solid rgb(237 202 153 / 20%);
+  color: rgb(237 202 153 / 62%);
+  font-weight: 500;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.astro__table td {
+  padding: 7px 4px;
+  border-bottom: 1px solid rgb(237 202 153 / 10%);
+  color: #fefbf5;
+}
+
+.astro__foot {
+  margin: 8px 0 0;
+  color: rgb(237 202 153 / 58%);
+  font:
+    400 11.5px/1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.astro__foot strong {
+  color: #edca99;
+  font-weight: 500;
+}
+
+/* ── Layer 1c: the explainer cards ────────────────────────────────────────── */
+
+.astro__card {
+  margin: 0 0 14px;
+  padding: 15px 16px;
+  border: 1px solid rgb(237 202 153 / 18%);
+  border-radius: 14px;
+  background: rgb(26 21 44 / 80%);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  color: #fefbf5;
+  font:
+    400 13.5px/1.62 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.astro__card h2 {
+  margin: 0 0 6px;
+  color: #fefbf5;
+  font:
+    600 15px/1.3 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+.astro__card p {
+  margin: 0 0 8px;
+}
+
+.astro__card p:last-child {
+  margin-bottom: 0;
+}
+
+.astro__card code {
+  color: #edca99;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.astro__card em {
+  color: #edca99;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ── Layer 2: the transparent canvas ──────────────────────────────────────── */
+
+/**
+ * The overlay.
+ *
+ * `position: fixed; inset: 0` — the canvas's box *is* the viewport, which is the
+ * precondition for `eventPrefix="client"`. `pointer-events: none` — R3F also sets
+ * it on the canvas element itself when `eventSource` is provided, and setting it
+ * on the wrapper keeps the host div and any future overlay child transparent to
+ * the pointer in one place.
+ */
+.astro__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/**
+ * `.canvas-host` is already `position: relative` at 100%×100%; pinning it to the
+ * overlay box is what keeps a host that ever grows padding from shrinking the
+ * canvas, which on a transparent overlay reads as "the character is gone" rather
+ * than as a layout bug.
+ */
+.astro-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Layer 3: the control bar ─────────────────────────────────────────────── */
+
+.astro__bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  /* The bar is fixed to the viewport, so it sits in the notch on a phone. */
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid rgb(237 202 153 / 20%);
+  border-radius: 14px;
+  background: rgb(26 21 44 / 92%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.astro__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  border: 1px solid rgb(237 202 153 / 20%);
+  border-radius: 10px;
+  background: rgb(58 58 58 / 75%);
+  color: #fefbf5;
+  font:
+    600 12.5px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  cursor: pointer;
+  transition:
+    background-color 240ms ease,
+    color 240ms ease;
+}
+
+.astro__btn:disabled {
+  border-color: rgb(58 58 58 / 50%);
+  background: rgb(58 58 58 / 50%);
+  color: rgb(254 251 245 / 45%);
+  cursor: not-allowed;
+}
+
+.astro__btn--accent {
+  border-color: transparent;
+  /* The stylesheet's one primary button: the body's own 137° gradient, with the
+     mid pole swapped for the colour the last tap rolled (`--astro-accent`, set
+     inline by `AstroPage`). Cream caption per `01-colour.md`; the fallback stop is
+     the flat brand orange, so the bar is never colourless. */
+  background: linear-gradient(
+    137deg,
+    #ff8b00 0%,
+    var(--astro-accent, #fa6b2f) 54.38%,
+    #fe3402 100%
+  );
+  color: #fefbf5;
+  text-shadow: 0 1px 1px rgb(26 21 44 / 35%);
+}
+
+.astro__btn--accent:disabled {
+  background: rgb(58 58 58 / 60%);
+  color: rgb(254 251 245 / 55%);
+}
+
+.astro__readout {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  white-space: nowrap;
+  color: rgb(237 202 153 / 72%);
+  font:
+    500 11px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+}
+
+.astro__swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--astro-accent, #fa6b2f);
+  transition: background-color 240ms ease;
+}

@@ -1,0 +1,890 @@
+/**
+ * The editor's own dark surface.
+ *
+ * It is deliberately not the app's Ionic theme: this is a tool, not a page, and the one thing a
+ * graph canvas cannot share with a mobile-first stylesheet is the assumption that a 44px tap
+ * target is the unit of layout. Type is 12–13px, hit targets are 24–28px, and every colour is a
+ * token here so the graph and the chrome cannot drift apart.
+ */
+
+.ed-shell {
+  --ed-bg: #0b0f14;
+  --ed-panel: #111823;
+  --ed-panel-2: #16202d;
+  --ed-line: #22303f;
+  --ed-line-2: #2c3d50;
+  --ed-text: #d9e2ec;
+  --ed-dim: #7d8fa3;
+  --ed-accent: #64d2ff;
+  --ed-accent-2: #f4a261;
+  --ed-danger: #f2716b;
+  --ed-ok: #74d99f;
+  --ed-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--ed-bg);
+  color: var(--ed-text);
+  font:
+    12px/1.45 system-ui,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  --ed-sidebar: 280px;
+  --ed-inspector: 340px;
+}
+
+.ed-shell *,
+.ed-shell *::before,
+.ed-shell *::after {
+  box-sizing: border-box;
+}
+
+.ed-mono {
+  font-family: var(--ed-mono);
+  font-size: 11px;
+  color: var(--ed-dim);
+}
+
+.ed-empty {
+  margin: 4px 0;
+  color: var(--ed-dim);
+  font-size: 11px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+
+.ed-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--ed-panel);
+  border-bottom: 1px solid var(--ed-line);
+}
+
+.ed-header__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ed-header__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ed-accent);
+  box-shadow: 0 0 8px var(--ed-accent);
+}
+
+.ed-header__file {
+  color: var(--ed-dim);
+  font-size: 11px;
+}
+
+.ed-header__state {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ed-panel-2);
+  color: var(--ed-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ed-header__state[data-dirty="true"] {
+  color: #1a1206;
+  background: var(--ed-accent-2);
+}
+
+.ed-header__tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--ed-panel-2);
+  border-radius: 8px;
+}
+
+.ed-tab {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ed-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ed-tab[data-active="true"] {
+  background: #24384b;
+  color: var(--ed-text);
+}
+
+.ed-header__stage {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.ed-segment {
+  padding: 4px 9px;
+  border: 1px solid var(--ed-line);
+  background: transparent;
+  color: var(--ed-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ed-segment:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.ed-segment:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.ed-segment[data-active="true"] {
+  background: #24384b;
+  color: var(--ed-text);
+  border-color: var(--ed-line-2);
+}
+
+.ed-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ed-btn {
+  padding: 4px 9px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 6px;
+  background: var(--ed-panel-2);
+  color: var(--ed-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ed-btn:hover:not(:disabled) {
+  border-color: var(--ed-accent);
+}
+
+.ed-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ed-btn--ghost {
+  background: transparent;
+  color: var(--ed-dim);
+}
+
+.ed-btn--play[data-active="true"] {
+  border-color: var(--ed-ok);
+  color: var(--ed-ok);
+}
+
+.ed-btn--danger {
+  border-color: #4a2323;
+  background: #2a1618;
+  color: var(--ed-danger);
+}
+
+.ed-header__phase {
+  font-family: var(--ed-mono);
+  font-size: 10px;
+  color: var(--ed-dim);
+}
+
+.ed-header__rebuild,
+.ed-behind {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  background: #2a2210;
+  border-bottom: 1px solid #4a3c14;
+  color: #f0c987;
+  font-size: 11px;
+}
+
+.ed-behind {
+  background: #10202a;
+  border-bottom-color: #1d3c4d;
+  color: var(--ed-accent);
+}
+
+.ed-header__error {
+  width: 100%;
+  padding: 4px 8px;
+  color: var(--ed-danger);
+  font-family: var(--ed-mono);
+  font-size: 11px;
+}
+
+.ed-header__status {
+  color: var(--ed-dim);
+  font-size: 11px;
+}
+
+/* ── Main ───────────────────────────────────────────────────────────── */
+
+.ed-main {
+  display: grid;
+  grid-template-columns: var(--ed-sidebar) 4px minmax(0, 1fr) 4px var(--ed-inspector);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ed-split {
+  background: var(--ed-line);
+  cursor: col-resize;
+}
+
+.ed-split:hover {
+  background: var(--ed-accent);
+}
+
+.ed-sidebar,
+.ed-inspector {
+  overflow: auto;
+  padding: 8px;
+  background: var(--ed-panel);
+}
+
+.ed-inspector {
+  border-left: 1px solid var(--ed-line);
+}
+
+.ed-sidebar {
+  border-right: 1px solid var(--ed-line);
+}
+
+.ed-center {
+  display: grid;
+  grid-template-rows: minmax(150px, 38%) minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ed-top {
+  display: grid;
+}
+
+/* ── Preview ────────────────────────────────────────────────────────── */
+
+.ed-preview {
+  position: relative;
+  min-height: 0;
+  border-bottom: 1px solid var(--ed-line);
+  background: #0b1020;
+}
+
+.ed-preview__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.ed-preview__error {
+  padding: 12px;
+  color: var(--ed-danger);
+  font-family: var(--ed-mono);
+  font-size: 11px;
+}
+
+.ed-preview__badge {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #0b1020cc;
+  color: var(--ed-dim);
+  font-family: var(--ed-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Stage / graph ──────────────────────────────────────────────────── */
+
+.ed-stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  position: relative;
+}
+
+.ed-stage__graph {
+  position: relative;
+  grid-row: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Explicit rows on both children: the absolutely positioned tools bar is a grid child, and
+   Chromium's auto-placement gives the timeline an *implicit* third row when it is in flow —
+   the stage then has the height, the strip does not, and the timeline paints outside its own
+   box. Naming the rows is what makes the mode ratios land on the right elements. */
+.ed-stage > .ed-timeline {
+  grid-row: 2;
+}
+
+/* The stage's three modes are row ratios, not three different components: `timeline` gives the
+   ruler the height a dope sheet needs, `split` halves it, `graph` leaves the strip as a footer.
+   A mode that only re-labelled itself would be a control that does nothing. */
+.ed-stage[data-mode="timeline"] {
+  grid-template-rows: 0 minmax(0, 1fr);
+}
+
+.ed-stage[data-mode="timeline"] .ed-stage__graph {
+  display: none;
+}
+
+.ed-stage[data-mode="split"] {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.ed-stage[data-mode="timeline"] .ed-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.ed-stage[data-mode="timeline"] .ed-ruler {
+  flex: 1;
+  min-height: 72px;
+}
+
+.ed-graph {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  background: #080c11;
+  cursor: grab;
+}
+
+.ed-graph__bg {
+  fill: #080c11;
+}
+
+.ed-graph__dot {
+  fill: #1b2733;
+}
+
+.ed-node__bg {
+  fill: #131e2a;
+  stroke: #2b3d50;
+  stroke-width: 1;
+}
+
+.ed-node__bg[data-type="exit"] {
+  stroke-dasharray: 3 3;
+}
+
+.ed-node[data-hovered="true"] .ed-node__bg {
+  stroke: var(--ed-accent);
+}
+
+.ed-node[data-selected="true"] .ed-node__bg {
+  stroke: var(--ed-accent);
+  stroke-width: 2;
+  fill: #16283a;
+}
+
+.ed-node[data-live="true"] .ed-node__bg {
+  stroke: var(--ed-ok);
+}
+
+.ed-node__title {
+  fill: var(--ed-text);
+  font: 12px var(--ed-mono);
+}
+
+.ed-node__meta {
+  fill: var(--ed-dim);
+  font: 10px var(--ed-mono);
+}
+
+.ed-node__progress {
+  fill: var(--ed-ok);
+}
+
+.ed-port circle {
+  fill: #1b2733;
+  stroke: var(--ed-line-2);
+  cursor: crosshair;
+}
+
+.ed-port:hover circle {
+  fill: var(--ed-accent);
+}
+
+.ed-link {
+  fill: none;
+  stroke: #33506b;
+  stroke-width: 1.5;
+  cursor: pointer;
+}
+
+.ed-link[data-any="true"] {
+  stroke-dasharray: 5 4;
+}
+
+.ed-link[data-selected="true"] {
+  stroke: var(--ed-accent);
+  stroke-width: 2.5;
+}
+
+.ed-link--draft {
+  stroke: var(--ed-accent-2);
+  stroke-dasharray: 4 4;
+  pointer-events: none;
+}
+
+.ed-pill rect {
+  fill: #101a24;
+  stroke: #2b3d50;
+}
+
+.ed-pill text {
+  fill: var(--ed-dim);
+  font: 10px var(--ed-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ed-pill[data-role="any"] rect {
+  stroke-dasharray: 3 3;
+}
+
+.ed-pill[data-selected="true"] rect {
+  stroke: var(--ed-accent);
+}
+
+.ed-drop {
+  fill: transparent;
+  pointer-events: all;
+}
+
+.ed-stage__tools {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 1;
+}
+
+.ed-stage__tools .ed-btn {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.ed-link--entry {
+  stroke-dasharray: 2 4;
+  stroke: #2c4a5e;
+}
+
+.ed-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--ed-mono);
+  font-size: 11px;
+}
+
+.ed-table th,
+.ed-table td {
+  text-align: left;
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--ed-line);
+}
+
+.ed-table th {
+  color: var(--ed-dim);
+  font-weight: 500;
+}
+
+/* ── Timeline ───────────────────────────────────────────────────────── */
+
+.ed-timeline {
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--ed-line);
+  background: var(--ed-panel);
+}
+
+.ed-timeline__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.ed-ruler {
+  position: relative;
+  height: 26px;
+  margin: 4px 0 6px;
+  border: 1px solid var(--ed-line);
+  border-radius: 4px;
+  background: #0b1119;
+}
+
+.ed-ruler--unknown {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ed-dim);
+  font-size: 10px;
+}
+
+.ed-ruler__tick {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  color: var(--ed-dim);
+  font-family: var(--ed-mono);
+  font-size: 9px;
+}
+
+.ed-ruler__marker {
+  position: absolute;
+  top: 14px;
+  width: 2px;
+  height: 10px;
+  background: var(--ed-accent-2);
+}
+
+.ed-telemetry {
+  display: grid;
+  gap: 2px;
+}
+
+.ed-telemetry__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ed-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #1b2733;
+  overflow: hidden;
+}
+
+.ed-bar__fill {
+  display: block;
+  height: 100%;
+  background: var(--ed-ok);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────────── */
+
+.ed-section {
+  margin-top: 10px;
+}
+
+.ed-section__title {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 4px;
+  color: var(--ed-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ed-section__count {
+  font-family: var(--ed-mono);
+}
+
+.ed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ed-row--tight {
+  margin-top: 4px;
+  gap: 4px;
+}
+
+.ed-row--item {
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ed-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ed-row--item:hover {
+  background: var(--ed-panel-2);
+}
+
+.ed-row--item[data-active="true"] {
+  background: #1d3145;
+}
+
+.ed-row__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ed-mono);
+  font-size: 11px;
+}
+
+.ed-row__name--button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ed-row__meta {
+  color: var(--ed-dim);
+  font-family: var(--ed-mono);
+  font-size: 10px;
+}
+
+.ed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ed-accent);
+}
+
+.ed-dot[data-kind="boolean"] {
+  background: var(--ed-ok);
+}
+
+.ed-dot[data-kind="trigger"] {
+  background: var(--ed-accent-2);
+}
+
+.ed-dot[data-kind="listener"] {
+  background: #a78bfa;
+}
+
+.ed-toggle {
+  width: 20px;
+  height: 18px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ed-dim);
+  font: 9px var(--ed-mono);
+  cursor: pointer;
+}
+
+.ed-toggle[data-on="true"] {
+  border-color: var(--ed-accent);
+  color: var(--ed-accent);
+}
+
+/* ── Inspector ──────────────────────────────────────────────────────── */
+
+.ed-inspector__close {
+  display: none;
+}
+
+.ed-inspector__empty {
+  padding: 8px;
+}
+
+.ed-inspector__empty p {
+  margin: 0 0 6px;
+}
+
+.ed-deck {
+  border: 1px solid var(--ed-line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ed-deck__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--ed-panel-2);
+  border-bottom: 1px solid var(--ed-line);
+}
+
+.ed-deck__id {
+  font-family: var(--ed-mono);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ed-deck__body {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.ed-chip {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #1d3145;
+  color: var(--ed-accent);
+  font-family: var(--ed-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ed-chip[data-type="transition"] {
+  color: var(--ed-accent-2);
+  background: #2a2318;
+}
+
+.ed-chip[data-type="layer"] {
+  color: #a78bfa;
+  background: #211b33;
+}
+
+.ed-field {
+  display: grid;
+  gap: 2px;
+}
+
+.ed-field__label {
+  color: var(--ed-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.ed-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 4px;
+  background: #0c141d;
+  color: var(--ed-text);
+  font: 11px var(--ed-mono);
+}
+
+.ed-input:focus {
+  outline: 1px solid var(--ed-accent);
+  border-color: var(--ed-accent);
+}
+
+.ed-input--slim {
+  width: auto;
+  flex: 1;
+}
+
+.ed-input--search {
+  margin-bottom: 4px;
+}
+
+.ed-textarea {
+  min-height: 90px;
+  padding: 6px;
+  border: 1px solid var(--ed-line-2);
+  border-radius: 4px;
+  background: #0c141d;
+  color: var(--ed-text);
+  font: 11px var(--ed-mono);
+  resize: vertical;
+}
+
+.ed-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.ed-deck__danger {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--ed-line);
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+
+.ed-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--ed-line);
+  background: var(--ed-panel);
+}
+
+/*
+ * Narrow layout: the stage keeps the screen, and the inspector becomes a sheet over it.
+ *
+ * A hidden inspector on a phone is an editor you cannot edit with — the graph is reachable
+ * and every deck is not. The sheet is the deck, anchored to the bottom and dismissed by
+ * deselecting (Escape, the graph's background, or the sheet's own close button), so there is
+ * no second piece of state for "is the sheet open".
+ */
+@media (max-width: 900px) {
+  .ed-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ed-sidebar,
+  .ed-split {
+    display: none;
+  }
+
+  .ed-inspector {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 4;
+    max-height: 62dvh;
+    border-left: 0;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -12px 40px #00000080;
+    transform: translateY(100%);
+    transition: transform 160ms ease;
+  }
+
+  .ed-inspector[data-open="true"] {
+    transform: translateY(0);
+  }
+
+  .ed-inspector__close {
+    display: block;
+    margin-left: auto;
+    padding: 4px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--ed-dim);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .ed-center {
+    grid-template-rows: minmax(120px, 32%) minmax(0, 1fr);
+  }
+
+  .ed-header__file,
+  .ed-header__phase,
+  .ed-footer .ed-mono {
+    display: none;
+  }
+}

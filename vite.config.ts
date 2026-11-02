@@ -105,6 +105,10 @@ export default defineConfig({
       // every `pnpm run theatre:state -- import` expands every `handles` array.
       // Same fight, same reason.
       "src/infrastructure/theatre/states/portfolio-project.state.json",
+      // Written by the machine editor's Save (`/__astro-editor/save`), which
+      // serialises with `JSON.stringify(…, 2)` too. The workspace file is
+      // git-ignored, but the formatter still sees it on disk.
+      "src/infrastructure/theatre/animationStateMachine/definitions/*.json",
     ],
   },
   lint: {

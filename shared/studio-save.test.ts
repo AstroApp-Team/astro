@@ -5,6 +5,7 @@ import {
   SAVED_SHAPE_KINDS,
   StudioSavePayloadSchema,
   THEATRE_STATE_DEFINITION_VERSION,
+  countSavedShapes,
   emptySavedShapes,
   emptyTheatreState,
   mergeProjectState,
@@ -65,11 +66,38 @@ describe("mergeProjectState", () => {
 describe("StudioSavePayloadSchema", () => {
   const payload = {
     state: state({ StudioSandbox: {} }),
-    shapes: { ...emptySavedShapes(), entries: [shape] },
+    shapes: { ...emptySavedShapes(), shapesBySheet: { SurfaceScene: [shape] } },
   };
 
   it("accepts what the Save button builds", () => {
     expect(StudioSavePayloadSchema.safeParse(payload).success).toBe(true);
+  });
+
+  it("keeps a bucket whose sheet this app does not mount, because the store round-trips it", () => {
+    // The schema cannot know the app's scene table — that would be a second
+    // source of truth for it. An unknown sheet id parses, and the store treats
+    // the bucket as inert: nothing renders it, and Save writes it back.
+    const parsed = StudioSavePayloadSchema.safeParse({
+      ...payload,
+      shapes: { ...payload.shapes, shapesBySheet: { SomeOtherScene: [shape] } },
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.shapes.shapesBySheet.SomeOtherScene).to.eql([shape]);
+  });
+
+  it("rejects a file that still has the legacy flat entries list, so a load falls back to the migration", () => {
+    const legacy = {
+      ...payload,
+      shapes: {
+        ordinal: 3,
+        sheetId: "SurfaceScene",
+        cameraKey: "Surface Camera",
+        entries: [shape],
+      },
+    };
+
+    expect(StudioSavePayloadSchema.safeParse(legacy).success).toBe(false);
   });
 
   it("carries the spawn ordinal through, because a reload must not reissue a theatreKey", () => {
@@ -83,7 +111,10 @@ describe("StudioSavePayloadSchema", () => {
   it("rejects a shape kind outside the catalogue", () => {
     const bad = {
       ...payload,
-      shapes: { ...payload.shapes, entries: [{ ...shape, kind: "dodecahedron" }] },
+      shapes: {
+        ...payload.shapes,
+        shapesBySheet: { StudioSandbox: [{ ...shape, kind: "dodecahedron" }] },
+      },
     };
     const parsed = StudioSavePayloadSchema.safeParse(bad);
 
@@ -124,11 +155,25 @@ describe("the empty files a checkout ships", () => {
     expect(emptyTheatreState().sheetsById).to.eql({});
   });
 
-  it("starts the counter at zero on the sandbox sheet", () => {
+  it("starts the counter at zero on the sandbox sheet with no buckets", () => {
     const shapes = emptySavedShapes();
     expect(shapes.ordinal).toBe(0);
     expect(shapes.sheetId).toBe("StudioSandbox");
-    expect(shapes.entries).to.eql([]);
+    expect(shapes.shapesBySheet).to.eql({});
+  });
+});
+
+describe("countSavedShapes", () => {
+  it("adds every bucket, because the save readout wants one number across sheets", () => {
+    expect(countSavedShapes(emptySavedShapes())).toBe(0);
+    expect(
+      countSavedShapes({
+        ordinal: 3,
+        sheetId: "SurfaceScene",
+        cameraKey: "Surface Camera",
+        shapesBySheet: { SurfaceScene: [shape], StudioSandbox: [shape, shape] },
+      }),
+    ).toBe(3);
   });
 });
 

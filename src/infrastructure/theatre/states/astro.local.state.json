@@ -1465,7 +1465,15 @@
     },
     "FloatScene": {
       "staticOverrides": {
-        "byObject": {}
+        "byObject": {
+          "Float Camera": {
+            "rotation": {
+              "x": 2.2048190464583186,
+              "y": 0,
+              "z": -3.141592653589793
+            }
+          }
+        }
       },
       "sequence": {
         "type": "PositionalSequence",
@@ -2172,9 +2180,267 @@
           }
         }
       }
+    },
+    "AstroScene": {
+      "staticOverrides": {
+        "byObject": {}
+      },
+      "sequence": {
+        "type": "PositionalSequence",
+        "length": 8,
+        "subUnitsPerUnit": 30,
+        "tracksByObject": {
+          "Astro": {
+            "trackIdByPropPath": {
+              "[\"position\",\"x\"]": "t-a-px",
+              "[\"position\",\"y\"]": "t-a-py",
+              "[\"position\",\"z\"]": "t-a-pz"
+            },
+            "trackData": {
+              "t-a-px": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Astro.position.x",
+                "keyframes": [
+                  {
+                    "id": "kf-a-x-001",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-x-002",
+                    "value": 0.7,
+                    "position": 2,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-x-003",
+                    "value": 0,
+                    "position": 4,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-x-004",
+                    "value": -0.7,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-x-005",
+                    "value": 0,
+                    "position": 8,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "t-a-py": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Astro.position.y",
+                "keyframes": [
+                  {
+                    "id": "kf-a-y-001",
+                    "value": 1.6,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-y-002",
+                    "value": 1.82,
+                    "position": 2,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-y-003",
+                    "value": 1.6,
+                    "position": 4,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-y-004",
+                    "value": 1.38,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-y-005",
+                    "value": 1.6,
+                    "position": 8,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              },
+              "t-a-pz": {
+                "type": "BasicKeyframedTrack",
+                "__debugName": "Astro.position.z",
+                "keyframes": [
+                  {
+                    "id": "kf-a-z-001",
+                    "value": 0,
+                    "position": 0,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-z-002",
+                    "value": -0.3,
+                    "position": 2,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-z-003",
+                    "value": 0,
+                    "position": 4,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-z-004",
+                    "value": 0.3,
+                    "position": 6,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  },
+                  {
+                    "id": "kf-a-z-005",
+                    "value": 0,
+                    "position": 8,
+                    "handles": [
+                      0.3333333333333333,
+                      0.3333333333333333,
+                      0.6666666666666666,
+                      0.6666666666666666
+                    ],
+                    "connectedRight": true,
+                    "type": "bezier"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "AstroV2Scene": {
+      "staticOverrides": {
+        "byObject": {
+          "Astro V2": {
+            "position": {
+              "z": 3.4999999999999987
+            }
+          }
+        }
+      },
+      "sequence": {
+        "type": "PositionalSequence",
+        "length": 8,
+        "subUnitsPerUnit": 30,
+        "tracksByObject": {}
+      }
     }
   },
   "revisionHistory": [
+    "TD9wpyB_wB5CkN58",
+    "nGvPrWqpo99J8cyg",
+    "IertauoSU0M2D571",
+    "OV0QbT4zStI33AYC",
+    "ZPexSrkQlyE_wJEA",
+    "FX7TFKfGJJKQi93M",
+    "2YEwGlrUwGxMN6B-",
     "U3Gl5EAy0qbGI3Jt",
     "xJpO8Zml_HjNGN01",
     "9-oDeqPE5wazohWH",

@@ -100,7 +100,16 @@ export const SavedShapeSchema = z.object({
  * hands out `Cube-0` a second time. Theatre then binds two meshes to the same
  * props, the same outliner row and the same keyframes — the shapes overlap and
  * animating one animates both. Saving the counter is what keeps a reload a
- * continuation instead of a fresh start.
+ * continuation instead of a fresh start. The ordinal is **global, not per
+ * sheet**: restarting it per sheet would reissue a live `theatreKey` the moment
+ * a second sheet spawns, and the two sheets' meshes would bind to one set of
+ * props.
+ *
+ * `shapesBySheet` is the partition that keeps a shape spawned in one scene from
+ * rendering in every scene: `<SpawnedShapes />` renders only the bucket matching
+ * the `SheetProvider` it is mounted in, so a cube in `SurfaceScene` is invisible
+ * on `/float`. A bucket whose key is not a sheet this app mounts is inert — it
+ * round-trips through Save untouched, and nothing renders it.
  *
  * `sheetId` and `cameraKey` are the tools' context, so a reload lands on the
  * sheet and camera the rig was being edited against.
@@ -109,7 +118,7 @@ export const SavedShapesSchema = z.object({
   ordinal: z.number().int().min(0).max(100_000),
   sheetId: z.string().min(4).max(60),
   cameraKey: z.string().min(1).max(60),
-  entries: z.array(SavedShapeSchema).max(200),
+  shapesBySheet: z.record(z.string().min(4).max(60), z.array(SavedShapeSchema).max(200)),
 });
 
 /**
@@ -140,7 +149,7 @@ export type StudioSavePayload = z.infer<typeof StudioSavePayloadSchema>;
 
 /** The empty file a checkout ships, and what "Clear" writes back. */
 export const SHAPES_FILE_HINT =
-  "Written by the Studio's Save button (dev only). Hand-edit it and reload the page: `entries` become the spawned shapes, `ordinal` is the next spawn number, `sheetId` and `cameraKey` are the tools' context. An entry needs id, kind (cube | sphere | flat-square | flat-circle), theatreKey (4+ chars, unique in the sheet), and position/rotation/scale as [x,y,z] — rotation in radians. Unknown keys are dropped; a malformed entry fails the whole load, and the dev server answers 400 naming the field.";
+  "Written by the Studio's Save button (dev only). Hand-edit it and reload the page: `shapesBySheet` maps a sheet id (e.g. SurfaceScene) to the shapes that scene renders, `ordinal` is the next spawn number (one global counter, shared by every sheet), `sheetId` and `cameraKey` are the tools' context. A shape needs id, kind (cube | sphere | flat-square | flat-circle), theatreKey (4+ chars, unique in the sheet), and position/rotation/scale as [x,y,z] — rotation in radians. A file in the old single-`entries` layout is migrated automatically on load: everything lands in its `sheetId` bucket. Unknown keys are dropped; a malformed entry fails the whole load, and the dev server answers 400 naming the field.";
 
 export function emptyTheatreState(): TheatreState {
   return {
@@ -151,7 +160,12 @@ export function emptyTheatreState(): TheatreState {
 }
 
 export function emptySavedShapes(sheetId = "StudioSandbox", cameraKey = "Camera"): SavedShapes {
-  return { ordinal: 0, sheetId, cameraKey, entries: [] };
+  return { ordinal: 0, sheetId, cameraKey, shapesBySheet: {} };
+}
+
+/** Total shapes across every sheet — the count the save readout prints. */
+export function countSavedShapes(shapes: SavedShapes): number {
+  return Object.values(shapes.shapesBySheet).reduce((total, entries) => total + entries.length, 0);
 }
 
 /**
