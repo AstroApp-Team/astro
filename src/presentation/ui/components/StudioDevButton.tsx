@@ -38,6 +38,18 @@ export default function StudioDevButton() {
       <Link className="studio-dev-button" to="/float">
         Float overlay
       </Link>
+      <Link className="studio-dev-button" to="/astro">
+        Astro overlay
+      </Link>
+      <Link className="studio-dev-button" to="/astro-v2">
+        Astro v2
+      </Link>
+      <Link className="studio-dev-button" to="/machine">
+        Machine
+      </Link>
+      <Link className="studio-dev-button" to="/editor?editor">
+        Machine editor
+      </Link>
       <Link className="studio-dev-button" to="/surface">
         Page textures
       </Link>
