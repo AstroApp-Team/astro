@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "name": "machine-demo",
+  "inputs": [
+    {
+      "kind": "trigger",
+      "name": "wave"
+    },
+    {
+      "kind": "trigger",
+      "name": "rest"
+    },
+    {
+      "kind": "number",
+      "name": "flutter",
+      "default": 0,
+      "min": 0,
+      "max": 1
+    }
+  ],
+  "layers": [
+    {
+      "id": "base",
+      "priority": 0,
+      "blend": "override",
+      "weight": 1,
+      "states": [
+        {
+          "id": "idle",
+          "type": "clip",
+          "clip": "demo.idle"
+        },
+        {
+          "id": "wave",
+          "type": "clip",
+          "clip": "demo.wave",
+          "speed": 1
+        }
+      ],
+      "transitions": [
+        {
+          "from": "idle",
+          "to": "wave",
+          "when": {
+            "input": "wave",
+            "op": "fired"
+          },
+          "duration": 0.3
+        },
+        {
+          "from": "wave",
+          "to": "idle",
+          "when": {
+            "input": "rest",
+            "op": "fired"
+          },
+          "duration": 0.25,
+          "interruption": "interrupt"
+        }
+      ],
+      "anyState": [],
+      "entry": [
+        {
+          "to": "idle"
+        }
+      ]
+    },
+    {
+      "id": "flutter",
+      "priority": 10,
+      "blend": "override",
+      "weight": 1,
+      "states": [
+        {
+          "id": "idle",
+          "type": "clip",
+          "clip": "demo.idle"
+        },
+        {
+          "id": "lift",
+          "type": "clip",
+          "clip": "demo.wave",
+          "play": {
+            "kind": "loop"
+          },
+          "speed": 1.4
+        }
+      ],
+      "transitions": [
+        {
+          "from": "idle",
+          "to": "lift",
+          "when": {
+            "input": "flutter",
+            "op": "greaterOrEqual",
+            "value": 0.5
+          },
+          "duration": 0.25
+        },
+        {
+          "from": "lift",
+          "to": "idle",
+          "when": {
+            "input": "flutter",
+            "op": "lessThan",
+            "value": 0.5
+          },
+          "duration": 0.25
+        }
+      ],
+      "anyState": [],
+      "entry": [
+        {
+          "to": "idle"
+        }
+      ],
+      "mask": "handOnly"
+    }
+  ],
+  "listeners": [
+    {
+      "target": {
+        "mesh": "head"
+      },
+      "event": "pointerDown",
+      "actions": [
+        {
+          "fire": "wave"
+        }
+      ]
+    },
+    {
+      "target": {
+        "mesh": "head"
+      },
+      "event": "drag",
+      "actions": [
+        {
+          "setFromDrag": "flutter",
+          "axis": "y",
+          "map": [
+            0,
+            1,
+            0,
+            1
+          ]
+        }
+      ]
+    }
+  ],
+  "masks": {
+    "handOnly": {
+      "bones": [
+        "hand"
+      ]
+    }
+  }
+}
