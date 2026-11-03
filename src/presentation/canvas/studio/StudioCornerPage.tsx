@@ -19,6 +19,7 @@ import { StatusBarService } from "@infra/native/StatusBarService.ts";
 import { ensureStudio, hideStudioUi, showStudioUi } from "@infra/theatre/studioInit.ts";
 import { SHEET_IDS, studioSheet } from "@infra/theatre/project.ts";
 import MainCanvas from "@presentation/canvas/MainCanvas.tsx";
+import ToolsDock from "@presentation/canvas/studio/tools/ToolsDock.tsx";
 import { aimCameraAt } from "@presentation/canvas/studio/shapeTools/aimService.ts";
 import { openShapeMenuFromElement } from "@presentation/canvas/studio/shapeTools/shapeMenuController.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
@@ -254,6 +255,7 @@ export default function StudioCornerPage() {
               </div>
             </dl>
           </div>
+          <ToolsDock studio={studio} />
         </div>
       </IonContent>
     </IonPage>
