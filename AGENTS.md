@@ -208,6 +208,20 @@ releasePointerCapture }` (R3F 9.8.2, `dist/events-*.esm.js`), typed as `EventTar
 
 Full rigging workflow, including the export/land step, is in `extra_docs/THEATRE.md`.
 
+- **The rig bench's tools live in an app-level dock, not in the Studio's chrome.** Every
+  authoring tool used to be reachable only through the Theatre.js panel — a floating overlay
+  you have to toggle, dev-and-desktop only, whose chrome is a shadow root no app stylesheet
+  can reach — so `/studio-corner` and `/rig/:sceneId` showed a canvas and a play button.
+  `presentation/canvas/studio/tools/ToolsDock.tsx` fixes that: a rail of panels (Scene tools,
+  Machine, Character) that mounts **the same pane components** the Studio extension registers,
+  into windows the app owns. Two details are load-bearing and both are silent when wrong:
+  the dock is **portalled to `document.body`** because `IonContent` is its own stacking
+  context while `#theatrejs-studio-root` is a body-level fixed overlay at `z-index: 100` — a
+  `position: fixed` dock rendered inside the page is visible and unclickable, with the empty
+  Studio root swallowing every press; and each window body needs an **opaque background**
+  because the panes are transparent by design (they were built to sit inside the Studio's
+  dark chrome). The rail sits at `z-index: 110`, above the Studio on purpose.
+
 - **`/studio-corner` is the rigging sandbox.** `StudioSandboxScene` mounts three
   `EditableNodePrefab`s against its own sheet (`StudioSandbox`), so a clip rigged
   there cannot touch a production scene's timeline. Rig a scene by copying it into
