@@ -1,0 +1,325 @@
+/**
+ * The tools dashboard.
+ *
+ * These windows float over a WebGL canvas and sit next to the Studio's own chrome, so the
+ * one rule is: the app's palette, its own z-index band, and never a shadow root — the
+ * panels are app DOM precisely because the Studio's DOM is not reachable.
+ *
+ * `z-index: 60` is above the page toolbars (`50`), below the shape flyout (`70`) and well
+ * below the Studio's own root (`100`). A window that covered the Studio panel would make
+ * the Studio's toolbar untappable, which is the bug this dock exists to avoid repeating.
+ */
+
+.tools {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  pointer-events: none;
+}
+
+/*
+ * A rail on the right edge, not a bar across the bottom: the rig pages already own the
+ * bottom-left corner with their own toolbar, and a dock that covers it is a second bug
+ * on the page it was meant to fix.
+ *
+ * `z-index: 110` is above the Theatre.js root (100) on purpose. The whole reason this
+ * exists is that the Studio's chrome is the only place the tools used to live, so a dock
+ * that the Studio panel can cover would reproduce the complaint it fixes.
+ */
+.tools__bar {
+  pointer-events: auto;
+  position: fixed;
+  top: 110px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px;
+  background: #0d131b;
+  border: 1px solid #26313d;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px #00000080;
+}
+
+.tools__label {
+  padding: 0 2px 2px;
+  color: #7d8fa3;
+  font:
+    600 10px/1 system-ui,
+    sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.tools__tab {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid #2c3d50;
+  border-radius: 6px;
+  background: #131d27;
+  color: #d9e2ec;
+  font:
+    12px/1.2 system-ui,
+    sans-serif;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tools__tab:hover {
+  border-color: #64d2ff;
+}
+
+.tools__tab[data-active="true"] {
+  border-color: #64d2ff;
+  background: #16283a;
+}
+
+.tools__tab-count {
+  color: #7d8fa3;
+  font-size: 10px;
+}
+
+.tools__tab--link {
+  color: #64d2ff;
+}
+
+/* ── Windows ──────────────────────────────────────────────────────────── */
+
+.tools-window {
+  pointer-events: auto;
+  position: fixed;
+  top: 110px;
+  right: 220px;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100dvh - 180px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #101823;
+  border: 1px solid #2c3d50;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px #000000a6;
+  color: #d9e2ec;
+  font:
+    12px/1.45 system-ui,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.tools-window[data-minimised="true"] {
+  max-height: none;
+}
+
+.tools-window__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #16202d;
+  border-bottom: 1px solid #26313d;
+  cursor: grab;
+  touch-action: none;
+}
+
+.tools-window__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #64d2ff;
+}
+
+.tools-window__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tools-window__summary {
+  color: #7d8fa3;
+  font-size: 10px;
+}
+
+.tools-window__btn {
+  margin-left: auto;
+  width: 22px;
+  height: 20px;
+  border: 1px solid #2c3d50;
+  border-radius: 4px;
+  background: transparent;
+  color: #9fb0c2;
+  font:
+    11px/1 system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.tools-window__btn + .tools-window__btn {
+  margin-left: 0;
+}
+
+.tools-window__btn:hover {
+  border-color: #64d2ff;
+  color: #64d2ff;
+}
+
+.tools-window__body {
+  overflow: auto;
+  padding: 8px;
+  min-height: 0;
+  /*
+   * Solid, because the panes are transparent by design (they were built to sit inside the
+   * Studio's own dark chrome). Without this the Studio's outline tree reads through the
+   * panel and the two texts look like one broken pane.
+   */
+  background: #0f1620;
+}
+
+.tools-window__body--react {
+  padding: 10px;
+}
+
+.tools-empty {
+  margin: 0;
+  color: #7d8fa3;
+  font-size: 11px;
+}
+
+/* ── The character panel ──────────────────────────────────────────────── */
+
+.tools-astro {
+  display: grid;
+  gap: 14px;
+}
+
+.tools-astro__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 6px;
+  color: #7d8fa3;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tools-astro__hint {
+  color: #64d2ff;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.tools-astro__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tools-chip {
+  padding: 3px 7px;
+  border: 1px solid #2c3d50;
+  border-radius: 999px;
+  background: transparent;
+  color: #c8d4e0;
+  font:
+    10px/1.3 ui-monospace,
+    "SF Mono",
+    Menlo,
+    monospace;
+  cursor: pointer;
+}
+
+.tools-chip[data-transient="true"] {
+  border-style: dashed;
+}
+
+.tools-chip[data-active="true"] {
+  border-color: #64d2ff;
+  background: #16283a;
+  color: #64d2ff;
+}
+
+.tools-astro__note {
+  margin: 8px 0 0;
+  color: #6d7f92;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.tools-astro__knobs {
+  display: grid;
+  gap: 8px;
+}
+
+.tools-knob {
+  display: grid;
+  gap: 2px;
+}
+
+.tools-knob__label {
+  display: flex;
+  justify-content: space-between;
+  color: #c8d4e0;
+  font-size: 11px;
+}
+
+.tools-knob__value {
+  color: #64d2ff;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+}
+
+.tools-knob input[type="range"] {
+  width: 100%;
+  accent-color: #64d2ff;
+}
+
+.tools-knob__hint {
+  color: #6d7f92;
+  font-size: 9px;
+}
+
+.tools-btn {
+  padding: 3px 8px;
+  border: 1px solid #2c3d50;
+  border-radius: 5px;
+  background: transparent;
+  color: #9fb0c2;
+  font:
+    11px/1.2 system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.tools-btn--tiny {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.tools-btn:hover {
+  border-color: #64d2ff;
+  color: #64d2ff;
+}
+
+@media (max-width: 720px) {
+  .tools__bar {
+    top: auto;
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+    right: 8px;
+  }
+
+  .tools-window {
+    top: auto;
+    right: 8px;
+    bottom: calc(210px + env(safe-area-inset-bottom, 0px));
+    left: 8px;
+    width: auto;
+    max-height: 52dvh;
+  }
+}
