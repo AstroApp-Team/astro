@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import type { Machine } from "@core/models/animationStateMachine.ts";
 import { MachineCanvas } from "@presentation/canvas/machine/MachineCanvas.tsx";
+import ToolsDock from "@presentation/canvas/studio/tools/ToolsDock.tsx";
 import { useAnimationMachine } from "@presentation/canvas/machine/useAnimationMachine.ts";
 import {
   loadMachineDefinition,
@@ -215,6 +216,7 @@ export default function MachinePage() {
             )}
           </section>
         </div>
+        <ToolsDock studio={null} />
       </IonContent>
     </IonPage>
   );

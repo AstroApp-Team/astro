@@ -12,12 +12,15 @@ import { arrowBackOutline, playOutline, squareOutline, syncOutline } from "ionic
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+import type { IStudio } from "@theatre/studio";
+
 import { SCENE_IDS, type SceneId, isSceneId } from "@core/models/scene.ts";
 import { StatusBarService } from "@infra/native/StatusBarService.ts";
 import { SCENE_SHEET_IDS, getSheet } from "@infra/theatre/project.ts";
 import { ensureStudio, hideStudioUi, showStudioUi } from "@infra/theatre/studioInit.ts";
 import { useSheetPlayback } from "@infra/theatre/useSheetPlayback.ts";
 import MainCanvas from "@presentation/canvas/MainCanvas.tsx";
+import ToolsDock from "@presentation/canvas/studio/tools/ToolsDock.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
 import { useShapeStore } from "@presentation/state/useShapeStore.ts";
@@ -54,6 +57,8 @@ export default function RigPage() {
   const { sceneId } = useParams<{ sceneId?: string }>();
   const [studioUiVisible, setStudioUiVisible] = useState(false);
   const [studioReady, setStudioReady] = useState(false);
+  /** The instance, not just a boolean: the tools dock mounts panes into it. */
+  const [studio, setStudio] = useState<IStudio | null>(null);
 
   const scene: SceneId | null = isSceneId(sceneId) ? sceneId : null;
 
@@ -101,6 +106,7 @@ export default function RigPage() {
       if (cancelled || studio == null) {
         return;
       }
+      setStudio(studio);
       setStudioReady(true);
       setStudioUiVisible(showStudioUi());
     });
@@ -148,6 +154,7 @@ export default function RigPage() {
   return (
     <RigBench
       scene={scene}
+      studio={studio}
       studioReady={studioReady}
       studioUiVisible={studioUiVisible}
       onToggleStudio={() => {
@@ -159,12 +166,13 @@ export default function RigPage() {
 
 type RigBenchProps = {
   scene: SceneId;
+  studio: IStudio | null;
   studioReady: boolean;
   studioUiVisible: boolean;
   onToggleStudio(): void;
 };
 
-function RigBench({ scene, studioReady, studioUiVisible, onToggleStudio }: RigBenchProps) {
+function RigBench({ scene, studio, studioReady, studioUiVisible, onToggleStudio }: RigBenchProps) {
   const sheet = getSheet(SCENE_SHEET_IDS[scene]);
   const playback = useSheetPlayback(sheet);
   /** Read on button clicks only — a live playhead readout re-renders 60 times a second. */
@@ -258,6 +266,7 @@ function RigBench({ scene, studioReady, studioUiVisible, onToggleStudio }: RigBe
               </div>
             </dl>
           </div>
+          <ToolsDock studio={studio} />
         </div>
       </IonContent>
     </IonPage>

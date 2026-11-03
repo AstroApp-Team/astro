@@ -517,6 +517,40 @@ studio.extend(config)                        // 1. register — before initializ
 studio.initialize({ usePersistentStorage: false })  // 2. paint the toolbar; the files are the persistence
 ```
 
+## The tools dock
+
+`/studio-corner`, `/rig/:sceneId` and `/machine` carry a **Tools** rail on the right edge
+(`presentation/canvas/studio/tools/ToolsDock.tsx`). It is the app-level door to every
+authoring panel:
+
+| Panel       | What it does                             | Where the code lives                            |
+| ----------- | ---------------------------------------- | ----------------------------------------------- |
+| Scene tools | spawn/aim/save, sheet picker, shape list | `canvas/studio/shapeTools/ShapePalettePane.tsx` |
+| Machine     | layers, clip assignment, input writes    | `canvas/studio/machineTools/MachinePane.tsx`    |
+| Character   | 12 expressions + the v2 look uniforms    | `canvas/studio/tools/AstroPane.tsx`             |
+| Editor ↗    | the machine editor, new tab              | `/editor?editor`                                |
+| Demo ↗      | the machine demo, new tab                | `/machine`                                      |
+
+The panels are the _same components_ the Studio extension registers as `panes[]`; the dock
+mounts them into nodes it owns, with the same `mount(node) → teardown` contract. That means
+they work even when the Theatre.js panel is closed, not initialised, or unusable at a
+phone-sized window, and a closed window holds no subscriptions.
+
+Two things about this file are not cosmetic:
+
+1. **It portals to `document.body`.** `IonContent` establishes a stacking context, so a
+   `position: fixed` dock rendered inside the page competes at the page's z-index — and
+   `#theatrejs-studio-root` is a body-level fixed overlay at `z-index: 100`. The rail was
+   visible and every press was swallowed by the empty Studio root. Body is the only stacking
+   context the two share, and the rail is `z-index: 110` so the Studio cannot cover it.
+2. **Window bodies are opaque.** The panes are transparent by design (they were built for the
+   Studio's dark chrome), so without a background the outline tree behind reads through and
+   two texts look like one broken pane.
+
+The Character panel is a store consumer, not a rig editor: `expression` and the v2 tunables
+are app state, and a keyframed expression or wave would win over these controls silently —
+which is why the two astro scenes carry only the character's `position` on their sheets.
+
 ## Rigging a clip for the state machine
 
 The machine's clips are Theatre timelines. The bridge is a second dev-only extension,
