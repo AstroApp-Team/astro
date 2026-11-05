@@ -27,7 +27,7 @@
  * survives oblique angles the way a flattened disc would not.
  */
 
-import { type ThreeEvent, useFrame } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import { MathUtils, type Mesh, Vector3 } from "three";
 
@@ -68,19 +68,11 @@ function damp(current: number, target: number, lambda: number, delta: number): n
 }
 
 export type AstroCharacterProps = {
-  /** Where the character sits, in the hero's camera space. */
+  /** Where the character sits, in the overlay's camera space. */
   position?: [number, number, number];
-  /** A press that reached the body. */
-  onPress?: (event: ThreeEvent<PointerEvent>) => void;
 };
 
-/** A body with no handler: still tappable, the press just does nothing. */
-const NO_PRESS = () => {};
-
-export function AstroCharacter({
-  position = [0, 1.6, 0],
-  onPress = NO_PRESS,
-}: AstroCharacterProps) {
+export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) {
   const tunables = useAstroV2Store((state) => state.tunables);
   /*
    * Subscribed normally: the expression changes on a press or a session event, not
@@ -242,12 +234,7 @@ export function AstroCharacter({
         <sphereGeometry args={[1, 64, 48]} />
       </mesh>
 
-      <mesh
-        ref={bodyRef}
-        material={bodyMaterial}
-        scale={ASTRO_V2_BODY_RADIUS}
-        onPointerDown={onPress}
-      >
+      <mesh ref={bodyRef} material={bodyMaterial} scale={ASTRO_V2_BODY_RADIUS}>
         <sphereGeometry args={[1, 72, 48]} />
       </mesh>
 

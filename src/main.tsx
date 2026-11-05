@@ -10,7 +10,8 @@ import "@ionic/react/css/structure.css";
 import "@ionic/react/css/typography.css";
 import "./theme/variables.css";
 import "./theme/voice.css";
-/* The hero character's own palette; it is a closed box, not part of the Ionic theme. */
+/* Astro's overlay. The character paints over the page, so the file has no Ionic theme
+   variables in it — the only sheet colours in the app are here and in the shaders. */
 import "./theme/astro.css";
 
 import App from "./App.tsx";

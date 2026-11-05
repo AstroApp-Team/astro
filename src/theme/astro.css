@@ -1,141 +1,75 @@
 /**
- * Astro on the voice page.
+ * Astro as a corner presence over the voice page.
  *
- * The character's own colours are the stylesheet's, not Ionic's, and they are
- * hard-coded on purpose: `#FF8B00` → `#FE3402` is the body's ramp and `#1a0703` is
- * the near-black warm brown the sheet puts the spark on. Ionic's palette follows the
- * OS setting (`variables.css`), so the hero is a closed box with its own background —
- * a transparent canvas over the system background would leave the halo's additive
- * glow over a surface the sheet never uses.
+ * The layer is a body-level `position: fixed` overlay with **`pointer-events: none`**.
+ * That single property is what makes the shape usable: the canvas covers the whole
+ * viewport, and the page's buttons, inputs and scroll must keep working underneath it.
+ * It also means the canvas is never a hit target, so nothing here raycasts — the pointer
+ * is read from a window listener in `AstroOverlay.tsx`.
  *
- * The height is a fixed clamp, **not** `height: 100%`. An `ion-content` scroller
- * gives a `height: 100%` child the scroller's box, and here that is a box inside a
- * padded scroller, which is exactly how a WebGL canvas ends up a black strip: the
- * host must have a height of its own before R3F measures it.
+ * `inset: 0` is required, not decorative: the canvas box must start at the viewport
+ * origin, which is what the pointer normalisation in `lookFromPointer` assumes.
+ *
+ * The layer is transparent (`alpha: true` in the Canvas) so the page's own background —
+ * Ionic's palette, which follows the OS setting — stays visible. The character carries
+ * its own light: the halo is additive, and the body's colours are the sheet's ramp.
+ * There is no dark box behind him, which is the whole point of an overlay.
  */
 
-.astro-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-  border: 1px solid rgb(255 139 0 / 14%);
-  border-radius: 18px;
-  /* The sheet's spark sits on a near-black warm brown, not on pure black. */
-  background: radial-gradient(120% 90% at 50% 42%, #2a0d05 0%, #16060a 55%, #0b0406 100%);
-  color: #ffe9d8;
-  padding: 0.5rem;
-  overflow: hidden;
+.astro-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above the page's own content, below the Studio panel (`#theatrejs-studio-root` is
+     100) so the rigging overlay on a dev desktop is never covered by the glow. */
+  z-index: 1;
+  pointer-events: none;
 }
 
-.astro-hero__canvas {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: clamp(170px, 30vh, 240px);
-}
-
-/* R3F sizes the canvas to this box. It is not a hit-target problem here — the box
-   holds nothing but the character — but the layering matters for the fallback notice. */
-.astro-hero__canvas > div {
+/* R3F sizes its container to this box. Without `inset: 0` above, the box would be 0×0
+   and the character would be invisible with no error. */
+.astro-overlay > div {
   position: absolute;
   inset: 0;
 }
 
-.astro-hero__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0 0.25rem;
-}
-
-.astro-hero__readout {
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
-  color: #c8997c;
-}
-
-.astro-hero__readout strong {
-  color: #ffe2c7;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.astro-hero__states {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-/* Plain buttons rather than `IonButton`: these are the character's states, and an
-   Ionic button brings the system palette and a 44px tall pill into a row of eight. */
-.astro-hero__state {
-  min-height: 30px;
-  padding: 5px 9px;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 9px;
-  background: rgb(255 255 255 / 4%);
-  color: #ffdcc2;
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-  transition:
-    background 120ms ease,
-    border-color 120ms ease;
-}
-
-.astro-hero__state--active {
-  border-color: #ff8b00;
-  background: rgb(255 139 0 / 22%);
-  color: #fff3e6;
-}
-
-.astro-hero__state:focus-visible {
-  outline: 2px solid #ff8b00;
-  outline-offset: 2px;
-}
-
-/* ── the canvas fallback: what a page shows when its 3D cannot start ─────────────
-   It fills the canvas host, so it has to be neutral rather than on-brand: it is not
-   art, it is a notice. A WebView with a blocklisted or software GL driver throws from
-   `new WebGLRenderer()`, and without this the throw escapes R3F and unmounts the app. */
-
+/*
+ * The no-GL-context notice, in the same corner as the character it replaces. `CanvasBoundary`
+ * renders this markup, so the selectors are its own (`__title` / `__body` / `__detail`), and
+ * `.mono` is the class it puts on the detail line.
+ */
 .canvas-fallback {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
-  border: 1px solid #e8b4a0;
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  max-width: 340px;
+  padding: 8px 10px;
+  border: 1px solid rgb(255 139 0 / 20%);
   border-radius: 10px;
-  background: rgb(255 248 244 / 92%);
-  color: #5b2b18;
-  font:
-    12px/1.45 ui-sans-serif,
-    system-ui,
-    sans-serif;
+  background: rgb(26 7 3 / 82%);
+  color: #ffe9d8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  /* Same rule as the layer above: a notice that cannot be drawn must not eat a press. */
   pointer-events: none;
 }
 
 .canvas-fallback__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
+  display: block;
+  margin-bottom: 4px;
 }
 
 .canvas-fallback__body {
-  margin: 0;
-  max-width: 42ch;
+  display: block;
+  margin-bottom: 4px;
 }
 
 .canvas-fallback__detail {
-  margin: 0;
-  opacity: 0.7;
-  font:
-    11px/1.4 ui-monospace,
-    monospace;
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
 }
 
 .mono {
-  font-family: ui-monospace, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
