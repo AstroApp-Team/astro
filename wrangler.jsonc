@@ -11,11 +11,15 @@
   // `directory` is deliberately omitted: @cloudflare/vite-plugin fills it in
   // on the generated output wrangler.json, pointing at the client build.
   //
-  // Assets are matched before the Worker runs, so /api/* falls through to Hono
-  // on its own — no `run_worker_first` needed. SPA routes never invoke the
-  // Worker, which also means they are not billed.
+  // Assets are matched before the Worker runs. `/api/*` is routed to the Worker first,
+  // which makes the asset config statically routed — and that is what lets
+  // `not_found_handling` apply to *any* request rather than only ones carrying
+  // `Sec-Fetch-Mode: navigate`. Without it, a deep link from curl, an iframe, a preview
+  // pane, or a WebView that omits Sec-Fetch headers gets a 404 instead of index.html.
+  // SPA routes still never invoke the Worker, so they are not billed.
   "assets": {
     "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
   },
   // Binding stays `DB`: worker/index.ts reads c.env.DB and the generated
   // CloudflareBindings interface declares it under that name.
