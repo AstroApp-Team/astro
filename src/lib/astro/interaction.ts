@@ -10,6 +10,29 @@
 import { type AstroExpression } from "./astro.ts";
 
 /**
+ * The direction he should look, given where the pointer is and where he is.
+ *
+ * Both inputs are `[-1, 1]` viewport space with y up. A corner character never sits at
+ * `(0, 0)`, so the pointer cannot be the gaze directly: with absolute viewport coordinates,
+ * a cursor parked next to him (bottom-right) reads as `(1, -1)` and he stares at the corner
+ * instead of at the cursor. Subtracting his own position is the difference between "where
+ * the pointer is" and "which way the pointer is from him".
+ *
+ * Normalised to length 1 at most, not clamped per axis: `followPointer` adds this to the
+ * expression's resting look and radially clamps the sum, so a vector longer than 1 would let
+ * a cursor far away erase his resting look instead of pulling it to the rim.
+ */
+export function gazeDirection(
+  pointer: { x: number; y: number },
+  origin: { x: number; y: number },
+): { x: number; y: number } {
+  const direction = { x: pointer.x - origin.x, y: pointer.y - origin.y };
+  const length = Math.hypot(direction.x, direction.y);
+  const scale = length > 1 ? 1 / length : 1;
+  return { x: direction.x * scale, y: direction.y * scale };
+}
+
+/**
  * The parts of the realtime session the face cares about.
  *
  * Typed structurally rather than as `Experimental_RealtimeStatus`: this is the

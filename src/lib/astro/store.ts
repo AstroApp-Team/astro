@@ -36,7 +36,13 @@ export type AstroStore = {
    * a second to move two prisms the frame loop is moving anyway.
    */
   look: { x: number; y: number };
+  /**
+   * Where the character is, as the same `[-1, 1]` viewport space the pointer is written
+   * in. Set from inside the canvas, where the corner position is known.
+   */
+  lookOrigin: { x: number; y: number };
   setLook(x: number, y: number): void;
+  setLookOrigin(x: number, y: number): void;
   /**
    * Show a state the session implies.
    *
@@ -53,9 +59,14 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
   expression: ASTRO_DEFAULT_EXPRESSION,
   resting: ASTRO_DEFAULT_EXPRESSION,
   look: { x: 0, y: 0 },
+  lookOrigin: { x: 0, y: 0 },
 
   setLook(x, y) {
     set({ look: { x, y } });
+  },
+
+  setLookOrigin(x, y) {
+    set({ lookOrigin: { x, y } });
   },
 
   setExpression(expression) {

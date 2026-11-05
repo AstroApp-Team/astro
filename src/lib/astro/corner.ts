@@ -6,6 +6,11 @@
  * lands somewhere different on every aspect ratio, and the inset has to be measured
  * against the halo rather than the body. `ASTRO_V2_HALO_RADIUS` is that radius in world
  * units (`ASTRO_V2_BODY_RADIUS * 1.9`; the sheet's own figure is `1.8 R`).
+ *
+ * The framing is **orthographic**, so `HalfExtent` is supplied by the caller rather than
+ * derived from a field of view: an orthographic frustum is set in world units and scaled
+ * by `zoom`, and the visible half extents are `pixels / (2 · zoom)`. Both projections are
+ * expressed here so the corner arithmetic has one shape regardless.
  */
 
 import { ASTRO_V2_HALO_RADIUS } from "./astroV2.ts";
@@ -31,6 +36,12 @@ export const ASTRO_CORNER_INSET_RATIO = 0.85;
  */
 export const ASTRO_CORNER_EDGE_RATIO = 0.45;
 
+/** Half the visible box at the character's plane, in world units. */
+export type HalfExtent = {
+  halfWidth: number;
+  halfHeight: number;
+};
+
 export type CornerInput = {
   /** Canvas width / height. */
   aspect: number;
@@ -42,27 +53,64 @@ export type CornerInput = {
   characterZ?: number;
 };
 
-/** Half the visible box at the character's plane, in world units. */
-export function visibleHalfExtent({ aspect, cameraZ, fovDeg, characterZ = 0 }: CornerInput) {
+/** Half the visible box for a perspective camera, in world units. */
+export function visibleHalfExtent({
+  aspect,
+  cameraZ,
+  fovDeg,
+  characterZ = 0,
+}: CornerInput): HalfExtent {
   const distance = cameraZ - characterZ;
   const halfHeight = Math.tan((fovDeg * Math.PI) / 360) * distance;
   return { halfHeight, halfWidth: halfHeight * aspect };
 }
 
 /**
- * The body's centre for a bottom-right corner, in the camera's space.
+ * Half the visible box for an orthographic camera, in world units.
+ *
+ * R3F sizes an orthographic camera in **pixels** (`left = -width/2`, `top = height/2`) and
+ * divides by `zoom`, so a world unit occupies `zoom` pixels. Inverting that is the whole
+ * function — and it is why the orthographic framing can be stated as "the halo covers this
+ * fraction of the shorter side" instead of as a distance.
+ */
+export function orthographicHalfExtent(
+  widthPx: number,
+  heightPx: number,
+  zoom: number,
+): HalfExtent {
+  /* The two halves are scaled by the *same* zoom, so they keep the canvas's aspect ratio.
+     Deriving both from one dimension is what would put him off-centre on a phone. */
+  return { halfWidth: widthPx / (2 * zoom), halfHeight: heightPx / (2 * zoom) };
+}
+
+/**
+ * Pixels-per-world-unit that makes the halo span `coverage` of the shorter viewport side.
+ *
+ * Measured against the halo rather than the body for the same reason the inset is: the
+ * glow is what the eye reads as his size, and it is 1.9× the body.
+ */
+export function orthographicZoom(
+  widthPx: number,
+  heightPx: number,
+  coverage: number,
+  haloWorld: number = ASTRO_CORNER_HALO_WORLD,
+): number {
+  return (Math.min(widthPx, heightPx) * coverage) / (2 * haloWorld);
+}
+
+/**
+ * The body's centre for a bottom-right corner, given the visible half extents.
  *
  * The y sign is the reason this needs a test: three's camera space has **y up**, so the
  * bottom of the frame is `-halfHeight`. Write it as `+halfHeight` and the character ends
  * up in the top-right with nothing to explain the move.
  */
-export function cornerPosition(input: CornerInput): [number, number, number] {
-  const { halfHeight, halfWidth } = visibleHalfExtent(input);
+export function cornerPosition(extent: HalfExtent, characterZ = 0): [number, number, number] {
+  const { halfHeight, halfWidth } = extent;
   const inset = Math.min(
     ASTRO_CORNER_HALO_WORLD * ASTRO_CORNER_INSET_RATIO,
     halfWidth * ASTRO_CORNER_EDGE_RATIO,
     halfHeight * ASTRO_CORNER_EDGE_RATIO,
   );
-  const characterZ = input.characterZ ?? 0;
   return [halfWidth - inset, -halfHeight + inset, characterZ];
 }
