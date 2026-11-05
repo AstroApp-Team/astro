@@ -10,6 +10,8 @@ import "@ionic/react/css/structure.css";
 import "@ionic/react/css/typography.css";
 import "./theme/variables.css";
 import "./theme/voice.css";
+/* The hero character's own palette; it is a closed box, not part of the Ionic theme. */
+import "./theme/astro.css";
 
 import App from "./App.tsx";
 import { queryClient } from "./lib/query.ts";

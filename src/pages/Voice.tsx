@@ -14,6 +14,7 @@ import { lockOpenOutline, refreshOutline, trashOutline } from "ionicons/icons";
 import { useState } from "react";
 
 import { USD_PER_SESSION_SECOND } from "../../shared/realtime.ts";
+import AstroHero from "../components/astro/AstroHero.tsx";
 import PasswordGate from "../components/PasswordGate.tsx";
 import VoiceSession from "../components/VoiceSession.tsx";
 import { setPassword, usePassword } from "../lib/password.ts";
@@ -58,6 +59,12 @@ export default function Voice() {
       </IonHeader>
 
       <IonContent className="ion-padding">
+        {/*
+         * The character is the page's hero, and it is rendered whether or not the
+         * password is in place: a phone can be handed over and the rig tested (tap,
+         * expression picker, WebGL in the WebView) with no Gateway key and no socket.
+         */}
+        <AstroHero />
         {password === "" ? <PasswordGate /> : <VoiceSession key={sessionKey} password={password} />}
       </IonContent>
 

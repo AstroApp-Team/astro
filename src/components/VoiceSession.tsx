@@ -13,6 +13,8 @@ import {
   VOICE_NAME,
 } from "../../shared/realtime.ts";
 import { realtimeSetupUrl } from "../lib/api.ts";
+import { faceForSession } from "../lib/astro/interaction.ts";
+import { useAstroStore } from "../lib/astro/store.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
@@ -201,6 +203,34 @@ export default function VoiceSession({ password }: { password: string }) {
     startSessionClock();
     return () => stopSessionClock();
   }, [status]);
+
+  /**
+   * The session's lifecycle, shown as a face.
+   *
+   * The store is the only channel between this component and the character — the
+   * same rule the rest of the page follows, and the reason the hero never reaches
+   * into a mesh: this writes a derived expression, the hero draws it. Reading it
+   * from `status` alone (rather than from the transcript) is what keeps a turn with
+   * no text at all — a tool call — from showing nothing.
+   *
+   * The cleanup parks the character when the session goes away. `Clear` remounts
+   * this component and `Forget the password` replaces it with the gate, and without
+   * a cleanup the last face of a dead session — `look-right`, say — would stay on
+   * the screen as if something were still happening.
+   */
+  useEffect(() => {
+    const face = faceForSession({
+      status,
+      isCapturing,
+      isPlaying,
+      hasError: error != null,
+    });
+    useAstroStore.getState().syncSession(face.expression, face.sustained);
+
+    return () => {
+      useAstroStore.getState().syncSession("doze", true);
+    };
+  }, [status, isCapturing, isPlaying, error]);
 
   /**
    * Events sent before the socket opens are dropped, so capture waits for
