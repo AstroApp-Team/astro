@@ -1,0 +1,12 @@
+{
+  "name": "@astro/studio",
+  "private": true,
+  "description": "Made-to-order animation and scene editor for Astro. Forked design: Theatre-compatible data, our own runtime.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./core": "./src/core/index.ts",
+    "./three": "./src/three/index.ts",
+    "./react": "./src/react/index.ts"
+  }
+}

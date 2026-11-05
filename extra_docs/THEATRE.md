@@ -517,39 +517,50 @@ studio.extend(config)                        // 1. register — before initializ
 studio.initialize({ usePersistentStorage: false })  // 2. paint the toolbar; the files are the persistence
 ```
 
-## The tools dock
+## The rig studio
 
-`/studio-corner`, `/rig/:sceneId` and `/machine` carry a **Tools** rail on the right edge
-(`presentation/canvas/studio/tools/ToolsDock.tsx`). It is the app-level door to every
-authoring panel:
+Every rig page (`/rig/:sceneId`) is the same three-panel studio
+(`presentation/ui/studio/StudioShell.tsx`), not a canvas with a floating panel. `/studio-corner`
+stays its sandbox page on purpose: it mounts `StudioSandbox` rather than a production scene's own
+sheet, so a clip rigged there cannot reach a shipping timeline.
 
-| Panel       | What it does                             | Where the code lives                            |
-| ----------- | ---------------------------------------- | ----------------------------------------------- |
-| Scene tools | spawn/aim/save, sheet picker, shape list | `canvas/studio/shapeTools/ShapePalettePane.tsx` |
-| Machine     | layers, clip assignment, input writes    | `canvas/studio/machineTools/MachinePane.tsx`    |
-| Character   | 12 expressions + the v2 look uniforms    | `canvas/studio/tools/AstroPane.tsx`             |
-| Editor ↗    | the machine editor, new tab              | `/editor?editor`                                |
-| Demo ↗      | the machine demo, new tab                | `/machine`                                      |
+| Panel        | Left column                                                       | Centre                  | Right column                             | Bottom deck             |
+| ------------ | ----------------------------------------------------------------- | ----------------------- | ---------------------------------------- | ----------------------- |
+| What it does | scene objects (select), timelines (drag), machine layers (switch) | preview + machine graph | properties / scene / machine / character | **Dope Sheet** + editor |
 
-The panels are the _same components_ the Studio extension registers as `panes[]`; the dock
-mounts them into nodes it owns, with the same `mount(node) → teardown` contract. That means
-they work even when the Theatre.js panel is closed, not initialised, or unusable at a
-phone-sized window, and a closed window holds no subscriptions.
+Every panel boundary is a drag handle (`--st-left`, `--st-right`, `--st-bottom`), so you can give
+the machine graph the whole window, or the dope sheet, without leaving the page. The Theatre.js
+panel is a header toggle, not the page's chrome: it is a body-level overlay at `z-index: 100` and
+covers anything asked to sit next to it.
 
-Two things about this file are not cosmetic:
+The left column's `+` creates **machine** timelines, not Theatre sheets: a machine timeline is a
+duration + `playStyle` the runtime schedules, while a sheet's sequence is compile-time
+(`SHEET_IDS`/`sceneRegistry`). Drag a timeline row onto the graph and it becomes a state; drop it
+on a link and the link is split with the state in the middle.
 
-1. **It portals to `document.body`.** `IonContent` establishes a stacking context, so a
-   `position: fixed` dock rendered inside the page competes at the page's z-index — and
-   `#theatrejs-studio-root` is a body-level fixed overlay at `z-index: 100`. The rail was
-   visible and every press was swallowed by the empty Studio root. Body is the only stacking
-   context the two share, and the rail is `z-index: 110` so the Studio cannot cover it.
-2. **Window bodies are opaque.** The panes are transparent by design (they were built for the
-   Studio's dark chrome), so without a background the outline tree behind reads through and
-   two texts look like one broken pane.
+The dope sheet **is** the sheet's sequence — one row per keyframeable path, diamonds at their
+keyframe times, the playhead at the pointer. `◆` on a property row pins a keyframe at the
+playhead with that property's current value; a diamond can be dragged to retime it and deleted
+with `⌫` or a double-click. Everything else (curve handles, easing, objects) stays in the Studio:
+a second writer of the `handles` arrays is how a state file and a Save start disagreeing.
 
-The Character panel is a store consumer, not a rig editor: `expression` and the v2 tunables
-are app state, and a keyframed expression or wave would win over these controls silently —
-which is why the two astro scenes carry only the character's `position` on their sheets.
+Selecting a state or a transition in the graph opens the bottom deck's second half — the dope
+sheet moves to the top and the editor (state / transition / layer deck) takes the lower half,
+the same inspector the machine editor shows.
+
+Two things about this page's code are not cosmetic:
+
+1. **The graph's pan flag is cleared on release.** The pan is a ref set on `pointerdown` and
+   cleared in `endDrag` (pointerup / pointercancel / lostpointercapture). The reported "it keeps
+   moving after I let go" was a move handler that panned whenever the pointer was over the SVG.
+2. **Links anchor to the card, not the node origin.** `linkGeometry` uses the card's right edge
+   for outgoing and its left edge for incoming, mid-height, and every link carries a transparent
+   14px hit path — at 1.5px a curve is otherwise unselectable, which reads as "edges are
+   decoration".
+
+The Character tab is a store consumer, not a rig editor: `expression` and the v2 tunables are app
+state, and a keyframed expression or wave would win over these controls silently — which is why
+the two astro scenes carry only the character's `position` on their sheets.
 
 ## Rigging a clip for the state machine
 

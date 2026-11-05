@@ -433,6 +433,13 @@
   fill: none;
   stroke: #33506b;
   stroke-width: 1.5;
+  pointer-events: none;
+}
+
+.ed-link__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
   cursor: pointer;
 }
 
@@ -887,4 +894,40 @@
   .ed-footer .ed-mono {
     display: none;
   }
+}
+
+/*
+ * The graph's frame.
+ *
+ * `.ed-graph` is `position: absolute; inset: 0`, so it needs a containing block that is *not* the
+ * viewport. This div is it: `inset: 0` inside the stage, and the stage declares `position:
+ * relative`. Without the frame the SVG resolved against the viewport and laid a 1440x900 graph
+ * over every panel — which reads as "the left panel is unclickable", because the graph's own
+ * background rectangle is what the pointer hits.
+ */
+.ed-graph__frame {
+  position: absolute;
+  inset: 0;
+}
+
+.ed-graph__fit {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  padding: 2px 7px;
+  border: 1px solid var(--ed-line-2, #2c3d50);
+  border-radius: 4px;
+  background: var(--ed-panel-2, #16202d);
+  color: var(--ed-dim, #7d8fa3);
+  font:
+    10px/1.6 ui-monospace,
+    Menlo,
+    monospace;
+  cursor: pointer;
+}
+
+.ed-graph__fit:hover {
+  border-color: var(--ed-accent, #64d2ff);
+  color: var(--ed-accent, #64d2ff);
 }

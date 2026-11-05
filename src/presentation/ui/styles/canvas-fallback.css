@@ -1,0 +1,42 @@
+/*
+ * The canvas fallback: what a page shows when its 3D cannot start.
+ *
+ * It fills the canvas host (which may be a fixed overlay on `/float` or a column on `/astro`), so it
+ * has to be neutral rather than on-brand: it is not art, it is a notice. `pointer-events: none` keeps
+ * it out of the way of the page underneath on the overlay routes.
+ */
+.canvas-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #e8b4a0;
+  border-radius: 10px;
+  background: rgb(255 248 244 / 92%);
+  color: #5b2b18;
+  font:
+    12px/1.45 Inter,
+    system-ui,
+    sans-serif;
+  pointer-events: none;
+}
+
+.canvas-fallback__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.canvas-fallback__body {
+  margin: 0;
+  max-width: 42ch;
+}
+
+.canvas-fallback__detail {
+  margin: 0;
+  opacity: 0.7;
+  font:
+    11px/1.4 ui-monospace,
+    monospace;
+}

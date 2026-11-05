@@ -16,8 +16,11 @@
 import { useState } from "react";
 
 import type {
+  AllCondition,
+  AnyCondition,
   Condition,
   InputDef,
+  LeafCondition,
   LayerDef,
   MachineDefinition,
   StateDef,
@@ -54,16 +57,64 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/**
+ * The `when` editor: a group operator plus rows, not a JSON textarea.
+ *
+ * The textarea was the wrong shape for the job. A transition's condition is a handful of
+ * comparisons against declared inputs, and asking an author to type
+ * `{"all":[{"input":"mood","op":"greaterThan","value":0.5}]}` to make a card leave `idle` is how
+ * the field ended up empty on every transition: the only editable thing about the most important
+ * field on a transition was a syntax error waiting to happen. Composition (`any`, `not`) is still
+ * one dropdown away, and `raw` stays available for trees this builder cannot draw.
+ */
 function ConditionEditor({
   condition,
+  inputs,
   onChange,
 }: {
   condition: Condition | undefined;
+  /** The machine's declared inputs — the dropdown's vocabulary, and the reason it validates. */
+  inputs: InputDef[];
   onChange: (condition: Condition | undefined) => void;
 }) {
   const [raw, setRaw] = useState(false);
   const [text, setText] = useState(() => JSON.stringify(condition ?? null, null, 2));
-  const leaves = condition != null && "all" in condition ? condition.all : null;
+  const number = inputs.filter((input) => input.kind === "number");
+  const bool = inputs.filter((input) => input.kind === "boolean");
+  const triggers = inputs.filter((input) => input.kind === "trigger");
+  const conditionals = [...number, ...bool, ...triggers];
+
+  const group: "all" | "any" | "not" | null =
+    condition == null
+      ? null
+      : "all" in condition
+        ? "all"
+        : "any" in condition
+          ? "any"
+          : "not" in condition
+            ? "not"
+            : null;
+  const leaves: LeafCondition[] =
+    group == null
+      ? []
+      : group === "not"
+        ? []
+        : group === "all"
+          ? (condition as AllCondition).all.filter(isLeaf)
+          : (condition as AnyCondition).any.filter(isLeaf);
+
+  const write = (next: LeafCondition[], mode: "all" | "any" | "not" | null) => {
+    if (mode == null || next.length === 0) {
+      onChange(condition == null ? undefined : undefined);
+      return;
+    }
+    if (mode === "all") onChange({ all: next });
+    else if (mode === "any") onChange({ any: next });
+    else {
+      const only = next[0];
+      if (only != null) onChange({ not: only });
+    }
+  };
 
   if (raw) {
     return (
@@ -94,25 +145,157 @@ function ConditionEditor({
     <div className="ed-deck__body">
       <div className="ed-row">
         <span className="ed-field__label">when</span>
+        <select
+          className="ed-input ed-input--sm"
+          value={group ?? "always"}
+          onChange={(event) => {
+            const mode = event.target.value;
+            if (mode === "always") {
+              onChange(undefined);
+              return;
+            }
+            write(
+              leaves.length === 0 ? [defaultLeaf(number, bool, triggers)] : leaves,
+              mode as "all" | "any" | "not",
+            );
+          }}
+        >
+          <option value="always">always</option>
+          <option value="all">all of</option>
+          <option value="any">any of</option>
+          <option value="not">not</option>
+        </select>
         <button type="button" className="ed-btn ed-btn--ghost" onClick={() => setRaw(true)}>
           raw
         </button>
       </div>
-      {leaves == null ? (
+
+      {group == null ? (
+        <p className="ed-empty">Always — an unconditional transition.</p>
+      ) : conditionals.length === 0 ? (
         <p className="ed-empty">
-          {condition == null
-            ? "Always — an unconditional transition."
-            : "A composed condition. Open raw to edit it."}
+          No inputs declared. Add one in the left column's Inputs section; a condition has to read
+          something.
         </p>
       ) : (
-        leaves.map((leaf, index) => (
-          <p className="ed-empty" key={`${String(index)}`}>
-            {JSON.stringify(leaf)}
-          </p>
-        ))
+        <>
+          {leaves.map((leaf, index) => (
+            <div className="ed-row" key={`${String(index)}-${leaf.input}`}>
+              <select
+                className="ed-input ed-input--sm"
+                value={leaf.input}
+                onChange={(event) => {
+                  const input = conditionals.find((row) => row.name === event.target.value);
+                  if (input == null) return;
+                  const next = [...leaves];
+                  next[index] = coerceLeaf(leaf, input.kind);
+                  write(next, group);
+                }}
+              >
+                {conditionals.map((input) => (
+                  <option key={input.name} value={input.name}>
+                    {input.name} ({input.kind})
+                  </option>
+                ))}
+              </select>
+              <select
+                className="ed-input ed-input--sm"
+                value={leaf.op}
+                onChange={(event) => {
+                  const next = [...leaves];
+                  next[index] = { ...leaf, op: event.target.value } as LeafCondition;
+                  write(next, group);
+                }}
+              >
+                {opsFor(leaf).map((op) => (
+                  <option key={op} value={op}>
+                    {op}
+                  </option>
+                ))}
+              </select>
+              {"value" in leaf ? (
+                typeof leaf.value === "boolean" ? (
+                  <select
+                    className="ed-input ed-input--sm"
+                    value={String(leaf.value)}
+                    onChange={(event) => {
+                      const next = [...leaves];
+                      next[index] = { ...leaf, value: event.target.value === "true" };
+                      write(next, group);
+                    }}
+                  >
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                  </select>
+                ) : (
+                  <input
+                    className="ed-input ed-input--sm"
+                    type="number"
+                    step="0.05"
+                    value={String(leaf.value)}
+                    onChange={(event) => {
+                      const next = [...leaves];
+                      next[index] = { ...leaf, value: Number(event.target.value) };
+                      write(next, group);
+                    }}
+                  />
+                )
+              ) : null}
+              <button
+                type="button"
+                className="ed-btn ed-btn--ghost"
+                title="Remove this comparison"
+                onClick={() => {
+                  write(
+                    leaves.filter((_, at) => at !== index),
+                    group,
+                  );
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          {group === "not" ? null : (
+            <button
+              type="button"
+              className="ed-btn ed-btn--ghost"
+              onClick={() => {
+                write([...leaves, defaultLeaf(number, bool, triggers)], group);
+              }}
+            >
+              + comparison
+            </button>
+          )}
+        </>
       )}
     </div>
   );
+}
+
+function isLeaf(condition: Condition): condition is LeafCondition {
+  return "input" in condition;
+}
+
+function defaultLeaf(number: InputDef[], bool: InputDef[], triggers: InputDef[]): LeafCondition {
+  const first = number[0] ?? bool[0] ?? triggers[0];
+  if (first == null) return { input: "", op: "greaterThan", value: 0 };
+  return coerceLeaf({ input: first.name, op: "greaterThan", value: 0 }, first.kind);
+}
+
+function coerceLeaf(leaf: LeafCondition, kind: InputDef["kind"]): LeafCondition {
+  if (kind === "number") return { input: leaf.input, op: "greaterThan", value: 0 };
+  if (kind === "boolean") return { input: leaf.input, op: "equals", value: true };
+  return { input: leaf.input, op: "fired" };
+}
+
+function opsFor(leaf: LeafCondition): string[] {
+  if ("consume" in leaf || leaf.op === "fired") {
+    return ["fired"];
+  }
+  return typeof leaf.value === "boolean"
+    ? ["equals", "notEquals"]
+    : ["greaterThan", "lessThan", "greaterOrEqual", "lessOrEqual", "equals", "notEquals"];
 }
 
 function StateDeck({
@@ -303,11 +486,13 @@ function TransitionDeck({
   row,
   index,
   anyState,
+  definition,
 }: {
   layer: LayerDef;
   row: TransitionDef;
   index: number;
   anyState: boolean;
+  definition: MachineDefinition;
 }) {
   const patchTransition = useEditorStore((store) => store.patchTransition);
   const removeTransition = useEditorStore((store) => store.removeTransition);
@@ -324,6 +509,7 @@ function TransitionDeck({
       <div className="ed-deck__body">
         <ConditionEditor
           condition={row.when}
+          inputs={definition.inputs}
           onChange={(when) => patchTransition(layer.id, index, when == null ? {} : { when })}
         />
         <div className="ed-grid2">
@@ -724,6 +910,7 @@ export function Inspector({ definition }: { definition: MachineDefinition }) {
           row={row}
           index={selection.index}
           anyState={layer.transitions[selection.index] == null}
+          definition={definition}
         />
       );
     }

@@ -407,6 +407,80 @@ Full rigging workflow, including the export/land step, is in `extra_docs/THEATRE
   is behind. `createMachine` has no hot-swap, so "apply a numeric edit live" is not a thing the
   runtime can do — pretending it does is how a test run gets yanked out from under a finger.
 
+### The rig studio
+
+- **`/rig/:sceneId` is three panels, and each one answers one question.**
+  `presentation/ui/studio/StudioShell.tsx` is the frame: header (scene dropdown, transport,
+  Studio toggle, Save), left column (scene objects → select, timelines → drag, machine layers →
+  switch), the preview + machine graph in the centre, the bottom deck (dope sheet + editor), and
+  the right column (Properties / Scene / Machine / Character tabs). Every boundary is a drag
+  handle — `--st-left`, `--st-right`, `--st-bottom` are CSS variables the shell writes, so a
+  resize is one style write, not a re-layout of the tree. The Studio's own panel is a toggle in
+  the header, not the page's chrome: it is a body-level overlay at `z-index: 100` and it covers
+  anything it is asked to sit next to.
+- **The bottom deck's dope sheet is the _sheet's_ sequence, and the left column's timelines are
+  the _machine's_ assets.** They are different things with confusingly similar names: the sheet
+  sequence holds the Theatre keyframes (`states/*.json`), and a machine timeline is a duration +
+  `playStyle` the runtime schedules. That is why the left column's `+` creates a machine timeline
+  and cannot create a sheet — sheets are compile-time (`SHEET_IDS`, `sceneRegistry`), and a "new
+  sheet" button that wrote a file nothing imports is a button that does nothing.
+- **Keyframing from a property is one click, and the one writer stays the Studio.** `◆` on a
+  property row pins a keyframe at the playhead with the property's current value
+  (`writeProp` → `sheet.sequence.pointer` + `setKeyframeOfPath`); dragging a diamond moves it,
+  `⌫` removes it (`deleteKeyframe`). Everything structural (curve handles, easing, sheet objects)
+  stays in the Studio: a second writer of the `handles` arrays is how the state file and a Save
+  start disagreeing, and the formatter fight in `vite.config.ts` is the same problem in miniature.
+- **Drag payloads between the left column and the graph are plain `dataTransfer` strings.** The
+  graph is an SVG doing its own hit-testing, so `text/x-astro-timeline` (with `text/plain` as a
+  fallback for browsers that strip custom types mid-drag) is the only interface both sides can
+  read without sharing React state. Dropping on empty canvas appends a state; dropping on a link
+  inserts a state by splitting it; the whole connection is done in `addTransition`-style ops so
+  it validates like every other command.
+- **The graph's pan is a ref cleared on `pointerup`, and the graph must not pan on hover.** The
+  reported "it keeps moving after I let go" was a stale drag flag: `onPointerMove` moved the
+  camera whenever the pointer was over the SVG. `draggingRef` is set on press and cleared on
+  `endDrag` (pointerup/pointercancel/lostpointercapture); a move with no press does nothing.
+- **A panel handle writes the panel on its own side of the pointer.** The preview's bottom edge used
+  to call `resize("bottom", …)` — the deck — so dragging the edge above the graph resized a box on the
+  other side of it, which reads as "the canvas will not change size". `--st-preview` is a panel size
+  (`usePanelLayout`, `PanelKey` includes `preview`), and each of the four handles writes the one it
+  borders: left column, preview, deck, right column.
+- **The shell opts out of text selection, and that is what makes a drag a drag.** `.st-shell` sets
+  `user-select: none` with `text` opted back in on inputs and `.ed-mono`. Without it the browser turns
+  any press held ~300 ms into a selection gesture, repaints the panel blue and retargets the moves, so
+  a scrub that was working stops updating mid-drag — the reported "it starts selecting text and will
+  not move where I want".
+- **Transitions are straight lines with a circular badge, and the badge is the click target.** The
+  stroke is `pointer-events: none`; `LinkBadge` at the midpoint carries the arrow (direction) and the
+  selection (opens the editor deck). The old 14 px invisible twin made the corridor between two cards
+  swallow pans, and a 1.5 px stroke is not a target on a trackpad.
+- **Machines are per scene, and one scene can hold several.** `useEditorStore.machines` /
+  `activeMachine` are keyed by `${scene}:${sheetId}`; definitions are stashed under
+  `${sceneKey}#${machineId}` and drafts under `draftKey(scene, machine)` — two machines sharing an id
+  share a draft, and the second one opens the first one's states. The left column's `+` in **State
+  machines** creates a whole definition (`newMachine(seed)`), while `+` in **Layers** adds a layer to
+  the open machine; conflating the two is why "add a state machine" produced a row inside the machine.
+- **The dope sheet shows a value per row, at the playhead.** `trackRows` carries keyframe values, and
+  a row prints the last key at or before the pointer, else its first key, else `—` — the only way to
+  tell "static" from "keyframed to the same value twice" without scrubbing and staring at the 3D view.
+- **A scene's machine seed must be a _valid_ definition, or the scene is read-only.** `apply` in
+  `useEditorStore` validates every draft and drops the ones the loader would reject, recording the
+  reason in `error`; the seed for a sheet with no keyframed objects used to be a layer with
+  `entry: []`, which the loader refuses (`no-entry`), so _every_ edit in `astro-v2` — a new timeline,
+  an input, a state — was silently discarded. The seed now spends one empty timeline and one clip
+  state on a placeholder state (`tl-idle`), and `StudioShell` mirrors `error` into the status line so
+  a refused command says so.
+- **A keyframe's _curve_ is still Studio-only, and a move recomputes its handles.** `moveKeyframe`
+  writes the old value at the new time and deletes the original, because that is what the public API
+  allows: `◆` selects, a drag retimes, `⌫` deletes, but the bezier handles are not editable from the
+  blade. Anything else is a second writer of the `handles` arrays — the same conflict as the
+  formatter in `vite.config.ts`.
+- **Link geometry is computed from the card box, not from the node's origin.** `linkGeometry`
+  anchors an outgoing edge at the card's right edge and an incoming edge at its left edge
+  (mid-height), and every link carries a transparent 14px hit path so a 1.5px curve is still
+  selectable. Anchor to the origin and every line ends inside the card it belongs to, which reads
+  as "the lines are wrong" and is unfixable by moving nodes.
+
 ## Astro's visual language
 
 - **`assets/astro-stylesheet.svg` is the source of truth, and `extra_docs/style/` is its

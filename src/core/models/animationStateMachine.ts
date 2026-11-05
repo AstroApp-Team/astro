@@ -255,6 +255,20 @@ export interface TimelineDef {
   startAt?: number | "random";
   markers?: MarkerDef[];
   events?: TimelineEventDef[];
+  /**
+   * The sheet properties this timeline owns, e.g. `["Astro.position.x", "Astro.expression"]`.
+   *
+   * A machine timeline is a *sequence*, not a cursor: the dope sheet shows these rows and nothing
+   * else, so two timelines can animate two different sets of props over two different windows of
+   * the same sheet. Empty means "all of the sheet's tracks", which is the old behaviour.
+   */
+  props?: string[];
+  /**
+   * The sheet window this timeline plays, in seconds. `offset + length` must stay inside the sheet
+   * sequence; `length` defaults to `duration` and `offset` to 0.
+   */
+  length?: number;
+  offset?: number;
   /** Inline clip reference. A state referencing this timeline may override the asset. */
   clip?: string;
   morphCurve?: string;

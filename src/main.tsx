@@ -14,6 +14,7 @@ import "@ionic/react/css/core.css";
 import "@ionic/react/css/typography.css";
 
 import "@presentation/ui/styles/variables.css";
+import "@presentation/ui/styles/canvas-fallback.css";
 import "@presentation/ui/styles/voice.css";
 
 /**

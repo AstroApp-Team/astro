@@ -1,0 +1,952 @@
+/**
+ * The rig studio's frame.
+ *
+ * It reuses the editor's tokens and controls (`.ed-*` is imported alongside this file), and adds
+ * only what is specific to a three-column authoring layout: the shell grid, the splitters, the
+ * timeline lanes and the drag affordances. Keeping the palette in one place is the point — the
+ * machine editor and the rig studio are the same tool with different panels.
+ */
+
+.st-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
+  background: #0b0f14;
+  color: #d9e2ec;
+  font:
+    12px/1.45 system-ui,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  --st-left: 260px;
+  --st-right: 330px;
+  --st-bottom: 340px;
+  --st-preview: 220px;
+
+  /*
+   * The editor's tokens, redeclared here rather than shared through a `:where()`. `.ed-*` components
+   * are rendered inside this shell (the inspector, the deck, the tabs) and `var(--ed-line)` with no
+   * definition on an ancestor falls back to `currentColor` — which is how the decks got white
+   * borders and the inputs lost their fills.
+   */
+  --ed-bg: #0b0f14;
+  --ed-panel: #111823;
+  --ed-panel-2: #16202d;
+  --ed-line: #22303f;
+  --ed-line-2: #2c3d50;
+  --ed-text: #d9e2ec;
+  --ed-dim: #7d8fa3;
+  --ed-accent: #64d2ff;
+  --ed-accent-2: #f4a261;
+  --ed-danger: #f2716b;
+  --ed-ok: #74d99f;
+  --ed-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+
+  /*
+   * Dragging a playhead, a keyframe or a splitter must not start a text selection. The browser
+   * runs selection on the same pointer as the drag, so after ~300 ms of holding the button it
+   * decides the press was a selection gesture and paints the whole panel blue — and the drag that
+   * was working stops updating, because the mouse-move target changed. Opting the shell out
+   * globally and opting text *back in* on the controls that need it (inputs, mono values) is the
+   * only version that does not fight the browser per element.
+   */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.st-shell input,
+.st-shell textarea,
+.st-shell .ed-input,
+.st-shell .ed-mono,
+.st-shell [contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+
+.st-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: #111823;
+  border-bottom: 1px solid #22303f;
+}
+
+.st-header__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.st-header__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64d2ff;
+  box-shadow: 0 0 8px #64d2ff;
+}
+
+.st-header__scene {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.st-header__select {
+  width: auto;
+  min-width: 200px;
+}
+
+.st-transport {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.st-transport__readout {
+  margin-left: 6px;
+  color: #9fb0c2;
+}
+
+.st-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.st-header__status {
+  max-width: 42ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #7d8fa3;
+  font-size: 11px;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+
+.st-body {
+  display: grid;
+  grid-template-columns: var(--st-left) 4px minmax(0, 1fr) 4px var(--st-right);
+  min-height: 0;
+}
+
+.st-column {
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  background: #111823;
+}
+
+.st-column--left {
+  border-right: 1px solid #22303f;
+}
+
+.st-column--right {
+  border-left: 1px solid #22303f;
+}
+
+.st-split {
+  background: #22303f;
+  touch-action: none;
+}
+
+.st-split:hover,
+.st-split:focus-visible {
+  background: #64d2ff;
+  outline: none;
+}
+
+.st-split--x {
+  cursor: col-resize;
+}
+
+.st-split--y {
+  cursor: row-resize;
+  height: 4px;
+}
+
+.st-center {
+  display: grid;
+  /*
+   * Four rows, two of them fixed by a variable: the preview (`--st-preview`), the graph (the
+   * flexible one), and the deck (`--st-bottom`). Two *handles* name those boundaries. Before this,
+   * the preview was `20%` and both handles wrote `bottom`, so the preview had no edge of its own
+   * and a drag on the graph's top border resized the deck below it instead.
+   */
+  grid-template-rows: var(--st-preview) 4px minmax(120px, 1fr) 4px var(--st-bottom);
+  min-height: 0;
+  min-width: 0;
+}
+
+.st-preview {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  background: #080c11;
+}
+
+.st-preview__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.st-preview__badge {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #0b1020cc;
+  color: #7d8fa3;
+  font:
+    10px/1.6 ui-monospace,
+    Menlo,
+    monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.st-graph {
+  /* `.ed-graph` is `position: absolute; inset: 0` (it fills its stage in
+     `/editor`), so this box has to be the containing block. Without it the SVG
+     resolves against the viewport: a 1440×900 graph laid over every panel, which
+     reads as "the left panel is not clickable" because the graph's background
+     rectangle is what the pointer hits. */
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.st-bottom-wrap {
+  min-height: 0;
+  overflow: auto;
+  border-top: 1px solid #22303f;
+  background: #111823;
+}
+
+/* ── Left sections ────────────────────────────────────────────────────── */
+
+.st-section + .st-section {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #1b2733;
+}
+
+.st-section__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 5px;
+  color: #7d8fa3;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.st-section__count {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.st-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.st-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #d9e2ec;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-row:hover {
+  background: #16202d;
+}
+
+.st-row[data-active="true"] {
+  background: #1d3145;
+}
+
+.st-row--drag {
+  cursor: grab;
+}
+
+.st-row--drag:active {
+  cursor: grabbing;
+}
+
+.st-row__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+}
+
+.st-row__label--button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-row__meta {
+  color: #7d8fa3;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.st-row__action {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #7d8fa3;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.st-row:hover .st-row__action,
+.st-row__action:focus-visible {
+  opacity: 1;
+}
+
+.st-row__action:hover {
+  color: #f2716b;
+  background: #2a1618;
+}
+
+.st-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #64d2ff;
+  flex: none;
+}
+
+.st-dot[data-kind="sheet"] {
+  background: #a78bfa;
+}
+
+.st-dot[data-kind="timeline"] {
+  background: #f4a261;
+}
+
+.st-icon {
+  width: 20px;
+  height: 18px;
+  border: 1px solid #2c3d50;
+  border-radius: 4px;
+  background: transparent;
+  color: #9fb0c2;
+  font:
+    11px/1 ui-monospace,
+    Menlo,
+    monospace;
+  cursor: pointer;
+}
+
+.st-icon:hover {
+  border-color: #64d2ff;
+  color: #64d2ff;
+}
+
+/* ── Timeline ─────────────────────────────────────────────────────────── */
+
+.st-timeline {
+  padding: 6px 10px 8px;
+}
+
+.st-timeline__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.st-timeline__zoom {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.st-timeline__scroll {
+  max-height: 100%;
+  margin-top: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.st-timeline__grid {
+  position: relative;
+  display: grid;
+  align-items: start;
+  width: max-content;
+  min-width: 100%;
+}
+
+.st-timeline__corner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  height: 22px;
+  background: #0d141c;
+  color: #7d8fa3;
+  font-size: 10px;
+  line-height: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.st-timeline__names {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #0d141c;
+  border-right: 1px solid #1b2836;
+}
+
+.st-timeline__names[data-active="true"] {
+  background: #101d2a;
+}
+
+.st-timeline__objectrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 6px;
+}
+
+.st-timeline__pick {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font:
+    600 11px/1 ui-monospace,
+    monospace;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.st-timeline__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  padding: 0 6px 0 14px;
+  border: 0;
+  background: transparent;
+  color: #9fb2c4;
+  font:
+    11px/1 ui-monospace,
+    monospace;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-timeline__row:hover {
+  background: #16283a;
+}
+
+.st-timeline__path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-timeline__count {
+  color: #5d7386;
+  font-size: 10px;
+}
+
+.st-timeline__key {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 1px solid #2c3d50;
+  background: transparent;
+  transform: rotate(45deg);
+  cursor: pointer;
+}
+
+.st-timeline__objectrow:hover .st-timeline__key {
+  border-color: #64d2ff;
+  background: #16283a;
+}
+
+.st-timeline__lanes {
+  min-width: 0;
+}
+
+.st-ruler {
+  position: relative;
+  height: 22px;
+  border-bottom: 1px solid #1b2836;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.st-ruler__tick {
+  position: absolute;
+  top: 4px;
+  color: #6b8199;
+  font:
+    10px/1 ui-monospace,
+    monospace;
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.st-ruler__tick::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  left: 1px;
+  width: 1px;
+  height: 5px;
+  background: #24333f;
+}
+
+.st-lanes__objecthead {
+  height: 0;
+}
+
+.st-lane {
+  position: relative;
+  height: 22px;
+  border-bottom: 1px solid #131e28;
+}
+
+.st-lane[data-active="true"] {
+  background: #0f1a24;
+}
+
+.st-lane:hover {
+  background: #16283a;
+}
+
+.st-kf {
+  position: absolute;
+  top: 7px;
+  width: 9px;
+  height: 9px;
+  margin-left: -4px;
+  padding: 0;
+  border: 1px solid #64d2ff;
+  border-radius: 1px;
+  background: #0d141c;
+  transform: rotate(45deg);
+  cursor: grab;
+}
+
+.st-kf:hover {
+  background: #64d2ff;
+}
+
+.st-kf[data-selected="true"] {
+  background: #ffd166;
+  border-color: #ffd166;
+  box-shadow: 0 0 0 2px rgb(255 209 102 / 30%);
+}
+
+.st-timeline__playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #ff6b3d;
+  box-shadow: 0 0 6px rgb(255 107 61 / 60%);
+  pointer-events: none;
+}
+
+.st-timeline__warn {
+  padding: 1px 6px;
+  border: 1px solid #6b3a1f;
+  border-radius: 999px;
+  color: #ffb27a;
+  font-size: 10px;
+}
+
+.st-timeline__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #7d8fa3;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.st-timeline__number {
+  width: 64px;
+  height: 20px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.st-timeline__zoomlabel {
+  min-width: 54px;
+  text-align: center;
+  font-size: 10px;
+}
+
+.st-timeline__empty {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+}
+
+.st-timeline__hint {
+  margin: 6px 0 0;
+  color: #5d7386;
+  font-size: 10px;
+}
+
+.st-lanes__playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #f4a261b8;
+  pointer-events: none;
+}
+
+.st-timeline__hint {
+  margin: 6px 0 0;
+  color: #6d7f92;
+  font-size: 10px;
+}
+
+/* ── Right panel ──────────────────────────────────────────────────────── */
+
+.st-tabs {
+  margin-bottom: 8px;
+}
+
+.st-props__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 11px;
+}
+
+.st-prop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 20px;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+
+.st-prop__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c8d4e0;
+  font:
+    11px ui-monospace,
+    Menlo,
+    monospace;
+}
+
+.st-prop__kf {
+  margin-left: 4px;
+  color: #64d2ff;
+  font-size: 8px;
+}
+
+.st-prop__input {
+  text-align: right;
+}
+
+.st-props__hint {
+  margin: 10px 0 0;
+  color: #6d7f92;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.st-tools__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+/* ── Bottom panel ─────────────────────────────────────────────────────── */
+
+.st-bottom {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.st-bottom__tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #22303f;
+  background: #0f1620;
+}
+
+.st-bottom__body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.st-bottom__pane {
+  min-height: 84px;
+  overflow: auto;
+  padding: 4px 8px 8px;
+}
+
+.st-bottom__body > .st-split--y {
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  border: 0;
+  background: #22303f;
+}
+
+.st-bottom__body > .st-split--y:hover {
+  background: #64d2ff;
+}
+
+@media (max-width: 1000px) {
+  .st-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .st-column,
+  .st-split {
+    display: none;
+  }
+
+  .st-center {
+    grid-template-rows: var(--st-preview) 4px minmax(120px, 1fr) 4px var(--st-bottom);
+  }
+}
+
+/*
+ * The Ionic host for the shell.
+ *
+ * `IonContent` is a shadow-DOM-free component with its own scroll container; the shell owns the
+ * viewport, so the content must not: `--overflow: hidden` removes the scrollbar, and `height:
+ * 100%` gives the grid the height that `ion-content` otherwise leaves to its scroller (the same
+ * chain the Ionic notes in AGENTS.md describe). Without both, the shell renders 0px tall inside a
+ * page that scrolls instead.
+ */
+.st-content {
+  --overflow: hidden;
+  --background: #0b0f14;
+}
+
+.st-content::part(scroll) {
+  overflow: hidden;
+}
+
+/* A timeline row's inline numbers — the inspector the row deserves. */
+.st-rowbody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  padding: 6px 8px 8px;
+  border-left: 2px solid #22303f;
+  background: #0b131b;
+}
+
+.st-field {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  color: #7d8fa3;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.st-field__input {
+  width: 100%;
+  height: 20px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.st-row[data-open="true"] {
+  background: #16283a;
+}
+
+/* ── Shaders tab ─────────────────────────────────────────────────────────────── */
+
+.st-shaders {
+  padding-bottom: 20px;
+}
+
+.st-shaders__list {
+  display: flex;
+  flex-direction: column;
+  max-height: 190px;
+  overflow: auto;
+  border-bottom: 1px solid #1b2836;
+}
+
+.st-shaders__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.st-shaders__row:hover {
+  background: #16283a;
+}
+
+.st-shaders__row[data-active="true"] {
+  background: #101d2a;
+  box-shadow: inset 2px 0 0 #64d2ff;
+}
+
+.st-shaders__name {
+  flex: 1;
+  overflow: hidden;
+  font:
+    600 11px/1 ui-monospace,
+    monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-shaders__mat {
+  color: #6b8199;
+  font:
+    10px/1 ui-monospace,
+    monospace;
+}
+
+.st-shaders__uniforms {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.st-shaders__value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.st-shaders__value .ed-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.st-shaders__colour {
+  height: 20px;
+  padding: 0 2px;
+}
+
+.st-shaders__readonly {
+  overflow: hidden;
+  color: #6b8199;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-shaders__import {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 10px;
+  padding: 6px 8px;
+  border: 1px dashed #2c3d50;
+  border-radius: 4px;
+  color: #9fb2c4;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.st-shaders__import:hover {
+  border-color: #64d2ff;
+  color: #cfe6f5;
+}
+
+.st-shaders__import input {
+  width: 100%;
+  font-size: 10px;
+}
+
+.st-shaders__imports {
+  margin: 0;
+  padding: 0 10px;
+  list-style: none;
+}
+
+.st-shaders__imports li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid #131e28;
+  font-size: 11px;
+}
+
+/* The value column: what the track is *at the playhead*, not just where its keys are. */
+.st-timeline__value {
+  margin-left: auto;
+  max-width: 8ch;
+  overflow: hidden;
+  color: #9fb0c2;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.st-timeline__row[data-empty="true"] .st-timeline__value {
+  color: #5c6b7c;
+}

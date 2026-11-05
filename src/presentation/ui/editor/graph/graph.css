@@ -1,0 +1,46 @@
+/*
+ * The transition badge: the click target and the direction indicator in one 16 px circle.
+ *
+ * The line is `pointer-events: none` on purpose — a 1.5 px stroke is not a target, and the wide
+ * invisible twin it used to have made the whole corridor between two nodes un-clickable, so a pan
+ * that started near a link was swallowed. The badge is the target; the line is the drawing.
+ */
+.ed-link__badge {
+  cursor: pointer;
+}
+
+.ed-link__badge-hit {
+  fill: transparent;
+}
+
+.ed-link__badge-ring {
+  fill: #111823;
+  stroke: #2c3d50;
+  stroke-width: 1.4;
+}
+
+.ed-link__badge:hover .ed-link__badge-ring {
+  stroke: #64d2ff;
+}
+
+.ed-link__badge[data-selected="true"] .ed-link__badge-ring {
+  stroke: #f4a261;
+  fill: #1d1610;
+}
+
+.ed-link__badge-arrow {
+  fill: none;
+  stroke: #7d8fa3;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ed-link__badge:hover .ed-link__badge-arrow,
+.ed-link__badge[data-selected="true"] .ed-link__badge-arrow {
+  stroke: #d9e2ec;
+}
+
+.ed-link__badge[data-any="true"] .ed-link__badge-ring {
+  stroke-dasharray: 3 2;
+}

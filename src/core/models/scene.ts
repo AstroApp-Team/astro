@@ -281,3 +281,25 @@ export const SANDBOX_NODES: SceneNode[] = [
   { theatreKey: "Prefab-Node-2", label: "Node 2", status: "active", position: [0, 0.5, 0] },
   { theatreKey: "Prefab-Node-3", label: "Node 3", status: "idle", position: [3, 0.5, 0] },
 ];
+
+/**
+ * Every scene's objects, keyed by id — the rig editor's hierarchy.
+ *
+ * The per-scene arrays above pre-date a page that needs *any* scene's objects at once, and the
+ * alternative (a switch in the view) is a second place to forget when a scene is added: the
+ * registry has `SCENE_COMPONENTS`, this project has `SCENE_SHEET_IDS`, and a hierarchy that
+ * silently shows nothing for a new scene is exactly the failure the sheet map exists to prevent.
+ * Typing it `Record<SceneId, …>` makes the omission a compile error instead.
+ */
+export const SCENE_NODES: Record<SceneId, SceneNode[]> = {
+  hub: [],
+  "infra-map": [],
+  "career-journey": [],
+  archive: [],
+  sting: STING_NODES,
+  float: FLOAT_NODES,
+  astro: ASTRO_NODES,
+  "astro-v2": ASTRO_V2_NODES,
+  surface: SURFACE_NODES,
+  "studio-sandbox": SANDBOX_NODES,
+};

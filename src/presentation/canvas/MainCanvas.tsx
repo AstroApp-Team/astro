@@ -1,10 +1,13 @@
 import { Canvas } from "@react-three/fiber";
+
+import { CanvasBoundary } from "@presentation/ui/components/CanvasBoundary.tsx";
 import { Suspense } from "react";
 import type { CSSProperties, RefObject } from "react";
 
 import type { SceneId } from "@core/models/scene.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
 import { SCENE_COMPONENTS } from "@presentation/canvas/scenes/sceneRegistry.tsx";
+import { ImportedModels, SceneIntrospection } from "@presentation/canvas/sceneInspect.tsx";
 
 /**
  * The root R3F canvas.
@@ -79,24 +82,36 @@ export default function MainCanvas({
       className={className == null ? "canvas-host" : `canvas-host ${className}`}
       style={{ touchAction: "none", ...style }}
     >
-      <Canvas
-        dpr={[1, 1.5]}
-        gl={{
-          antialias: false,
-          powerPreference: "high-performance",
-          failIfMajorPerformanceCaveat: false,
-          alpha: true,
-        }}
-        camera={{ position: [0, 4, 9], fov: 55 }}
-        {...(eventSource == null ? {} : { eventSource })}
-        {...(eventPrefix == null ? {} : { eventPrefix })}
-      >
-        <Suspense fallback={null}>
-          {/* R3F keeps GL objects in refs, not React state, so switching scenes
-              is a remount. `epoch` is the store's bump for exactly that. */}
-          <Scene key={`${key}-${epoch}`} />
-        </Suspense>
-      </Canvas>
+      {/*
+        The boundary wraps the Canvas, not the page: a browser without WebGL must still render the
+        text, the log and the buttons around the scene. Without it the throw from `WebGLRenderer`
+        escaped the effect inside R3F and unmounted the app — every canvas route was blank white.
+      */}
+      <CanvasBoundary what={key}>
+        <Canvas
+          dpr={[1, 1.5]}
+          gl={{
+            antialias: false,
+            powerPreference: "high-performance",
+            failIfMajorPerformanceCaveat: false,
+            alpha: true,
+          }}
+          camera={{ position: [0, 4, 9], fov: 55 }}
+          {...(eventSource == null ? {} : { eventSource })}
+          {...(eventPrefix == null ? {} : { eventPrefix })}
+        >
+          <Suspense fallback={null}>
+            {/* R3F keeps GL objects in refs, not React state, so switching scenes
+                is a remount. `epoch` is the store's bump for exactly that. */}
+            <Scene key={`${key}-${epoch}`} />
+            {/* Not keyed: both must survive a scene remount. `SceneIntrospection` is what lets the
+                studio list shaders and apply a material override; `ImportedModels` renders the
+                glTF files imported at runtime, which no sheet can hold. */}
+            <SceneIntrospection />
+            <ImportedModels />
+          </Suspense>
+        </Canvas>
+      </CanvasBoundary>
     </div>
   );
 }

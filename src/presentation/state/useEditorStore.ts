@@ -26,6 +26,7 @@ import type {
   LayerDef,
   MachineDefinition,
   StateDef,
+  TimelineDef,
   TransitionDef,
 } from "@core/models/animationStateMachine.ts";
 import type {
@@ -70,7 +71,23 @@ import { validateDefinition } from "@core/usecases/animationStateMachine/validat
 import type { ListenerDef } from "@core/models/animationStateMachine.ts";
 
 const MACHINE_ID = "machine-demo";
-const DRAFT_KEY = `astro.editor.${MACHINE_ID}.draft`;
+
+/**
+ * Draft keys are per **scene**, not per machine.
+ *
+ * Two scenes share no definition: a state added while rigging `StingScene` used to appear in
+ * `FloatScene`'s graph as well, and a clip id (`SheetId/ObjectKey`) resolved to nothing there.
+ * The vendor file on disk is still one `machine-demo`; the drafts are keyed by sheet.
+ */
+function draftKey(sceneKey: string, machineId: string): string {
+  return `astro.editor.${MACHINE_ID}.${sceneKey}.${machineId}.draft`;
+}
+
+/** One scene can hold several machines; the id is the draft key's last segment. */
+export interface MachineEntry {
+  id: string;
+  name: string;
+}
 const FILE_KEY = `astro.editor.${MACHINE_ID}.file`;
 
 /** Where the dev-only middleware lives (§4.3). A build has no such endpoint. */
@@ -78,6 +95,23 @@ const EDITOR_ENDPOINT = "/__astro-editor";
 
 interface EditorStore {
   machineId: string;
+  /**
+   * Which scene's machine is open. `live` while the rig studio drives it; the `/editor` route
+   * leaves it at the demo so its own bench keeps working unchanged.
+   */
+  sceneKey: string;
+  /** Every scene+machine definition opened this session, keyed `${sceneKey}#${machineId}`. */
+  sceneDefs: Record<string, MachineDefinition>;
+  /**
+   * The machines that exist per scene, and which one is open.
+   *
+   * A "scene" here is the runtime scene + sheet (`sting:StingScene`), because two scenes on one
+   * sheet share no clips. Machines are per scene, not global: a state added while rigging the
+   * sting character must not appear in the float page's graph — the clip ids resolve to nothing
+   * there, and the graph would be showing a machine that can never play.
+   */
+  machines: Record<string, MachineEntry[]>;
+  activeMachine: Record<string, string>;
   definition: MachineDefinition;
   file: EditorFile;
   past: MachineDefinition[];
@@ -87,6 +121,14 @@ interface EditorStore {
   source: "shipped" | "local";
   error: string | null;
   status: string;
+  /**
+   * Which machine timeline the dope sheet is showing, or `null` for the whole sheet.
+   *
+   * A timeline is a sequence with its own props and its own window of the sheet (see
+   * `TimelineDef.props` / `length` / `offset`). Without a focus the deck shows every track, which
+   * is the right default on a sheet with one clip and the wrong one the moment there are two.
+   */
+  focusedTimeline: string | null;
 
   /* session — never persisted */
   mode: StageMode;
@@ -109,6 +151,17 @@ interface EditorStore {
   load: () => void;
   /** Fetch the workspace file once per session: `localStorage` is the draft, disk is the file. */
   hydrate: () => Promise<void>;
+  /**
+   * Open a scene's machine, creating it from `seed` the first time.
+   *
+   * The current definition is stashed under its own scene key, so switching scenes is not a
+   * `discard`: unsaved edits survive until the tab closes.
+   */
+  switchScene: (sceneKey: string, seed: () => MachineDefinition, force?: boolean) => void;
+  /** Add a machine to the open scene, seeded from `seed`, and switch to it. */
+  newMachine: (seed: () => MachineDefinition, name?: string) => void;
+  selectMachine: (machineId: string) => void;
+  deleteMachine: (machineId: string) => void;
 
   select: (selection: Selection) => void;
   hover: (selection: Selection) => void;
@@ -149,6 +202,29 @@ interface EditorStore {
   patchListener: (index: number, patch: Partial<ListenerDef>) => void;
   removeListener: (index: number) => void;
   setMarkers: (layerId: string, stateId: string, markers: { time: number; name: string }[]) => void;
+
+  /** Add a timeline (§5) and return its id. `id` is never reused: the ordinal keeps climbing. */
+  addTimeline: (init?: Partial<TimelineDef>) => string;
+  /** Remove a timeline. Refused while a state still references it — see the action's note. */
+  removeTimeline: (timelineId: string) => { ok: boolean; reason?: string };
+  patchTimeline: (timelineId: string, patch: Partial<TimelineDef>) => void;
+  /** Point the dope sheet at one timeline (or back at the whole sheet with `null`). */
+  focusTimeline: (timelineId: string | null) => void;
+  /** Bind a state to a timeline, or (for `state !== null`) create the state first. */
+  bindTimeline: (layerId: string, timelineId: string, stateId: string | null) => string | null;
+  /**
+   * Insert a timeline "between" two states: the transition `from → to` is replaced by
+   * `from → S → to`, where `S` carries the timeline. This is what dropping a timeline on a
+   * connecting line means — a transition cannot own a clip, so the drop earns one a state.
+   */
+  insertTimeline: (
+    layerId: string,
+    timelineId: string,
+    from: string,
+    to: string,
+    index: number,
+    anyState?: boolean,
+  ) => void;
 }
 
 function readJson<T>(key: string): T | null {
@@ -178,7 +254,7 @@ function loadDraft(): {
   dirty: boolean;
 } {
   const shipped = loadShippedDefinition(MACHINE_ID);
-  const draft = readJson<{ definition?: unknown }>(DRAFT_KEY)?.definition;
+  const draft = readJson<{ definition?: unknown }>(draftKey("machine-demo", "main"))?.definition;
   if (draft == null) return { definition: shipped, source: "shipped", dirty: false };
   try {
     return { definition: loadDefinition(draft), source: "local", dirty: true };
@@ -223,11 +299,15 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       error: null,
       ...(structural && state.playing ? { rebuild: "structural change" } : {}),
     });
-    writeJson(DRAFT_KEY, { definition, at: Date.now() });
+    writeJson(draftKey(state.sceneKey, state.machineId), { definition, at: Date.now() });
   };
 
   return {
-    machineId: MACHINE_ID,
+    machineId: "main",
+    sceneKey: "machine-demo",
+    sceneDefs: {},
+    machines: { "machine-demo": [{ id: "main", name: "Demo machine" }] },
+    activeMachine: { "machine-demo": "main" },
     definition: initial.definition,
     file: storedFile ?? { ...EMPTY_EDITOR_FILE, machineId: MACHINE_ID },
     past: [],
@@ -236,6 +316,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     source: initial.source,
     error: null,
     status: "",
+    focusedTimeline: null,
 
     mode: "graph",
     focus: "viewport",
@@ -282,7 +363,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         error: null,
         status: "Discarded — the shipped definition is open.",
       });
-      if (typeof localStorage !== "undefined") localStorage.removeItem(DRAFT_KEY);
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(draftKey(get().sceneKey, get().machineId));
+      }
     },
     save: async () => {
       const { definition, file, machineId } = get();
@@ -312,7 +395,9 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           body: JSON.stringify({ id: machineId, definition, editor: nextFile }),
         });
         if (!response.ok) throw new Error(`${response.status} ${await response.text()}`);
-        if (typeof localStorage !== "undefined") localStorage.removeItem(DRAFT_KEY);
+        if (typeof localStorage !== "undefined") {
+          localStorage.removeItem(draftKey(get().sceneKey, get().machineId));
+        }
         set({ dirty: false, source: "shipped", status: "Saved to disk." });
       } catch (error) {
         /* The endpoint is dev-only, so a production build always lands here. The draft stays
@@ -346,6 +431,148 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       set({ definition: draft.definition, dirty: draft.dirty, source: draft.source });
     },
 
+    switchScene: (sceneKey, seed, force = false) => {
+      const state = get();
+      if (state.sceneKey === sceneKey && !force) return;
+
+      /* Stash the open definition under the *pair* it belongs to, so coming back restores edits. */
+      const stash = {
+        ...state.sceneDefs,
+        [`${state.sceneKey}#${state.machineId}`]: state.definition,
+      };
+      const known = state.machines[sceneKey] ?? [{ id: "main", name: "Main machine" }];
+      const machineId =
+        known.find((entry) => entry.id === state.activeMachine[sceneKey])?.id ??
+        known[0]?.id ??
+        "main";
+      const key = `${sceneKey}#${machineId}`;
+      let next = stash[key];
+      if (next == null) {
+        try {
+          next = seed();
+        } catch (error) {
+          set({ error: error instanceof Error ? error.message : String(error) });
+          return;
+        }
+      }
+      set({
+        sceneKey,
+        machineId,
+        machines: { ...state.machines, [sceneKey]: known },
+        activeMachine: { ...state.activeMachine, [sceneKey]: machineId },
+        sceneDefs: { ...stash, [key]: next },
+        definition: next,
+        past: [],
+        future: [],
+        dirty: false,
+        source: "local",
+        selection: null,
+        previewClip: null,
+        focusedTimeline: null,
+        error: null,
+        status: `Machine: ${known.find((entry) => entry.id === machineId)?.name ?? machineId}`,
+      });
+    },
+
+    /**
+     * Add a machine to the open scene.
+     *
+     * The id is `machine-N`, never reused: two machines sharing an id share a draft key, and the
+     * second one would open the first one's states. The seed comes from the caller because only it
+     * knows the scene's clips — a machine seeded here would be an empty graph that cannot play.
+     */
+    newMachine: (seed, name) => {
+      const state = get();
+      const existing = state.machines[state.sceneKey] ?? [];
+      let ordinal = existing.length + 1;
+      while (existing.some((entry) => entry.id === `machine-${String(ordinal)}`)) ordinal += 1;
+      const id = `machine-${String(ordinal)}`;
+      const label = name ?? `Machine ${String(ordinal)}`;
+      let definition: MachineDefinition;
+      try {
+        definition = seed();
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+      set({
+        machines: { ...state.machines, [state.sceneKey]: [...existing, { id, name: label }] },
+        activeMachine: { ...state.activeMachine, [state.sceneKey]: id },
+        sceneDefs: {
+          ...state.sceneDefs,
+          [`${state.sceneKey}#${state.machineId}`]: state.definition,
+          [`${state.sceneKey}#${id}`]: definition,
+        },
+        machineId: id,
+        definition,
+        past: [],
+        future: [],
+        dirty: true,
+        selection: null,
+        error: null,
+        status: `New machine: ${label}`,
+      });
+      writeJson(draftKey(state.sceneKey, id), { definition, at: Date.now() });
+    },
+
+    selectMachine: (machineId) => {
+      const state = get();
+      if (machineId === state.machineId) return;
+      const next = state.sceneDefs[`${state.sceneKey}#${machineId}`];
+      if (next == null) {
+        set({ error: `Machine "${machineId}" has not been opened in this session.` });
+        return;
+      }
+      const stash = {
+        ...state.sceneDefs,
+        [`${state.sceneKey}#${state.machineId}`]: state.definition,
+      };
+      set({
+        machineId,
+        activeMachine: { ...state.activeMachine, [state.sceneKey]: machineId },
+        sceneDefs: stash,
+        definition: next,
+        past: [],
+        future: [],
+        dirty: false,
+        selection: null,
+        error: null,
+        status: `Machine: ${
+          state.machines[state.sceneKey]?.find((entry) => entry.id === machineId)?.name ?? machineId
+        }`,
+      });
+    },
+
+    deleteMachine: (machineId) => {
+      const state = get();
+      const existing = state.machines[state.sceneKey] ?? [];
+      /* The last machine is the scene's machine: deleting it would leave the scene unriggable. */
+      if (existing.length <= 1) {
+        set({ error: "A scene needs at least one machine." });
+        return;
+      }
+      const nextList = existing.filter((entry) => entry.id !== machineId);
+      const fallback = nextList[0]?.id ?? "main";
+      const nextId = machineId === state.machineId ? fallback : state.machineId;
+      const nextDef =
+        state.sceneDefs[`${state.sceneKey}#${nextId}`] ??
+        (nextId === state.machineId ? state.definition : state.definition);
+      const stash = { ...state.sceneDefs };
+      delete stash[`${state.sceneKey}#${machineId}`];
+      set({
+        machines: { ...state.machines, [state.sceneKey]: nextList },
+        activeMachine: { ...state.activeMachine, [state.sceneKey]: nextId },
+        sceneDefs: stash,
+        machineId: nextId,
+        definition: nextDef,
+        selection: null,
+        error: null,
+        status: `Deleted machine ${machineId}`,
+      });
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(draftKey(state.sceneKey, machineId));
+      }
+    },
     select: (selection) => set({ selection }),
     hover: (hovered) => set({ hovered }),
     setMode: (mode) => set({ mode }),
@@ -475,6 +702,97 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     addListener: (listener) => apply((definition) => addListener(definition, listener)),
     patchListener: (index, patch) => apply((definition) => patchListener(definition, index, patch)),
     removeListener: (index) => apply((definition) => removeListener(definition, index)),
+    addTimeline: (init) => {
+      const definition = get().definition;
+      const timelines = definition.timelines ?? [];
+      let ordinal = timelines.length + 1;
+      while (timelines.some((row) => row.id === `tl-${String(ordinal)}`)) ordinal += 1;
+      const id = init?.id ?? `tl-${String(ordinal)}`;
+      const timeline: TimelineDef = {
+        id,
+        duration: init?.duration ?? 1,
+        playStyle: init?.playStyle ?? { kind: "loop" },
+        speed: init?.speed ?? 1,
+        ...init,
+      };
+      apply((current) => ({ ...current, timelines: [...(current.timelines ?? []), timeline] }));
+      return id;
+    },
+    removeTimeline: (timelineId) => {
+      const users = get().definition.layers.flatMap((layer) =>
+        layer.states.filter((state) => "timeline" in state && state.timeline === timelineId),
+      );
+      if (users.length > 0) {
+        const names = users.map((state) => state.id).join(", ");
+        return {
+          ok: false,
+          reason: `“${timelineId}” is still used by ${names}. Rebind or delete those states first.`,
+        };
+      }
+      apply((current) => ({
+        ...current,
+        timelines: (current.timelines ?? []).filter((row) => row.id !== timelineId),
+      }));
+      if (get().focusedTimeline === timelineId) set({ focusedTimeline: null });
+      return { ok: true };
+    },
+    focusTimeline: (timelineId) => {
+      set({ focusedTimeline: timelineId });
+    },
+    patchTimeline: (timelineId, patch) =>
+      apply((current) => ({
+        ...current,
+        timelines: (current.timelines ?? []).map((row) =>
+          row.id === timelineId ? { ...row, ...patch } : row,
+        ),
+      })),
+    bindTimeline: (layerId, timelineId, stateId) => {
+      const timeline = (get().definition.timelines ?? []).find((row) => row.id === timelineId);
+      if (timeline == null) return null;
+      let target = stateId;
+      if (target == null) {
+        const layer = get().definition.layers.find((row) => row.id === layerId);
+        if (layer == null) return null;
+        const added = addState(get().definition, layerId, "clip");
+        target = added.stateId;
+        apply(() => added.definition);
+      }
+      apply((current) =>
+        patchState(current, layerId, target, {
+          type: "clip",
+          timeline: timelineId,
+          ...(timeline.clip == null ? {} : { clip: timeline.clip }),
+        } as Partial<StateDef>),
+      );
+      set({ selection: { kind: "state", layer: layerId, state: target } });
+      return target;
+    },
+    insertTimeline: (layerId, timelineId, from, to, index, anyState = false) => {
+      const timeline = (get().definition.timelines ?? []).find((row) => row.id === timelineId);
+      if (timeline == null) return;
+      const added = addState(get().definition, layerId, "clip");
+      const stateId = added.stateId;
+      /*
+       * Two applies, not one. The second reads `current` from the store, and the store's copy does
+       * not contain the state `addState` just computed — patching it in the same `apply` throws
+       * `no state "state-N" in layer "..."` and the drop silently does nothing. Committing the
+       * state first (valid on its own: a clip state with its default asset) makes the transition
+       * rewrite operate on a definition that has it.
+       */
+      apply(() => added.definition);
+      apply((current) => {
+        const removed = removeTransition(current, layerId, index, anyState);
+        const bound = patchState(removed, layerId, stateId, {
+          type: "clip",
+          timeline: timelineId,
+          ...(timeline.clip == null ? {} : { clip: timeline.clip }),
+        } as Partial<StateDef>);
+        /* An any-state edge comes from no state, so its replacement starts at the any pill too. */
+        const first = addTransition(bound, layerId, from, stateId, { anyState });
+        return addTransition(first, layerId, stateId, to, {});
+      });
+      set({ selection: { kind: "state", layer: layerId, state: stateId } });
+    },
     setMarkers: (layerId, stateId, markers) => {
       /* Markers live where the runtime reads them: on the shared timeline when the state
          references one, on the state itself otherwise (`withMarkers` owns that rule). */

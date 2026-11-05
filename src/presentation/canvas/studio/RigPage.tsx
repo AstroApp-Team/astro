@@ -1,63 +1,45 @@
-import {
-  IonButton,
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonIcon,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-} from "@ionic/react";
-import { arrowBackOutline, playOutline, squareOutline, syncOutline } from "ionicons/icons";
+/**
+ * `/rig/:sceneId` — the rig studio.
+ *
+ * The page is now a frame around `StudioShell`: this file owns the things that are *route* facts
+ * (which scene, the Studio's lifecycle, the sheet the shape tools spawn into, the status-bar
+ * style) and the shell owns everything about the workspace. Splitting it that way is what let the
+ * same shell be reused by `/editor`'s panels without this page growing a second layout.
+ *
+ * The route is registered in production like every other route — a route nobody has seen fail in
+ * prod is a route with a bug nobody has seen. The Studio panel itself stays behind the
+ * `import.meta.env.DEV && !native` gate in `studioInit.ts`, so on a phone this is a read-only rig
+ * viewer: the shell renders, the panels are read-only, and the preview still plays.
+ *
+ * `setSelectionVisuals(true)` is stated on mount, not inherited: `IonRouterOutlet` keeps the page
+ * you navigated away from mounted, so coming from `/showcase` the *other* page's flag is what is
+ * current, and a bench that inherits it shows nothing selected.
+ */
+
+import { IonContent, IonPage } from "@ionic/react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import type { IStudio } from "@theatre/studio";
 
 import { SCENE_IDS, type SceneId, isSceneId } from "@core/models/scene.ts";
 import { StatusBarService } from "@infra/native/StatusBarService.ts";
-import { SCENE_SHEET_IDS, getSheet } from "@infra/theatre/project.ts";
+import { SCENE_SHEET_IDS } from "@infra/theatre/project.ts";
 import { ensureStudio, hideStudioUi, showStudioUi } from "@infra/theatre/studioInit.ts";
-import { useSheetPlayback } from "@infra/theatre/useSheetPlayback.ts";
-import MainCanvas from "@presentation/canvas/MainCanvas.tsx";
-import ToolsDock from "@presentation/canvas/studio/tools/ToolsDock.tsx";
 import { useAppStore } from "@presentation/state/useAppStore.ts";
 import { useSceneStore } from "@presentation/state/useSceneStore.ts";
 import { useShapeStore } from "@presentation/state/useShapeStore.ts";
+import { StudioShell } from "@presentation/ui/studio/StudioShell.tsx";
 
-import "@presentation/ui/styles/studio.css";
+import "@presentation/ui/editor/editor.css";
+import "@presentation/ui/studio/studio.css";
 
-/**
- * The rig bench: a production scene, mounted on its own sheet, with the Studio
- * loaded over it.
- *
- * This route is why the sandbox round trip exists at all. `/studio-corner` rigs
- * the `StudioSandbox` sheet, and moving a rig out of it means renaming the
- * `sheetsById` key in the exported JSON to the production sheet id — a hand edit
- * of a file nobody should hand edit, and the failure mode is silent (core finds
- * no sheet, the scene plays at its initial values, no error).
- *
- * Here the sheet under the canvas *is* the production sheet, so the export is
- * already keyed correctly:
- *
- *   1. `/rig/sting` on a desktop browser in dev
- *   2. Toggle Studio → rig → right-click the project → Export state
- *   3. `pnpm run theatre:state -- import <the.json> --to StingScene`
- *
- * No rename, no mirroring the node array into `SANDBOX_NODES`, and the
- * theatreKeys you keyframe are literally the ones the shipped scene renders.
- *
- * The route is registered in production like every other route — a route nobody
- * has seen fail in prod is a route with a bug nobody has seen. The Studio panel
- * itself stays behind the `import.meta.env.DEV && !native` gate in
- * `studioInit.ts`, so on a phone this is a plain scene viewer with a play button.
- */
 export default function RigPage() {
-  const navigate = useNavigate();
   const { sceneId } = useParams<{ sceneId?: string }>();
   const [studioUiVisible, setStudioUiVisible] = useState(false);
   const [studioReady, setStudioReady] = useState(false);
-  /** The instance, not just a boolean: the tools dock mounts panes into it. */
+  /** The instance, not just a boolean: the tools panel mounts panes into it. */
   const [studio, setStudio] = useState<IStudio | null>(null);
 
   const scene: SceneId | null = isSceneId(sceneId) ? sceneId : null;
@@ -70,19 +52,8 @@ export default function RigPage() {
     setActiveScene(scene);
     setScreen("rig");
 
-    /**
-     * The sheet the Studio tools act on is this scene's own sheet, so "Aim
-     * Camera" rotates the camera that ships rather than the sandbox's.
-     */
+    /* The shape tools spawn into this scene's own sheet, so "Add Shape" lands where you are. */
     useShapeStore.getState().setSheetId(SCENE_SHEET_IDS[scene]);
-
-    /**
-     * The highlight is load-bearing here: it is how you see which object the
-     * Studio's stopwatch and the toolbar readout are aimed at. Stated on mount
-     * rather than inherited, because `IonRouterOutlet` keeps the page you navigate
-     * away from mounted — coming from `/showcase`, that page's flag is what is
-     * current, and a bench that inherits it shows nothing selected.
-     */
     useSceneStore.getState().setSelectionVisuals(true);
 
     StatusBarService.setStyle("dark");
@@ -95,9 +66,8 @@ export default function RigPage() {
   }, [scene, setActiveScene, setScreen]);
 
   /**
-   * Studio readiness is state, not a render-time poll — see the same note in
-   * `StudioCornerPage`. `isStudioAvailable()` reads a module variable, so the
-   * button would sit disabled for the whole session.
+   * Studio readiness is state, not a render-time poll — `isStudioAvailable()` reads a module
+   * variable, so the button would sit disabled for the whole session.
    */
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +78,14 @@ export default function RigPage() {
       }
       setStudio(studio);
       setStudioReady(true);
-      setStudioUiVisible(showStudioUi());
+      /*
+       * Hidden on arrival, and that is a layout fact rather than a preference: the Studio's root is a
+       * `position: fixed; inset: 0` overlay at `z-index: 100` that takes pointer events across the
+       * whole viewport, so a shell underneath it is visible but dead — every click lands on the
+       * Studio root. The panel is a mode: the header's Studio button turns it on, and the Studio's
+       * own close button turns it off.
+       */
+      setStudioUiVisible(hideStudioUi());
     });
 
     return () => {
@@ -121,16 +98,6 @@ export default function RigPage() {
   if (scene == null) {
     return (
       <IonPage>
-        <IonHeader>
-          <IonToolbar>
-            <IonButtons slot="start">
-              <IonButton onClick={() => navigate("/voice")}>
-                <IonIcon slot="icon-only" icon={arrowBackOutline} />
-              </IonButton>
-            </IonButtons>
-            <IonTitle>Rig bench</IonTitle>
-          </IonToolbar>
-        </IonHeader>
         <IonContent fullscreen>
           <div className="rig-picker">
             <p>
@@ -152,122 +119,17 @@ export default function RigPage() {
   }
 
   return (
-    <RigBench
-      scene={scene}
-      studio={studio}
-      studioReady={studioReady}
-      studioUiVisible={studioUiVisible}
-      onToggleStudio={() => {
-        setStudioUiVisible((visible) => (visible ? hideStudioUi() : showStudioUi()));
-      }}
-    />
-  );
-}
-
-type RigBenchProps = {
-  scene: SceneId;
-  studio: IStudio | null;
-  studioReady: boolean;
-  studioUiVisible: boolean;
-  onToggleStudio(): void;
-};
-
-function RigBench({ scene, studio, studioReady, studioUiVisible, onToggleStudio }: RigBenchProps) {
-  const sheet = getSheet(SCENE_SHEET_IDS[scene]);
-  const playback = useSheetPlayback(sheet);
-  /** Read on button clicks only — a live playhead readout re-renders 60 times a second. */
-  const [playhead, setPlayhead] = useState(0);
-  const length = playback.length();
-  const sheetId = SCENE_SHEET_IDS[scene];
-
-  return (
     <IonPage>
-      <IonHeader>
-        <IonToolbar>
-          <IonButtons slot="start">
-            <Link className="rig-back" to="/voice">
-              <IonIcon icon={arrowBackOutline} />
-            </Link>
-          </IonButtons>
-          <IonTitle>Rig · {scene}</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-
-      <IonContent fullscreen>
-        <div className="studio-stage">
-          <MainCanvas scene={scene} className="studio-canvas" />
-
-          <div className="studio-toolbar">
-            <div className="studio-toolbar__buttons">
-              <button
-                type="button"
-                onClick={() => {
-                  playback.play([0, length]);
-                  setPlayhead(playback.position());
-                }}
-              >
-                <IonIcon icon={playOutline} />
-                Play 0 → {length}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  playback.loop([0, length]);
-                  setPlayhead(playback.position());
-                }}
-              >
-                <IonIcon icon={syncOutline} />
-                Loop
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  playback.reset();
-                  setPlayhead(0);
-                }}
-              >
-                <IonIcon icon={squareOutline} />
-                Reset
-              </button>
-              <button
-                type="button"
-                onClick={onToggleStudio}
-                disabled={!studioReady}
-                title={
-                  studioReady
-                    ? "Show or hide the Theatre.js Studio panel"
-                    : "The Studio only loads in dev, on a desktop browser"
-                }
-              >
-                {studioUiVisible ? "Hide Studio" : "Toggle Studio"}
-              </button>
-            </div>
-
-            <dl className="studio-toolbar__readout">
-              <div>
-                <dt>Sheet</dt>
-                <dd>{sheetId}</dd>
-              </div>
-              <div>
-                <dt>Sequence</dt>
-                <dd>{length === 0 ? "empty — nothing rigged yet" : `${length}s`}</dd>
-              </div>
-              <div>
-                <dt>Playhead</dt>
-                <dd>{playhead.toFixed(2)}s</dd>
-              </div>
-              <div>
-                <dt>Export</dt>
-                <dd>
-                  Studio → right-click the project → Export state, then:
-                  <br />
-                  <code>pnpm run theatre:state -- import &lt;file&gt; --to {sheetId}</code>
-                </dd>
-              </div>
-            </dl>
-          </div>
-          <ToolsDock studio={studio} />
-        </div>
+      <IonContent className="st-content" scrollY={false}>
+        <StudioShell
+          scene={scene}
+          studio={studio}
+          studioUi={studioUiVisible}
+          studioAvailable={studioReady}
+          onToggleStudio={() => {
+            setStudioUiVisible((visible) => (visible ? hideStudioUi() : showStudioUi()));
+          }}
+        />
       </IonContent>
     </IonPage>
   );
