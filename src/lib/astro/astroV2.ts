@@ -166,16 +166,20 @@ export const ASTRO_V2_PALETTE = {
   /** The eyes: cream, never white. */
   core: "#FEFBF5",
   /**
-   * The inner wall of the eye wells: the sheet's midtone orange, lifted toward the cream
-   * so the well reads as a lit cavity rather than as a hole cut in the body.
+   * The inner wall of the eye wells — the side of the eye.
    *
-   * Derived, not printed: the midpoint between the sheet's `#FA6B2F` and the eye's own
-   * `#FEFBF5` — light enough that the well reads as a lit cavity and not as a second
-   * orange ring, still orange enough to hold the eye's edge against the body. It is one
-   * flat colour on purpose: the wall is two or three pixels at phone size, and a gradient
-   * across it is noise, not shading. See `eyeUniforms.uInner`.
+   * **Darker than `bottom`, the darkest body stop.** The wall is the inside of a hole, so
+   * it can only be in shadow: the previous value (`#FDC3A8`, the sheet's midtone orange
+   * lifted toward the cream) read as a lit rim laid on the body instead of a cavity cut
+   * into it. Unlit is the palette's own logic — nothing in this character is lit; the body
+   * is a gradient and the halo is a ramp — and unlit shadow has to be near-black to look
+   * like one when the surface around it is `#FE3402`.
+   *
+   * Warm rather than neutral (`#1A0400`, not `#000000`) so it sits in the same family as
+   * the body it is cut from. One flat colour on purpose: the wall is two or three pixels at
+   * phone size, and a gradient across it is noise. See `eyeUniforms.uInner`.
    */
-  eyeWell: "#FDC3A8",
+  eyeWall: "#1A0400",
   /** Halo shell: the sheet's glow, and the bloom it fades into. */
   haloInner: "#FB5F25",
   haloOuter: "#FF8B00",

@@ -43,6 +43,26 @@ const GRADIENT_DIR = new Vector3(0.35, 1, 0.15).normalize();
 
 const color = (hex: string) => new Color(hex);
 
+/**
+ * The view ray at a fragment, in view space. Shared by the body and the halo.
+ *
+ * Under a **perspective** camera every fragment is seen from the camera's origin, so the
+ * ray really is `-viewPosition`. Under an **orthographic** one the rays are parallel, and
+ * `-viewPosition` is then dominated by how far the character sits from the view axis — so
+ * every view-dependent term skews toward whichever side he was moved to. That is what
+ * "the halo is pointing the wrong direction" was: the grazing band is `1 - dot(normal,
+ * view)`, and it was being measured against a ray aimed off toward the corner.
+ *
+ * `projectionMatrix[3][3]` is 1.0 for an orthographic frustum and 0.0 for a perspective
+ * one, so one `mix` covers both and there is no uniform to keep in step with the camera.
+ */
+const VIEW_DIRECTION = /* glsl */ `
+  vec3 viewDirection(vec3 viewPosition) {
+    float orthographic = projectionMatrix[3][3];
+    return normalize(mix(-viewPosition, vec3(0.0, 0.0, 1.0), orthographic));
+  }
+`;
+
 /* ── body ────────────────────────────────────────────────────────────────────── */
 
 export const bodyUniforms = {
@@ -71,16 +91,19 @@ export const bodyUniforms = {
   uGradientScale: { value: 1 },
 };
 
-const bodyVertexShader = /* glsl */ `
+/* Exported for `materials.test.ts`, which guards the view ray both programs share. */
+export const bodyVertexShader = /* glsl */ `
   varying vec3 vWorld;
   varying vec3 vViewNormal;
   varying vec3 vViewDir;
+
+  ${VIEW_DIRECTION}
 
   void main() {
     vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
 
     vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-    vViewDir = normalize(-viewPosition.xyz);
+    vViewDir = viewDirection(viewPosition.xyz);
     vViewNormal = normalize(normalMatrix * normal);
 
     gl_Position = projectionMatrix * viewPosition;
@@ -181,7 +204,9 @@ export const eyeUniforms = {
   uStretch: { value: 1 },
   uCore: { value: color(ASTRO_V2_PALETTE.core) },
   /**
-   * The well's inner wall: one flat colour, the sheet's midtone orange brightened.
+   * The well's inner wall — the side of the eye, the band the prism's barrel shows around
+   * the cream plate. Deliberately darker than the darkest body stop (see
+   * `ASTRO_V2_PALETTE.eyeWall`).
    *
    * Solid on purpose. A gradient along the wall needs a normal, and a wall's normal is
    * perpendicular to the view ray everywhere — the only variation a facing term can
@@ -189,7 +214,7 @@ export const eyeUniforms = {
    * rather than as a cavity. A flat tint is what the stylesheet does with its feature
    * shadow: one colour, hard edge.
    */
-  uInner: { value: color(ASTRO_V2_PALETTE.eyeWell) },
+  uInner: { value: color(ASTRO_V2_PALETTE.eyeWall) },
   uOpacity: { value: 1 },
 };
 
@@ -313,17 +338,19 @@ export const haloUniforms = {
   uDrift: { value: 0 },
 };
 
-const haloVertexShader = /* glsl */ `
+export const haloVertexShader = /* glsl */ `
   uniform float uSize;
 
   varying vec3 vViewNormal;
   varying vec3 vViewDir;
 
+  ${VIEW_DIRECTION}
+
   void main() {
     vec3 scaled = position * uSize;
 
     vec4 viewPosition = modelViewMatrix * vec4(scaled, 1.0);
-    vViewDir = normalize(-viewPosition.xyz);
+    vViewDir = viewDirection(viewPosition.xyz);
     vViewNormal = normalize(normalMatrix * normal);
 
     gl_Position = projectionMatrix * viewPosition;
