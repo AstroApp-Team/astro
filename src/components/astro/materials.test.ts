@@ -2,7 +2,7 @@ import { Color, OrthographicCamera, PerspectiveCamera } from "three";
 import { describe, expect, it } from "vite-plus/test";
 
 import { ASTRO_V2_PALETTE } from "../../lib/astro/astroV2.ts";
-import { bodyVertexShader, eyeUniforms, haloVertexShader } from "./materials.ts";
+import { bodyVertexShader, eyeFragmentShader, eyeUniforms, haloVertexShader } from "./materials.ts";
 
 /**
  * Both programs shade by facing angle — the body's rim bloom and the halo's grazing
@@ -38,17 +38,36 @@ describe("the view ray the shaders measure facing against", () => {
 });
 
 describe("the eye's inner wall", () => {
-  /* Linear-light luminance, the space `Color` keeps when given a hex in sRGB. */
-  const luminance = ({ r, g, b }: Color) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  /* sRGB-encoded channels, which is the space the fragment shader's output is blended in
+     (`colorspace_fragment` runs before the blend). */
+  const channels = (c: Color) => [c.r, c.g, c.b] as const;
+  const luminance = ([r, g, b]: readonly [number, number, number]) =>
+    0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-  it("is darker than every stop of the body gradient", () => {
-    /* The wall is the inside of a hole, so it is in shadow. A lit wall read as a rim laid
-       on the body rather than a cavity cut into it — hence "darker than the darkest astro
-       colour", which is `bottom`. */
-    const wall = luminance(eyeUniforms.uInner.value);
+  it("is translucent, and the plate is not", () => {
+    /* "43% opacity only on the side": the alpha splits on the same `isPlate` step as the
+       colour, in the one draw call — the wall composites against the body, the cream
+       eye does not. */
+    expect(eyeUniforms.uWallOpacity.value).toBe(0.43);
+    expect(eyeUniforms.uOpacity.value).toBe(1);
 
-    for (const stop of [ASTRO_V2_PALETTE.top, ASTRO_V2_PALETTE.mid, ASTRO_V2_PALETTE.bottom]) {
-      expect(wall).toBeLessThan(luminance(new Color(stop)));
-    }
+    expect(eyeFragmentShader).toContain("mix(uWallOpacity, uOpacity, isPlate)");
+    expect(eyeFragmentShader).not.toContain("vec4(col, uOpacity)");
+  });
+
+  it("composites darker than the body it sits on", () => {
+    /* The rule the wall has to obey, now that it is a tint rather than a solid: at 43% over
+       the body's darkest stop the result must still read as the inside of a hole. */
+    const wall = channels(eyeUniforms.uInner.value);
+    const body = channels(new Color(ASTRO_V2_PALETTE.bottom));
+    const alpha = eyeUniforms.uWallOpacity.value;
+
+    const blend = (c: number, i: number) => alpha * c + (1 - alpha) * body[i]!;
+    const composite: readonly [number, number, number] = [
+      blend(wall[0], 0),
+      blend(wall[1], 1),
+      blend(wall[2], 2),
+    ];
+    expect(luminance(composite)).toBeLessThan(luminance(body));
   });
 });

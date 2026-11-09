@@ -2,10 +2,17 @@
  * Astro as a corner presence over the voice page.
  *
  * The layer is a body-level `position: fixed` overlay with **`pointer-events: none`**.
- * That single property is what makes the shape usable: the canvas covers the whole
- * viewport, and the page's buttons, inputs and scroll must keep working underneath it.
- * It also means the canvas is never a hit target, so nothing here raycasts — the pointer
- * is read from a window listener in `AstroOverlay.tsx`.
+ * That property is what makes the shape usable: the canvas covers the whole viewport, and
+ * the page's buttons, inputs and scroll must keep working underneath it. It also means the
+ * canvas is never a hit target, so nothing here raycasts — the pointer is read from a window
+ * listener in `AstroOverlay.tsx`.
+ *
+ * `pointer-events: none` here is **not sufficient on its own**. R3F writes
+ * `pointer-events: auto` inline on its own root div (r3f only sets `none` when given an
+ * `eventSource`), and an inline style outranks this rule, so the canvas re-enables hit
+ * testing and covers every control on the page. The fix has to be the `style` prop on
+ * `<Canvas>` in `AstroOverlay.tsx`; losing it looks exactly like "no input field and a dead
+ * Unlock button", because that is what a full-viewport transparent canvas above the page is.
  *
  * `inset: 0` is required, not decorative: the canvas box must start at the viewport
  * origin, which is what the pointer normalisation in `lookFromPointer` assumes.

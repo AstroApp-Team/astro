@@ -84,10 +84,22 @@ export function orthographicHalfExtent(
 }
 
 /**
- * Pixels-per-world-unit that makes the halo span `coverage` of the shorter viewport side.
+ * Pixels-per-world-unit that makes the halo span `coverage` of the **longer** viewport side.
  *
- * Measured against the halo rather than the body for the same reason the inset is: the
- * glow is what the eye reads as his size, and it is 1.9× the body.
+ * Measured against the halo rather than the body for the same reason the inset is: the glow
+ * is what the eye reads as his size, and it is 1.9× the body.
+ *
+ * The **longer** side, not the shorter, and that is the whole difference between a phone and
+ * a monitor. Sizing against `min(w, h)` sizes a portrait phone by its narrow width — the one
+ * dimension it has least of — so he came out ~16% of the width on a handset and read as an
+ * icon, while the same figure looked right on a 1440×900 monitor whose shorter side is 900px.
+ * The longer side is the one that tracks *how much screen there is*: 25% of it is 360px on
+ * that monitor and 211px on a 390×844 phone, where the old rule gave the phone 156px.
+ *
+ * The trade-off is deliberate: on a tablet or a landscape phone the character is sized by the
+ * width, so he is larger relative to the short side than he is on a monitor. That is the
+ * price of "the same character" across viewports, and it is why the inset is clamped in
+ * `cornerPosition` — a big halo must still read as a corner.
  */
 export function orthographicZoom(
   widthPx: number,
@@ -95,7 +107,7 @@ export function orthographicZoom(
   coverage: number,
   haloWorld: number = ASTRO_CORNER_HALO_WORLD,
 ): number {
-  return (Math.min(widthPx, heightPx) * coverage) / (2 * haloWorld);
+  return (Math.max(widthPx, heightPx) * coverage) / (2 * haloWorld);
 }
 
 /**

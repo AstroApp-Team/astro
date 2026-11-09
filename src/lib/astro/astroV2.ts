@@ -168,18 +168,19 @@ export const ASTRO_V2_PALETTE = {
   /**
    * The inner wall of the eye wells — the side of the eye.
    *
-   * **Darker than `bottom`, the darkest body stop.** The wall is the inside of a hole, so
-   * it can only be in shadow: the previous value (`#FDC3A8`, the sheet's midtone orange
-   * lifted toward the cream) read as a lit rim laid on the body instead of a cavity cut
-   * into it. Unlit is the palette's own logic — nothing in this character is lit; the body
-   * is a gradient and the halo is a ramp — and unlit shadow has to be near-black to look
-   * like one when the surface around it is `#FE3402`.
+   * **A tint, not a solid.** `eyeUniforms.uWallOpacity` draws the wall at 43%, so this hex
+   * is composited against the body's gradient and the body's colour drifts through it.
+   * Composited over `bottom` (`#FE3402`) it lands near `#D34620`: a muted, browner orange
+   * than any body stop without being a hole punched in the character.
    *
-   * Warm rather than neutral (`#1A0400`, not `#000000`) so it sits in the same family as
-   * the body it is cut from. One flat colour on purpose: the wall is two or three pixels at
-   * phone size, and a gradient across it is noise. See `eyeUniforms.uInner`.
+   * The lighter `#FDC3A8` this started from read as a lit rim laid *on* the body, and the
+   * near-black `#1A0400` that replaced it read as a hole; 43% of a midtone brown sits
+   * between the two, which is what the wall is — a surface that is neither lit nor empty.
+   *
+   * One flat colour on purpose: the wall is two or three pixels at phone size, and a
+   * gradient across it is noise. See `eyeUniforms.uInner` and `uWallOpacity`.
    */
-  eyeWall: "#1A0400",
+  eyeWall: "#995F48",
   /** Halo shell: the sheet's glow, and the bloom it fades into. */
   haloInner: "#FB5F25",
   haloOuter: "#FF8B00",

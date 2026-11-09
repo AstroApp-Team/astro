@@ -12,7 +12,11 @@ import {
 } from "./corner.ts";
 
 /** The camera the overlay declares: orthographic, `zoom` derived from the canvas size. */
-function framing(widthPx: number, heightPx: number, coverage = 0.3) {
+/** The overlay's own coverage (`HALO_COVERAGE` in `AstroOverlay.tsx`), so these cases
+ * describe the framing that actually ships. */
+const OVERLAY_COVERAGE = 0.25;
+
+function framing(widthPx: number, heightPx: number, coverage = OVERLAY_COVERAGE) {
   const zoom = orthographicZoom(widthPx, heightPx, coverage);
   return orthographicHalfExtent(widthPx, heightPx, zoom);
 }
@@ -30,17 +34,32 @@ describe("orthographic framing", () => {
     expect(portrait.halfHeight / portrait.halfWidth).toBeCloseTo(844 / 390, 5);
   });
 
-  it("sizes the halo against the shorter side, on either orientation", () => {
-    /* `coverage` is a fraction of the shorter side, so the halo occupies that fraction of
-       min(width, height) in pixels — measured against the halo, not the body. */
+  it("sizes the halo against the longer side, on either orientation", () => {
+    /* `coverage` is a fraction of the **longer** side, so the halo occupies that fraction of
+       max(width, height) in pixels — measured against the halo, not the body. Sizing by the
+       shorter side measured a portrait phone by its narrow width, which is what made him an
+       icon on a handset and correct on a monitor. */
     for (const [w, h] of [
       [1440, 900],
       [390, 844],
+      [844, 390],
     ] as const) {
-      const zoom = orthographicZoom(w, h, 0.3);
+      const zoom = orthographicZoom(w, h, 0.25);
       const haloPx = 2 * ASTRO_CORNER_HALO_WORLD * zoom;
-      expect(haloPx).toBeCloseTo(Math.min(w, h) * 0.3, 3);
+      expect(haloPx).toBeCloseTo(Math.max(w, h) * 0.25, 3);
     }
+  });
+
+  it("gives a portrait phone the monitor's framing instead of its own width", () => {
+    /* The report was "he's too small on phone, fine on desktop". At the overlay's 25% the
+       monitor is unchanged from the old 30%-of-shorter-side rule (360px), while the phone
+       grows by a third — 211px of glow instead of 156px, ~111px of body instead of 82px. */
+    const haloSpan = (w: number, h: number) =>
+      2 * ASTRO_CORNER_HALO_WORLD * orthographicZoom(w, h, 0.25);
+
+    expect(haloSpan(1440, 900)).toBeCloseTo(360, 3);
+    expect(haloSpan(390, 844)).toBeCloseTo(211, 3);
+    expect(haloSpan(390, 844)).toBeGreaterThan(156 * 1.3);
   });
 });
 
@@ -86,12 +105,28 @@ describe("cornerPosition", () => {
     expect(x).toBeGreaterThan(tight.halfWidth / 2);
   });
 
-  it("uses the halo's own inset at the overlay's coverage, so the glow stays whole", () => {
-    /* At 30% coverage the frame is wider than the halo, so the halo-based inset is the
-       smaller one and the clamp never fires: the glow crosses the edge by a slice only. */
+  it("uses the halo's own inset when the frame has room, and the clamp when it does not", () => {
+    /* Which of the two applies is a property of the framing, not of the screen: at the
+       overlay's 25%-of-the-longer-side framing a monitor's half-width (4.36 units) leaves
+       room for the halo's 0.93-unit inset, while a portrait phone's (2.01) does not — the
+       clamp binds there and the glow bleeds ~18px off the edge instead of pushing him
+       toward the middle. Both outcomes are the design; what must never happen is the centre
+       drifting left of the corner. */
+    const monitor = framing(1440, 900);
+    expect(ASTRO_CORNER_HALO_WORLD * ASTRO_CORNER_INSET_RATIO).toBeLessThan(
+      monitor.halfWidth * ASTRO_CORNER_EDGE_RATIO,
+    );
+    expect(cornerPosition(monitor)[0]).toBeCloseTo(
+      monitor.halfWidth - ASTRO_CORNER_HALO_WORLD * ASTRO_CORNER_INSET_RATIO,
+      5,
+    );
+
     const portrait = framing(390, 844);
+    expect(ASTRO_CORNER_HALO_WORLD * ASTRO_CORNER_INSET_RATIO).toBeGreaterThan(
+      portrait.halfWidth * ASTRO_CORNER_EDGE_RATIO,
+    );
     expect(cornerPosition(portrait)[0]).toBeCloseTo(
-      portrait.halfWidth - ASTRO_CORNER_HALO_WORLD * ASTRO_CORNER_INSET_RATIO,
+      portrait.halfWidth - portrait.halfWidth * ASTRO_CORNER_EDGE_RATIO,
       5,
     );
     expect(cornerPosition(portrait)[0]).toBeGreaterThan(portrait.halfWidth / 2);

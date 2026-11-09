@@ -205,17 +205,32 @@ export const eyeUniforms = {
   uCore: { value: color(ASTRO_V2_PALETTE.core) },
   /**
    * The well's inner wall — the side of the eye, the band the prism's barrel shows around
-   * the cream plate. Deliberately darker than the darkest body stop (see
+   * the cream plate. A *tint*, not a shadow colour: it is drawn at `uWallOpacity` (43%), so
+   * what reaches the screen is this hue over the body's gradient (see
    * `ASTRO_V2_PALETTE.eyeWall`).
    *
-   * Solid on purpose. A gradient along the wall needs a normal, and a wall's normal is
+   * Flat on purpose. A gradient along the wall needs a normal, and a wall's normal is
    * perpendicular to the view ray everywhere — the only variation a facing term can
    * produce there is across the two pixels where the wall curves, which reads as noise
    * rather than as a cavity. A flat tint is what the stylesheet does with its feature
    * shadow: one colour, hard edge.
    */
   uInner: { value: color(ASTRO_V2_PALETTE.eyeWall) },
+  /** The plate's alpha. 1: the cream is the one surface that must stay opaque. */
   uOpacity: { value: 1 },
+  /**
+   * The wall's alpha — the side of the eye only, hand-tunable.
+   *
+   * The material is `transparent` with normal blending, so this alpha composites the wall
+   * against the body already drawn underneath it: 0.43 shows 43% of `eyeWall` and 57% of
+   * the body's gradient. That is a *translucent* wall rather than a dimmed one — the body's
+   * colour comes through and moves with the wave, which is the effect worth having at the
+   * two-to-three-pixel band the barrel occupies.
+   *
+   * The plate keeps `uOpacity` (1.0) regardless: it is the eye, and a translucent hole would
+   * stop reading as a hole. Applied per-fragment by `isPlate`, so one draw call covers both.
+   */
+  uWallOpacity: { value: 0.43 },
 };
 
 const eyeVertexShader = /* glsl */ `
@@ -258,10 +273,11 @@ const eyeVertexShader = /* glsl */ `
   }
 `;
 
-const eyeFragmentShader = /* glsl */ `
+export const eyeFragmentShader = /* glsl */ `
   uniform vec3 uCore;
   uniform vec3 uInner;
   uniform float uOpacity;
+  uniform float uWallOpacity;
 
   varying float vNormalZ;
 
@@ -282,7 +298,13 @@ const eyeFragmentShader = /* glsl */ `
     float isPlate = step(0.5, abs(vNormalZ));
     vec3 col = mix(uInner, uCore, isPlate);
 
-    gl_FragColor = vec4(col, uOpacity);
+    /*
+     * Alpha splits on the same step as the colour, so "only the side" is exact: the wall is
+     * the barrel's fragments, the plate is the cap's, and nothing interpolates between them.
+     */
+    float alpha = mix(uWallOpacity, uOpacity, isPlate);
+
+    gl_FragColor = vec4(col, alpha);
 
     #include <colorspace_fragment>
   }

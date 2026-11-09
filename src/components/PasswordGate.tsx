@@ -32,11 +32,19 @@ export default function PasswordGate() {
       <IonNote>This app makes paid voice calls, so it is behind a shared password.</IonNote>
 
       <IonInput
+        /* `fill="outline"` is what makes this look like a field. Ionic's modern input with no
+           `fill` renders a floating label over a bare line — on a phone that reads as "there is
+           no textbox here", which is exactly how the gate was reported. */
+        fill="outline"
         label="Password"
         labelPlacement="stacked"
+        placeholder="Shared password"
         type="password"
         value={value}
         autocomplete="current-password"
+        autocapitalize="off"
+        spellcheck={false}
+        enterkeyhint="go"
         onIonInput={(event) => setValue(event.detail.value ?? "")}
       />
 

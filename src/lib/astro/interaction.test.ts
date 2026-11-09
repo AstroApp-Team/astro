@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { isTransient } from "./expression.ts";
-import { gazeDirection, faceForSession } from "./interaction.ts";
+import { faceForSession, gazeDirection, hitsCharacter, viewportToPixels } from "./interaction.ts";
 import { useAstroStore } from "./store.ts";
 
 /**
@@ -102,14 +102,57 @@ describe("gazeDirection", () => {
   });
 });
 
+describe("the press hit test", () => {
+  /* `lookOrigin` is written in the canvas's `[-1, 1]` space with y **up**; pointer events are
+     in CSS pixels with y **down**. That flip is the bug this guards: miss it and the tap
+     target sits in the top-right of the window while the character sits in the bottom-right,
+     which reads as a character that ignores every touch. */
+  it("maps the store's up-positive origin onto pointer pixels", () => {
+    expect(viewportToPixels({ x: 0, y: 0 }, 400, 800)).toEqual({ x: 200, y: 400 });
+
+    const bottomRight = viewportToPixels({ x: 0.74, y: -0.78 }, 400, 800);
+    expect(bottomRight.x).toBeCloseTo(348, 5);
+    expect(bottomRight.y).toBeCloseTo(712, 5);
+
+    /* A press on his centre is on him; the mirrored point in the top-right is not. */
+    expect(hitsCharacter(bottomRight, bottomRight, 50)).toBe(true);
+    expect(hitsCharacter({ x: 348, y: 88 }, bottomRight, 50)).toBe(false);
+  });
+
+  it("is a disc, not a box, so the area outside the glow stays the page's", () => {
+    const centre = { x: 200, y: 400 };
+    expect(hitsCharacter({ x: 240, y: 430 }, centre, 50)).toBe(true);
+    /* 40 across and 40 down is a 56px diagonal: inside the bounding box, outside the disc. */
+    expect(hitsCharacter({ x: 240, y: 440 }, centre, 50)).toBe(false);
+  });
+});
+
 describe("the expression store", () => {
   it("the character's own position is written separately from the gaze", () => {
-    /* The pointer handler needs his position to turn "where the cursor is" into "which way
-       the cursor is from him", and it reads it outside the canvas — so it has to be store
-       state, not a prop on the mesh. */
-    useAstroStore.getState().setLookOrigin(0.74, -0.78);
+    /* The pointer and press handlers need his position to turn "where the cursor is" into
+       "which way the cursor is from him", and they read it outside the canvas — so it has to
+       be store state, not a prop on the mesh. */
+    useAstroStore.getState().setLookOrigin(0.74, -0.78, 78);
     expect(useAstroStore.getState().lookOrigin).toEqual({ x: 0.74, y: -0.78 });
+    expect(useAstroStore.getState().lookRadius).toBe(78);
     expect(useAstroStore.getState().look).toEqual({ x: 0, y: 0 });
+  });
+
+  it("a press greets, then returns to what the session was doing", () => {
+    useAstroStore.getState().syncSession("look-right", true);
+
+    useAstroStore.getState().react();
+    expect(useAstroStore.getState().expression).toBe("happy");
+    expect(useAstroStore.getState().resting).toBe("look-right");
+
+    useAstroStore.getState().settle();
+    expect(useAstroStore.getState().expression).toBe("look-right");
+  });
+
+  it("a press on a sleeping character wakes him instead of starting a greeting", () => {
+    useAstroStore.getState().syncSession("sleep", true);
+    useAstroStore.getState().react();
+    expect(useAstroStore.getState().expression).toBe("doze");
   });
 
   it("a sustained session state becomes the return target; a momentary one does not", () => {

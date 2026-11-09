@@ -1,13 +1,46 @@
 /**
  * Astro's page-side state — pure, no React, no three, no timers.
  *
- * Ported from the refactor branch's `core/usecases/astroInteraction.ts`, minus the tap
- * rules and the playhead/log helpers: on `main` the character is a presence in the
- * corner, not a thing you press, and there is no Theatre clip to seek or tap log to
- * render. What is here is the voice session's lifecycle, expressed as a face.
+ * Ported from the refactor branch's `core/usecases/astroInteraction.ts`, minus the playhead
+ * and log helpers (there is no Theatre clip to seek and no tap log to render). What is here
+ * is the voice session's lifecycle, expressed as a face, plus the screen-space hit test the
+ * corner overlay needs because its canvas cannot receive events.
  */
 
 import { type AstroExpression } from "./astro.ts";
+
+/** A point in CSS pixels, y **down** — the space pointer events are written in. */
+export type ScreenPoint = { x: number; y: number };
+
+/**
+ * The character's centre in CSS pixels, from the `[-1, 1]` viewport position the canvas
+ * writes into `lookOrigin`.
+ *
+ * The y flip is the whole reason this is a function and not two inline expressions: the
+ * canvas works in three's camera space, where y is **up**, and pointer events are y-down.
+ * Interpolating the origin straight into pixels puts every tap target in the top-right of
+ * the window while the character sits in the bottom-right — a character that ignores every
+ * press and reacts to ones nowhere near him.
+ */
+export function viewportToPixels(
+  origin: { x: number; y: number },
+  width: number,
+  height: number,
+): ScreenPoint {
+  return { x: ((origin.x + 1) / 2) * width, y: ((1 - origin.y) / 2) * height };
+}
+
+/**
+ * Whether a press landed on him, given his centre and the radius of the tappable disc.
+ *
+ * The canvas layer is `pointer-events: none` (the page keeps its clicks), so the browser
+ * never delivers a press to the character and R3F's raycast never runs. A tap on him is
+ * therefore this: a plain distance test in screen space. A press that misses is left
+ * untouched, so the page's own controls still receive it.
+ */
+export function hitsCharacter(pointer: ScreenPoint, centre: ScreenPoint, radius: number): boolean {
+  return Math.hypot(pointer.x - centre.x, pointer.y - centre.y) <= radius;
+}
 
 /**
  * The direction he should look, given where the pointer is and where he is.

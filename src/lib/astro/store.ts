@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { ASTRO_DEFAULT_EXPRESSION, type AstroExpression } from "./astro.ts";
 import { ASTRO_V2_TUNABLES, type AstroV2Tunables } from "./astroV2.ts";
-import { isTransient } from "./expression.ts";
+import { hitReaction, isTransient } from "./expression.ts";
 
 /**
  * Astro's expression, and the state it returns to.
@@ -41,8 +41,16 @@ export type AstroStore = {
    * in. Set from inside the canvas, where the corner position is known.
    */
   lookOrigin: { x: number; y: number };
+  /**
+   * His radius in CSS pixels, alongside `lookOrigin`.
+   *
+   * The canvas is `pointer-events: none`, so a tap on him is hit-tested arithmetically —
+   * and in pixels, not in the normalised space: a disc drawn in `[-1, 1]` coordinates is an
+   * ellipse on a phone, so a tap that looks like it lands on him misses by the aspect ratio.
+   */
+  lookRadius: number;
   setLook(x: number, y: number): void;
-  setLookOrigin(x: number, y: number): void;
+  setLookOrigin(x: number, y: number, radius: number): void;
   /**
    * Show a state the session implies.
    *
@@ -53,6 +61,16 @@ export type AstroStore = {
   syncSession(expression: AstroExpression, sustained: boolean): void;
   /** Show a state outright, and make it the return target unless it is momentary. */
   setExpression(expression: AstroExpression): void;
+  /**
+   * A press on him.
+   *
+   * `resting` is deliberately left alone: a greeting is a moment, not a new baseline, so
+   * `settle()` returns him to whatever the session was doing. See `hitReaction` — a press
+   * during a reaction is a no-op, and a press on a sleeping character wakes him one notch.
+   */
+  react(): void;
+  /** End a momentary face: back to `resting`. */
+  settle(): void;
 };
 
 export const useAstroStore = create<AstroStore>((set, get) => ({
@@ -60,13 +78,14 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
   resting: ASTRO_DEFAULT_EXPRESSION,
   look: { x: 0, y: 0 },
   lookOrigin: { x: 0, y: 0 },
+  lookRadius: 0,
 
   setLook(x, y) {
     set({ look: { x, y } });
   },
 
-  setLookOrigin(x, y) {
-    set({ lookOrigin: { x, y } });
+  setLookOrigin(x, y, radius) {
+    set({ lookOrigin: { x, y }, lookRadius: radius });
   },
 
   setExpression(expression) {
@@ -75,6 +94,16 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
 
   syncSession(expression, sustained) {
     set({ expression, resting: sustained ? expression : get().resting });
+  },
+
+  react() {
+    /* `hitReaction` is the rule, not this method: it knows that a transient face must not be
+       interrupted and that sleep wakes one notch at a time. */
+    set({ expression: hitReaction(get().expression) });
+  },
+
+  settle() {
+    set({ expression: get().resting });
   },
 }));
 
