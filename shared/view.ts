@@ -14,8 +14,12 @@
  *      agent's feedback signal — and a run only ends on a page that passes.
  *   3. The iframe renders with `sandbox="allow-scripts"` and *no*
  *      `allow-same-origin`, which puts the document on an opaque origin: no
- *      parent DOM, no cookies, no storage. `sealViewHtml` adds the CSP that
- *      closes the last hole, network access.
+ *      parent DOM, no cookies, no storage. `sealViewHtml` (src/lib/seal-view.ts)
+ *      adds the CSP that closes the last hole, network access, plus the
+ *      `Astro` runtime every page is written against.
+ *
+ * Everything that crosses the wire is the page's own source — sealing happens
+ * in the browser, right before a document becomes a `srcdoc`.
  */
 
 import type { UIMessage } from "ai";
@@ -28,21 +32,6 @@ import type { UIMessage } from "ai";
  * the whole page as `currentHtml`.
  */
 export const MAX_VIEW_HTML_BYTES = 96 * 1024;
-
-/**
- * Injected by the Worker rather than written by the agent — one less rule for
- * the model to get right, and it cannot be talked out of it. `'unsafe-inline'`
- * looks alarming and is not: inline script *is* the artifact, and `default-src
- * 'none'` means that script can reach nothing outside its own document.
- *
- * `'unsafe-eval'` for the same reason: eval only runs more code inside the same
- * jail. Without it `Function(expr)()` throws — and that is how a model writes
- * every calculator, which then answers "Error" to 7×12 with nothing wrong in
- * the page to point at.
- */
-export const VIEW_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval'; " +
-  "img-src data:; font-src data:";
 
 /** The one message shape the parent will listen to. Anything else is dropped. */
 export const VIEW_EVENT_TYPE = "astro:event";
@@ -58,6 +47,19 @@ export const VIEW_EVENT_TYPE = "astro:event";
 export const VIEW_STATE_TYPE = "astro:state";
 
 /**
+ * An uncaught error inside a live page, posted by the runtime. The app keeps
+ * the last few and hands them to the next build, so the coding agent hears
+ * about bugs that only show up once someone uses the page.
+ */
+export const VIEW_ERROR_TYPE = "astro:error";
+
+/**
+ * The runtime's report from the hidden check frame: the problems it found
+ * rendering the page and running every no-argument action once.
+ */
+export const VIEW_CHECK_TYPE = "astro:check";
+
+/**
  * Caps what a sandboxed page can make the parent hold. Well above any sane
  * game state, well below a memory lever.
  */
@@ -69,6 +71,28 @@ export type View = { title: string; html: string };
 export function viewTitle(html: string): string {
   const title = /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1]?.trim();
   return title != null && title !== "" ? title.slice(0, 80) : "Page";
+}
+
+/**
+ * The page's spec: the `<!-- spec ... -->` comment every page carries, one
+ * `- item` per feature the user asked for. It is how intent survives across
+ * requests — the coding agent never hears the conversation, so without it the
+ * page's current code is its only record of what was wanted, bugs included.
+ * Returns null when the page has no spec block.
+ */
+export function viewSpec(html: string): string[] | null {
+  const block = /<!--\s*spec\b([\s\S]*?)-->/i.exec(html)?.[1];
+  if (block == null) return null;
+  return block
+    .split("\n")
+    .map((line) => /^\s*-\s+(.+?)\s*$/.exec(line)?.[1])
+    .filter((item): item is string => item != null);
+}
+
+/** Spec items in `before` that `after` no longer lists — what an edit dropped. */
+export function removedSpecItems(before: string, after: string): string[] {
+  const kept = new Set(viewSpec(after) ?? []);
+  return (viewSpec(before) ?? []).filter((item) => !kept.has(item));
 }
 
 /** What a view is allowed to tell the voice agent about. */
@@ -180,6 +204,39 @@ export function checkViewHtml(html: string): string[] {
     );
   }
 
+  const spec = viewSpec(html);
+  if (spec == null || spec.length === 0) {
+    problems.push(
+      "The page has no spec. Right after <title>, add a `<!-- spec` comment with one " +
+        "`- item` line per feature the user has asked for, and keep it current.",
+    );
+  }
+
+  /**
+   * The runtime owns the screen and both message channels. A page that writes
+   * HTML into the DOM or posts its own messages is back to the shape that made
+   * pages fall apart as they grew — two sources of truth for the screen — so
+   * it is caught here, where it costs one fix, not after the edits pile up.
+   */
+  if (/\b(?:innerHTML|outerHTML|insertAdjacentHTML)\b|\bdocument\s*\.\s*write\b/.test(html)) {
+    problems.push(
+      "The page writes HTML into the DOM directly. Everything on screen comes from " +
+        "Astro.view(...); change state in an action and let the view re-render.",
+    );
+  }
+  if (/\bpostMessage\b|addEventListener\(\s*["']message["']/.test(html)) {
+    problems.push(
+      "The page handles messages itself. The runtime already saves and restores " +
+        "Astro.state; to tell the voice assistant something, call Astro.emit(name, value).",
+    );
+  }
+  if (/<script\b/i.test(html) && !/\bAstro\s*\.\s*view\s*\(/.test(html)) {
+    problems.push(
+      "The page has a script but no Astro.view(...). Put state in Astro.state, the " +
+        "screen in Astro.view, and changes in Astro.actions.",
+    );
+  }
+
   /**
    * `\${x}` inside a template literal is the literal text "${x}", not the value
    * of x — so the page renders its own source. Models reach for this escape
@@ -195,62 +252,6 @@ export function checkViewHtml(html: string): string[] {
   }
 
   return problems;
-}
-
-/**
- * A few lines of classless defaults, injected ahead of the page's own styles
- * so the agent can skip styling entirely and still get a page that is legible,
- * fills the frame, has finger-sized controls and sits on the app's own ink
- * background. Anything the page writes overrides it. The agent's prompt tells
- * it what is here — keep the two in step.
- */
-export const VIEW_BASE_CSS =
-  ":root{color-scheme:dark;font:18px/1.4 system-ui,sans-serif}" +
-  "*{box-sizing:border-box}" +
-  "html,body{margin:0;min-height:100%}" +
-  "body{padding:16px;background:#1a152c;color:#f3effa}" +
-  "button,input,select,textarea{font:inherit;color:inherit;padding:.5em .8em;" +
-  "border:1px solid #4a4266;border-radius:10px;background:#2a2344}" +
-  "button{cursor:pointer}button:active{background:#3a3159}" +
-  "canvas,svg{max-width:100%}";
-
-/**
- * Adds the CSP the sandbox cannot set on its own, and the base stylesheet. A
- * `<meta http-equiv>` policy only applies to content that parses after it, so
- * it goes as early as the document allows: inside `<head>` if there is one,
- * otherwise ahead of everything, where the parser will hoist it into the
- * implied head.
- *
- * Also runs on half-written documents streamed mid-run: everything that
- * reaches the iframe goes through here.
- */
-export function sealViewHtml(html: string): string {
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${VIEW_CSP}">`;
-
-  /**
-   * Idempotent on purpose: an edited page starts from the *sealed* document
-   * the client sent back, so re-sealing on every publish would stack a meta
-   * tag per edit. Keyed on our exact tag rather than any CSP meta — a page
-   * that writes its own, looser policy still gets ours, and the browser
-   * enforces both.
-   */
-  if (html.includes(meta)) return html;
-
-  const seal = `${meta}<style>${VIEW_BASE_CSS}</style>`;
-
-  const head = /<head\b[^>]*>/i.exec(html);
-  if (head != null) {
-    const at = head.index + head[0].length;
-    return html.slice(0, at) + seal + html.slice(at);
-  }
-
-  const doctype = /<!doctype html>/i.exec(html);
-  if (doctype != null) {
-    const at = doctype.index + doctype[0].length;
-    return html.slice(0, at) + seal + html.slice(at);
-  }
-
-  return seal + html;
 }
 
 /**

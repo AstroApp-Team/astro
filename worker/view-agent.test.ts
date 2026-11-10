@@ -1,8 +1,8 @@
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
 
-import { sealViewHtml, type ViewProgress } from "../shared/view.ts";
-import { buildView, gatewayCostUsd } from "./view-agent.ts";
+import type { ViewProgress } from "../shared/view.ts";
+import { buildPrompt, buildView, gatewayCostUsd } from "./view-agent.ts";
 
 /**
  * The loop is driven through `MockLanguageModelV4` — the SDK's own seam — so
@@ -78,8 +78,9 @@ function scriptedModel(turns: Turn[]) {
   return model;
 }
 
-const GOOD_PAGE =
-  "<!doctype html><html><head><title>Answer</title></head><body><h1>blue</h1></body></html>";
+const SPEC = "<!-- spec\n- Shows the answer\n-->";
+
+const GOOD_PAGE = `<!doctype html><html><head><title>Answer</title></head><body>${SPEC}<h1>blue</h1></body></html>`;
 
 const noop = () => {};
 
@@ -102,12 +103,9 @@ describe("buildView", () => {
 
     expect(model.doStreamCalls).toHaveLength(1);
     expect(view.title).toBe("Answer");
-    // The agent never writes the policy or the base styles; the Worker adds
-    // them, so the model cannot be talked out of the first or forget the
-    // second.
-    expect(view.html).toContain('<meta http-equiv="Content-Security-Policy"');
-    expect(view.html).toContain("<style>:root{color-scheme:dark");
-    expect(view.html).toContain("<h1>blue</h1>");
+    // The page comes back exactly as written: the browser seals it (CSP,
+    // base styles, runtime), so the next edit's `currentHtml` stays small.
+    expect(view.html).toBe(GOOD_PAGE);
   });
 
   it("paints the page while write_view is still streaming", async () => {
@@ -121,13 +119,9 @@ describe("buildView", () => {
       onCost: noop,
     });
 
-    /**
-     * The first draft goes out off the first delta — half a document, sealed
-     * like any other — and the last is the finished page.
-     */
+    /** The first draft goes out off the first delta — half a document — and the last is the finished page. */
     expect(drafts.length).toBeGreaterThan(1);
     expect(drafts[0]).not.toContain("<h1>blue</h1>");
-    expect(drafts[0]).toContain("Content-Security-Policy");
     expect(drafts.at(-1)).toBe(view.html);
   });
 
@@ -205,7 +199,7 @@ describe("buildView", () => {
   });
 
   it("refuses an ambiguous edit unless replaceAll is set", async () => {
-    const twice = "<!doctype html><body><p>x</p><p>x</p></body>";
+    const twice = `<!doctype html><body>${SPEC}<p>x</p><p>x</p></body>`;
 
     const view = await buildView({
       model: scriptedModel([
@@ -221,23 +215,6 @@ describe("buildView", () => {
 
     expect(view.html).not.toContain("<p>x</p>");
     expect(view.html).toContain("<p>y</p><p>y</p>");
-  });
-
-  it("keeps exactly one CSP meta when editing an already-sealed page", async () => {
-    /**
-     * The client sends back the *sealed* document, so every edit cycle would
-     * stack another meta tag if sealing were not idempotent.
-     */
-    const view = await buildView({
-      model: scriptedModel([call("edit_view", { oldText: "blue", newText: "red" })]),
-      request: "make it red",
-      currentHtml: sealViewHtml(GOOD_PAGE),
-      onProgress: noop,
-      onDraft: noop,
-      onCost: noop,
-    });
-
-    expect(view.html.match(/Content-Security-Policy/g) ?? []).toHaveLength(1);
   });
 
   it("keeps going after a page that fails the checks, until it is fixed", async () => {
@@ -304,6 +281,40 @@ describe("buildView", () => {
 
     expect(costs.length).toBeGreaterThan(1);
     expect(costs.every((usd) => usd === 0.0000243)).toBe(true);
+  });
+});
+
+describe("buildPrompt", () => {
+  it("starts an empty screen from the request alone", () => {
+    expect(buildPrompt({ mode: "edit", request: "a timer" })).toBe("The screen is empty. a timer");
+  });
+
+  it("passes the page and the errors it threw in use along with an edit", () => {
+    const prompt = buildPrompt({
+      mode: "edit",
+      request: "add a reset",
+      currentHtml: GOOD_PAGE,
+      pageErrors: ["action buy: s.wallet is undefined"],
+    });
+
+    expect(prompt).toContain(GOOD_PAGE);
+    expect(prompt).toContain("- action buy: s.wallet is undefined");
+    expect(prompt).toContain("use edit_view");
+    expect(prompt.endsWith("add a reset")).toBe(true);
+  });
+
+  it("asks a rebuild for a rewrite from the spec that keeps the state's shape", () => {
+    const prompt = buildPrompt({
+      mode: "rebuild",
+      request: "the unicorn button never charges anything",
+      currentHtml: GOOD_PAGE,
+    });
+
+    expect(prompt).toContain(GOOD_PAGE);
+    expect(prompt).toContain("Why: the unicorn button never charges anything");
+    expect(prompt).toContain("ONE write_view");
+    expect(prompt).toContain("Astro.restore");
+    expect(prompt).not.toContain("use edit_view");
   });
 });
 

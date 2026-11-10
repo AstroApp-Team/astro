@@ -136,8 +136,34 @@ projects (`app`, `worker`, `node`) share strict settings from
   that `write_view`/`edit_view` mutate; every tool result carries
   `checkViewHtml`, and there is no publish step (it cost a whole model
   round-trip). The client's `view.html` is the source of truth _between_
-  requests — it comes back as `currentHtml`, already sealed, which is why
-  `sealViewHtml` must stay idempotent.
+  requests and comes back as `currentHtml` — unsealed: only the page's own
+  source ever crosses the wire.
+- **Sealing happens in the browser, right before `srcdoc`.** `sealViewHtml`
+  (`src/lib/seal-view.ts`) adds the CSP, `VIEW_BASE_CSS`, htm's Preact
+  standalone build and `src/lib/view-runtime.js` (both imported `?raw`). Seal
+  on the Worker again and ~17 KB of runtime rides into every edit prompt.
+- **Every page is written against the `Astro` runtime.** `Astro.state` (one
+  JSON object), ``Astro.view((s, a) => html`...`)`` and `Astro.actions`, each
+  in its own `<script>` in that order so the view paints while the page still
+  streams. The runtime re-renders after each action and owns both message
+  channels; `checkViewHtml` rejects pages that write HTML into the DOM, post
+  their own messages, or script without `Astro.view`. The prompt in
+  `view-agent.ts` documents the API to the model — keep the two in step.
+- **Every page carries a `<!-- spec -->` of what the user asked for.** It is
+  the only record of intent the stateless coding agent has. `checkViewHtml`
+  requires it, and `describeLanding` tells the voice model which items a run
+  dropped, so a silently deleted feature gets noticed and asked back.
+- **A finished page is run before it is reported.** `runViewCheck` loads it in
+  a hidden check-mode frame: the runtime renders it, runs every action that
+  takes no arguments from the starting state, and posts `astro:check`.
+  Problems go straight back to the agent, up to `MAX_AUTO_FIXES` times. Arity
+  is what makes this safe — never smoke-test actions that take arguments.
+  Errors the live page throws (`astro:error`) ride along with the next build
+  as `pageErrors`, and are fed silently to the voice model.
+- **`rebuild_view` is the voice model's escape hatch for a tangled page.** It
+  sends `mode: "rebuild"`: `REBUILD_MODEL_ID` with some reasoning rewrites the
+  whole page from its spec, drafts are withheld so the old page stays usable,
+  and state carries over by key (or `Astro.restore`). Edits stay on Haiku.
 - **Live rendering depends on the provider streaming tool arguments.** Drafts
   reach the iframe from `write_view`'s `onInputDelta` (as `data-draft`), which
   only fires under `agent.stream()` and only if the provider streams input.
@@ -147,10 +173,10 @@ projects (`app`, `worker`, `node`) share strict settings from
   thing that works" prompt, and `VIEW_BASE_CSS` injected by `sealViewHtml` (so
   pages need no styling) took a calculator from 48 s to ~5 s. Any styling or
   "polish" rule added to the prompt is paid for in seconds on every build.
-- **`astro:state` is what keeps a game alive across an edit.** The page posts
-  its state to the parent whenever it changes; the parent keeps only the latest
-  and posts it back into the new frame on `load`. The parent never inspects the
-  state, so rejecting a stale or foreign state is the page's own job.
+- **`astro:state` is what keeps a game alive across an edit.** The runtime
+  posts `Astro.state` (throttled) after each action; the parent keeps only the
+  latest and posts it back into the new frame on `load`. The runtime merges it
+  over the starting state by key and kind, or through `Astro.restore`.
 
 ## Commands
 

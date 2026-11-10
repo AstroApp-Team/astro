@@ -27,6 +27,7 @@
     "ai": "^7.0.156",
     "drizzle-orm": "0.45.2",
     "hono": "4.13.3",
+    "htm": "3.1.1",
     "ionicons": "8.1.0",
     "react": "catalog:",
     "react-dom": "catalog:",

@@ -114,6 +114,7 @@ export const PASSWORD_QUERY_PARAM = "key";
  * The browser only supplies the handler, via `onToolCall`.
  */
 export const RENDER_VIEW_TOOL_NAME = "render_view";
+export const REBUILD_VIEW_TOOL_NAME = "rebuild_view";
 
 export const REALTIME_TOOLS: Experimental_RealtimeToolDefinition[] = [
   {
@@ -143,6 +144,30 @@ export const REALTIME_TOOLS: Experimental_RealtimeToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    type: "function",
+    name: REBUILD_VIEW_TOOL_NAME,
+    description:
+      "Have a stronger, slower coding model rewrite the page on screen from scratch, from the " +
+      "list of features the user has asked for. Use it when the page has outgrown quick edits: " +
+      "the user says things are broken, inconsistent or missing, a change made something else " +
+      "stop working, edits keep failing, or the app reports errors from the page. It takes " +
+      "ten seconds or more; the current page stays usable meanwhile and the user's data " +
+      "carries over. Not for new pages or small changes — use render_view for those.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description:
+            "What is wrong, in the user's terms: what broke, what is missing, what behaves " +
+            "inconsistently. Include any change the user wants made as part of the rewrite.",
+        },
+      },
+      required: ["reason"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export type RenderViewArgs = { request: string };
@@ -153,10 +178,20 @@ export type RenderViewArgs = { request: string };
  * the shape next to the JSON Schema that asked for it, so the two cannot drift.
  */
 export function parseRenderViewArgs(args: unknown): RenderViewArgs | null {
+  const request = textArg(args, "request");
+  return request == null ? null : { request };
+}
+
+export function parseRebuildViewArgs(args: unknown): { reason: string } | null {
+  const reason = textArg(args, "reason");
+  return reason == null ? null : { reason };
+}
+
+function textArg(args: unknown, key: string): string | null {
   if (typeof args !== "object" || args === null) return null;
 
-  const { request } = args as { request?: unknown };
-  if (typeof request !== "string" || request.trim() === "") return null;
+  const value = (args as Record<string, unknown>)[key];
+  if (typeof value !== "string" || value.trim() === "") return null;
 
-  return { request: request.trim().slice(0, 2000) };
+  return value.trim().slice(0, 2000);
 }
