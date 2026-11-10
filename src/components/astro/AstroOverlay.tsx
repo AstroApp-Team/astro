@@ -342,6 +342,12 @@ function DragHandle() {
 }
 
 export default function AstroOverlay() {
+  /* `<ion-app>` is in the DOM by the time this commits, not while it first renders. */
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setHost(document.querySelector<HTMLElement>("ion-app") ?? document.body);
+  }, []);
+
   /* A tab the user has left is a paused render: this layer is a presence, not a process. */
   const [visible, setVisible] = useState(true);
   useEffect(() => {
@@ -393,11 +399,15 @@ export default function AstroOverlay() {
   }, []);
 
   /*
-   * Portalled to `document.body`, not left inside `IonContent`: `IonContent` is its own
+   * Portalled to `<ion-app>`, not left inside `IonContent`: `IonContent` is its own
    * stacking context, so a `position: fixed` child of it paints inside that box and can
-   * be covered by the page's own scroll content. As a body-level layer it sits over
-   * everything, and `pointer-events: none` means it never eats a press.
+   * be covered by the page's own scroll content. Not `document.body` either: Ionic stacks
+   * its modals inside `<ion-app>`, so a body-level layer painted over the transcript
+   * sheet. As a direct child of `<ion-app>` he sits over the page and under its overlays,
+   * and `pointer-events: none` means he never eats a press.
    */
+  if (host == null) return null;
+
   return createPortal(
     <div className="astro-overlay">
       {/* Scoped to the canvas: a WebView with no GL context loses the character, not the
@@ -439,6 +449,6 @@ export default function AstroOverlay() {
           `CanvasBoundary` is then the thing to press, which is why it is a real button. */}
       <DragHandle />
     </div>,
-    document.body,
+    host,
   );
 }

@@ -1,12 +1,25 @@
 import { experimental_useRealtime, type Experimental_UseRealtimeOptions } from "@ai-sdk/react";
-import { IonButton, IonChip, IonIcon, IonNote, IonSpinner, IonText } from "@ionic/react";
+import {
+  IonBadge,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonFooter,
+  IonHeader,
+  IonIcon,
+  IonModal,
+  IonNote,
+  IonSpinner,
+  IonTitle,
+  IonToolbar,
+} from "@ionic/react";
 import { gateway } from "ai";
 import {
+  chatbubblesOutline,
   micOffOutline,
   micOutline,
   stopCircleOutline,
   terminalOutline,
-  volumeHighOutline,
 } from "ionicons/icons";
 import { useEffect, useRef, useState } from "react";
 
@@ -26,6 +39,7 @@ import { useAstroStore } from "../lib/astro/store.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
+import UsageMeter from "./UsageMeter.tsx";
 
 /**
  * Both of these are compared by identity inside the hook: a fresh object on
@@ -446,161 +460,216 @@ export default function VoiceSession({ password }: { password: string }) {
     if (!isLive) setMuted(false);
   }, [isLive]);
 
+  /**
+   * The transcript is a sheet, not a column: the app the coding agent builds is
+   * the page, and the conversation is something you open. A transcript sharing
+   * the app's scroll pushed the app off screen with every line.
+   */
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [seenTurns, setSeenTurns] = useState(0);
+  const unread = transcriptOpen ? 0 : Math.max(0, messages.length - seenTurns);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  const closeTranscript = () => {
+    setTranscriptOpen(false);
+    setSeenTurns(messages.length);
+  };
+
+  useEffect(() => {
+    if (transcriptOpen) transcriptEndRef.current?.scrollIntoView({ block: "end" });
+  }, [transcriptOpen, messages]);
+
+  const activity = muted
+    ? "muted"
+    : isPlaying
+      ? "speaking"
+      : isCapturing
+        ? "listening"
+        : status === "connecting"
+          ? "connecting"
+          : null;
+
   return (
     <>
-      <div className="voice-controls">
-        {/**
-         * Astro is the start button — tapping him starts the conversation — so this block is
-         * the *other* two things: a way to stop and mute once it is running, and a plain
-         * fallback when it is not.
-         *
-         * The fallback is not dead weight: he is a canvas, and a WebView without WebGL gets
-         * `CanvasBoundary`'s notice instead of a character. A page whose only start control
-         * is a mesh that failed to compile has no start control at all.
-         */}
-        {isLive ? (
-          <>
-            <IonButton expand="block" fill="outline" color="tertiary" onClick={toggleMute}>
-              <IonIcon slot="start" icon={muted ? micOffOutline : micOutline} />
-              {muted ? "Unmute" : "Mute microphone"}
-            </IonButton>
-            <IonButton expand="block" color="danger" onClick={stop}>
-              <IonIcon slot="start" icon={stopCircleOutline} />
-              End conversation
-            </IonButton>
-          </>
-        ) : (
-          <>
-            <p className="voice-hint">Tap Astro, or press start, and just talk.</p>
-            <IonButton expand="block" fill="outline" onClick={() => void start()}>
-              <IonIcon slot="start" icon={micOutline} />
-              Start talking
-            </IonButton>
-          </>
-        )}
-
-        <div className="voice-status">
-          <IonChip color={status === "connected" ? "success" : "medium"}>
-            {status === "connecting" && <IonSpinner name="dots" />}
-            {status}
-          </IonChip>
-          {muted && (
-            <IonChip color="medium" onClick={toggleMute}>
-              <IonIcon icon={micOffOutline} />
-              muted
-            </IonChip>
-          )}
-          {isCapturing && !muted && (
-            <IonChip color="tertiary">
-              <IonIcon icon={micOutline} />
-              listening
-            </IonChip>
-          )}
-          {isPlaying && (
-            <IonChip color="secondary">
-              <IonIcon icon={volumeHighOutline} />
-              speaking
-            </IonChip>
-          )}
-        </div>
-
-        {error != null && (
-          <IonText color="danger">
-            <p>{error}</p>
-          </IonText>
-        )}
-
-        {notice != null && <IonNote>{notice}</IonNote>}
-      </div>
-
-      {/**
-       * The coding agent's output. `status` is what the run is doing right now,
-       * built from the agent's own lifecycle rather than a spinner — the page
-       * takes ten or twenty seconds and the wait should say why.
-       */}
-      {viewBuilder.status != null && (
-        <div className="voice-building">
-          <IonSpinner name="dots" />
-          <IonNote>{viewBuilder.status}</IonNote>
-        </div>
-      )}
-
-      {viewBuilder.view != null && (
-        <div className="voice-view-panel">
-          {/**
-           * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
-           * whole security model: the document lands on an opaque origin, so
-           * it cannot reach this page's DOM, cookies, or storage. The two are
-           * only safe apart — adding `allow-same-origin` back would hand a
-           * model-written page the run of the app.
-           */}
-          {/**
-           * `onLoad` hands the previous page's saved state to the new one —
-           * this is what lets the coding agent edit a game mid-play without
-           * resetting the score.
-           */}
-          <iframe
-            ref={frameRef}
-            className="voice-view"
-            title={viewBuilder.view.title}
-            sandbox="allow-scripts"
-            srcDoc={viewBuilder.view.html}
-            onLoad={onFrameLoad}
-          />
-          <IonNote className="voice-view-panel__title">{viewBuilder.view.title}</IonNote>
-        </div>
-      )}
-
-      {/**
-       * Dev-only, and the fastest way to tell the two bring-up failures apart:
-       * `audio-delta` arriving with nothing audible is the playback path, no
-       * `audio-delta` at all is the session config.
-       */}
-      {import.meta.env.DEV && events.length > 0 && (
-        <pre className="voice-events">
-          {events
-            .slice(-12)
-            .map((event) => event.type)
-            .join(" · ")}
-        </pre>
-      )}
-
-      {messages.length === 0 ? (
-        <IonNote className="voice-empty">
-          Nothing said yet. Tap Astro, allow the microphone, and just talk — {VOICE_MODEL_ID}{" "}
-          answers out loud and the transcript shows up here.
-        </IonNote>
-      ) : (
-        <div className="voice-transcript">
-          {messages.map((message) => (
-            <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
-              <span className="voice-turn__role">{message.role}</span>
-              {/**
-               * Rendered part by part rather than joined into one string: a
-               * turn that only calls a tool has no text at all, and collapsing
-               * the parts would make a working call look like a dropped reply.
-               * Part indexes are stable — the reducer updates parts in place.
-               */}
-              {message.parts.map((part, index) => {
-                if (part.type === "text") return <p key={index}>{part.text}</p>;
-
-                if (part.type === "dynamic-tool") {
-                  return (
-                    <p key={part.toolCallId} className="voice-turn__tool">
-                      <IonIcon icon={terminalOutline} />
-                      {part.toolName || "…"}
-                      {part.state === "input-streaming" ? "" : `(${JSON.stringify(part.input)})`}
-                      {part.state === "output-available" && " ✓"}
-                    </p>
-                  );
-                }
-
-                return null;
-              })}
+      <IonContent scrollY={false}>
+        <div className="voice-stage">
+          {viewBuilder.view == null ? (
+            <div className="voice-stage__empty">
+              <p>Tap Astro and just talk.</p>
+              <IonNote>
+                Ask for something (a game, a timer, a checklist) and it shows up here, full screen.{" "}
+                {VOICE_MODEL_ID} answers out loud.
+              </IonNote>
             </div>
-          ))}
+          ) : (
+            /**
+             * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
+             * whole security model: the document lands on an opaque origin, so
+             * it cannot reach this page's DOM, cookies, or storage. The two are
+             * only safe apart — adding `allow-same-origin` back would hand a
+             * model-written page the run of the app.
+             *
+             * `onLoad` hands the previous page's saved state to the new one —
+             * this is what lets the coding agent edit a game mid-play without
+             * resetting the score.
+             */
+            <iframe
+              ref={frameRef}
+              className="voice-view"
+              title={viewBuilder.view.title}
+              sandbox="allow-scripts"
+              srcDoc={viewBuilder.view.html}
+              onLoad={onFrameLoad}
+            />
+          )}
+
+          {/**
+           * Floated over the top of the stage so a status never moves the app.
+           * `status` is what the coding agent is doing right now, built from its
+           * own lifecycle rather than a spinner — the page takes ten or twenty
+           * seconds and the wait should say why.
+           */}
+          <div className="voice-banners">
+            {viewBuilder.status != null && (
+              <div className="voice-banner">
+                <IonSpinner name="dots" />
+                <span>{viewBuilder.status}</span>
+              </div>
+            )}
+            {error != null && (
+              <div className="voice-banner voice-banner--error" role="alert">
+                {error}
+              </div>
+            )}
+            {notice != null && <div className="voice-banner">{notice}</div>}
+          </div>
         </div>
-      )}
+      </IonContent>
+
+      <IonFooter>
+        <IonToolbar>
+          {/**
+           * Astro is the start button — tapping him starts the conversation — so
+           * this bar is the *other* things: stop and mute once it is running, and
+           * a plain fallback when it is not. The fallback is not dead weight: a
+           * WebView without WebGL gets `CanvasBoundary`'s notice instead of a
+           * character, and then this is the only start control.
+           *
+           * Everything is packed to the left: the bottom-right is Astro's corner,
+           * and his tap target there would swallow a button under it.
+           */}
+          <div className="voice-bar">
+            {isLive ? (
+              <>
+                <IonButton
+                  fill="outline"
+                  color="tertiary"
+                  onClick={toggleMute}
+                  title={muted ? "Unmute" : "Mute microphone"}
+                >
+                  <IonIcon slot="icon-only" icon={muted ? micOffOutline : micOutline} />
+                </IonButton>
+                <IonButton color="danger" onClick={stop}>
+                  <IonIcon slot="start" icon={stopCircleOutline} />
+                  End
+                </IonButton>
+              </>
+            ) : (
+              <IonButton fill="outline" onClick={() => void start()}>
+                <IonIcon slot="start" icon={micOutline} />
+                Start
+              </IonButton>
+            )}
+
+            <IonButton
+              fill="clear"
+              className="voice-bar__transcript"
+              onClick={() => setTranscriptOpen(true)}
+              title="Show the transcript"
+            >
+              <IonIcon slot="icon-only" icon={chatbubblesOutline} />
+              {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
+            </IonButton>
+
+            {activity != null && (
+              <IonNote className="voice-bar__activity">
+                {status === "connecting" && <IonSpinner name="dots" />}
+                {activity}
+              </IonNote>
+            )}
+          </div>
+        </IonToolbar>
+      </IonFooter>
+
+      <IonModal
+        isOpen={transcriptOpen}
+        onDidDismiss={closeTranscript}
+        breakpoints={[0, 0.6, 1]}
+        initialBreakpoint={0.6}
+      >
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Transcript</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={closeTranscript}>Close</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <UsageMeter />
+
+          {/**
+           * Dev-only, and the fastest way to tell the two bring-up failures apart:
+           * `audio-delta` arriving with nothing audible is the playback path, no
+           * `audio-delta` at all is the session config.
+           */}
+          {import.meta.env.DEV && events.length > 0 && (
+            <pre className="voice-events">
+              {events
+                .slice(-12)
+                .map((event) => event.type)
+                .join(" · ")}
+            </pre>
+          )}
+
+          {messages.length === 0 ? (
+            <IonNote className="voice-empty">Nothing said yet.</IonNote>
+          ) : (
+            <div className="voice-transcript">
+              {messages.map((message) => (
+                <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
+                  <span className="voice-turn__role">{message.role}</span>
+                  {/**
+                   * Rendered part by part rather than joined into one string: a
+                   * turn that only calls a tool has no text at all, and collapsing
+                   * the parts would make a working call look like a dropped reply.
+                   * Part indexes are stable — the reducer updates parts in place.
+                   */}
+                  {message.parts.map((part, index) => {
+                    if (part.type === "text") return <p key={index}>{part.text}</p>;
+
+                    if (part.type === "dynamic-tool") {
+                      return (
+                        <p key={part.toolCallId} className="voice-turn__tool">
+                          <IonIcon icon={terminalOutline} />
+                          {part.toolName || "…"}
+                          {part.state === "input-streaming"
+                            ? ""
+                            : `(${JSON.stringify(part.input)})`}
+                          {part.state === "output-available" && " ✓"}
+                        </p>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+          <div ref={transcriptEndRef} />
+        </IonContent>
+      </IonModal>
     </>
   );
 }
