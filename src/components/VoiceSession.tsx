@@ -37,6 +37,7 @@ import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
 import { faceForSession } from "../lib/astro/interaction.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
+import { useMediaQuery } from "../lib/use-media-query.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
@@ -89,6 +90,9 @@ const sessionConfig = {
  * One conversation. The parent remounts this with a new `key` to clear it —
  * the hook keeps its store in a ref, so a remount is what starts a fresh one.
  */
+
+/** Wide enough to dock the transcript beside the page instead of a sheet over it. */
+const DOCKED_TRANSCRIPT_QUERY = "(min-width: 900px)";
 
 /** How often the voice may *speak about* page events. See the effect below. */
 const EVENT_SPEECH_THROTTLE_MS = 5_000;
@@ -454,6 +458,74 @@ export default function VoiceSession({ password }: { password: string }) {
     if (transcriptOpen) transcriptEndRef.current?.scrollIntoView({ block: "end" });
   }, [transcriptOpen, messages]);
 
+  /**
+   * A draggable bottom sheet is a phone gesture; with a mouse it reads as a
+   * mobile app squeezed into a window. Wide screens dock the transcript beside
+   * the page instead — on the left, because the bottom-right is Astro's corner
+   * and he would sit on top of the newest lines.
+   */
+  const docked = useMediaQuery(DOCKED_TRANSCRIPT_QUERY);
+
+  const toggleTranscript = () => {
+    if (transcriptOpen) closeTranscript();
+    else setTranscriptOpen(true);
+  };
+
+  const transcriptBody = (
+    <>
+      <UsageMeter />
+
+      {/**
+       * Dev-only, and the fastest way to tell the two bring-up failures apart:
+       * `audio-delta` arriving with nothing audible is the playback path, no
+       * `audio-delta` at all is the session config.
+       */}
+      {import.meta.env.DEV && events.length > 0 && (
+        <pre className="voice-events">
+          {events
+            .slice(-12)
+            .map((event) => event.type)
+            .join(" · ")}
+        </pre>
+      )}
+
+      {messages.length === 0 ? (
+        <IonNote className="voice-empty">Nothing said yet.</IonNote>
+      ) : (
+        <div className="voice-transcript">
+          {messages.map((message) => (
+            <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
+              <span className="voice-turn__role">{message.role}</span>
+              {/**
+               * Rendered part by part rather than joined into one string: a
+               * turn that only calls a tool has no text at all, and collapsing
+               * the parts would make a working call look like a dropped reply.
+               * Part indexes are stable — the reducer updates parts in place.
+               */}
+              {message.parts.map((part, index) => {
+                if (part.type === "text") return <p key={index}>{part.text}</p>;
+
+                if (part.type === "dynamic-tool") {
+                  return (
+                    <p key={part.toolCallId} className="voice-turn__tool">
+                      <IonIcon icon={terminalOutline} />
+                      {part.toolName || "…"}
+                      {part.state === "input-streaming" ? "" : `(${JSON.stringify(part.input)})`}
+                      {part.state === "output-available" && " ✓"}
+                    </p>
+                  );
+                }
+
+                return null;
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+      <div ref={transcriptEndRef} />
+    </>
+  );
+
   const activity = !isLive
     ? null
     : muted
@@ -469,56 +541,74 @@ export default function VoiceSession({ password }: { password: string }) {
   return (
     <>
       <IonContent scrollY={false}>
-        <div className="voice-stage">
-          {viewBuilder.view == null ? (
-            <div className="voice-stage__empty">
-              <p>Tap Astro and just talk.</p>
-              <IonNote>
-                Ask for something (a game, a timer, a checklist) and it shows up here, full screen.{" "}
-                {VOICE_MODEL_ID} answers out loud.
-              </IonNote>
-            </div>
-          ) : (
-            /**
-             * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
-             * whole security model: the document lands on an opaque origin, so
-             * it cannot reach this page's DOM, cookies, or storage. The two are
-             * only safe apart — adding `allow-same-origin` back would hand a
-             * model-written page the run of the app.
-             *
-             * `onLoad` hands the previous page's saved state to the new one —
-             * this is what lets the coding agent edit a game mid-play without
-             * resetting the score.
-             */
-            <iframe
-              ref={frameRef}
-              className="voice-view"
-              title={viewBuilder.view.title}
-              sandbox="allow-scripts"
-              srcDoc={viewBuilder.view.html}
-              onLoad={onFrameLoad}
-            />
+        <div className="voice-layout">
+          {docked && transcriptOpen && (
+            <aside className="voice-panel" aria-label="Transcript">
+              <header className="voice-panel__header">
+                <h2>Transcript</h2>
+                <IonButton fill="clear" size="small" onClick={closeTranscript}>
+                  Close
+                </IonButton>
+              </header>
+              <div className="voice-panel__body">{transcriptBody}</div>
+            </aside>
           )}
+          <div className="voice-stage">
+            {viewBuilder.view == null ? (
+              <div className="voice-stage__empty">
+                <p>Tap Astro and just talk.</p>
+                <IonNote>
+                  Ask for something (a game, a timer, a checklist) and it shows up here, full
+                  screen. {VOICE_MODEL_ID} answers out loud.
+                </IonNote>
+              </div>
+            ) : (
+              /**
+               * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
+               * whole security model: the document lands on an opaque origin, so
+               * it cannot reach this page's DOM, cookies, or storage. The two are
+               * only safe apart — adding `allow-same-origin` back would hand a
+               * model-written page the run of the app.
+               *
+               * `onLoad` hands the previous page's saved state to the new one —
+               * this is what lets the coding agent edit a game mid-play without
+               * resetting the score.
+               */
+              <iframe
+                ref={frameRef}
+                className="voice-view"
+                title={viewBuilder.view.title}
+                sandbox="allow-scripts"
+                srcDoc={viewBuilder.view.html}
+                onLoad={onFrameLoad}
+              />
+            )}
 
-          {/**
-           * Floated over the top of the stage so a status never moves the app.
-           * `status` is what the coding agent is doing right now, built from its
-           * own lifecycle rather than a spinner — the page takes ten or twenty
-           * seconds and the wait should say why.
-           */}
-          <div className="voice-banners">
-            {viewBuilder.status != null && (
-              <div className="voice-banner">
-                <IonSpinner name="dots" />
-                <span>{viewBuilder.status}</span>
-              </div>
-            )}
-            {error != null && (
-              <div className="voice-banner voice-banner--error" role="alert">
-                {error}
-              </div>
-            )}
-            {notice != null && <div className="voice-banner">{notice}</div>}
+            {/**
+             * Floated over the top of the stage so a status never moves the app.
+             * `status` is what the coding agent is doing right now, built from its
+             * own lifecycle rather than a spinner — the page takes ten or twenty
+             * seconds and the wait should say why.
+             */}
+            <div className="voice-banners">
+              {viewBuilder.status != null && (
+                <div className="voice-banner">
+                  <IonSpinner name="dots" />
+                  <span>{viewBuilder.status}</span>
+                </div>
+              )}
+              {viewBuilder.failure != null && (
+                <div className="voice-banner voice-banner--error" role="alert">
+                  The page could not be built: {viewBuilder.failure}
+                </div>
+              )}
+              {error != null && (
+                <div className="voice-banner voice-banner--error" role="alert">
+                  {error}
+                </div>
+              )}
+              {notice != null && <div className="voice-banner">{notice}</div>}
+            </div>
           </div>
         </div>
       </IonContent>
@@ -561,8 +651,8 @@ export default function VoiceSession({ password }: { password: string }) {
             <IonButton
               fill="clear"
               className="voice-bar__transcript"
-              onClick={() => setTranscriptOpen(true)}
-              title="Show the transcript"
+              onClick={toggleTranscript}
+              title={transcriptOpen ? "Hide the transcript" : "Show the transcript"}
             >
               <IonIcon slot="icon-only" icon={chatbubblesOutline} />
               {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
@@ -578,8 +668,9 @@ export default function VoiceSession({ password }: { password: string }) {
         </IonToolbar>
       </IonFooter>
 
+      {/* Phones keep the sheet: there, dragging it is the native gesture. */}
       <IonModal
-        isOpen={transcriptOpen}
+        isOpen={transcriptOpen && !docked}
         onDidDismiss={closeTranscript}
         breakpoints={[0, 0.6, 1]}
         initialBreakpoint={0.6}
@@ -592,60 +683,7 @@ export default function VoiceSession({ password }: { password: string }) {
             </IonButtons>
           </IonToolbar>
         </IonHeader>
-        <IonContent className="ion-padding">
-          <UsageMeter />
-
-          {/**
-           * Dev-only, and the fastest way to tell the two bring-up failures apart:
-           * `audio-delta` arriving with nothing audible is the playback path, no
-           * `audio-delta` at all is the session config.
-           */}
-          {import.meta.env.DEV && events.length > 0 && (
-            <pre className="voice-events">
-              {events
-                .slice(-12)
-                .map((event) => event.type)
-                .join(" · ")}
-            </pre>
-          )}
-
-          {messages.length === 0 ? (
-            <IonNote className="voice-empty">Nothing said yet.</IonNote>
-          ) : (
-            <div className="voice-transcript">
-              {messages.map((message) => (
-                <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
-                  <span className="voice-turn__role">{message.role}</span>
-                  {/**
-                   * Rendered part by part rather than joined into one string: a
-                   * turn that only calls a tool has no text at all, and collapsing
-                   * the parts would make a working call look like a dropped reply.
-                   * Part indexes are stable — the reducer updates parts in place.
-                   */}
-                  {message.parts.map((part, index) => {
-                    if (part.type === "text") return <p key={index}>{part.text}</p>;
-
-                    if (part.type === "dynamic-tool") {
-                      return (
-                        <p key={part.toolCallId} className="voice-turn__tool">
-                          <IonIcon icon={terminalOutline} />
-                          {part.toolName || "…"}
-                          {part.state === "input-streaming"
-                            ? ""
-                            : `(${JSON.stringify(part.input)})`}
-                          {part.state === "output-available" && " ✓"}
-                        </p>
-                      );
-                    }
-
-                    return null;
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-          <div ref={transcriptEndRef} />
-        </IonContent>
+        <IonContent className="ion-padding">{transcriptBody}</IonContent>
       </IonModal>
     </>
   );
