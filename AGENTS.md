@@ -112,7 +112,8 @@ projects (`app`, `worker`, `node`) share strict settings from
   opens are dropped on the floor.
 - **The hook owns the setup fetch**, so no custom headers are possible — that is
   why the shared password rides in the query string on `/api/realtime/setup`.
-- **Both models bill by the token, and the footer adds up what each reports.**
+- **Both models bill by the token, and the header total adds up what each
+  reports (itemized in the transcript sheet).**
   Gemini Live puts `usageMetadata` on the raw `response-done`; `voiceTurnUsd`
   prices it, and its rules (unitemized prompt tokens billed as text, thinking
   billed as output, tool-call output free) were matched to the Gateway balance
