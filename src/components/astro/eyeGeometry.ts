@@ -23,25 +23,17 @@
 
 import { BufferAttribute, CylinderGeometry } from "three";
 
+import { happyTarget, sleepyTarget } from "../../lib/astro/eyeShape.ts";
+
 /** Segments around the oval. 64 is smooth at the size the eyes are ever drawn. */
 const RADIAL_SEGMENTS = 64;
 
 /**
- * The crescent target, in the geometry's unit space.
- *
- * The prism is a unit cylinder: `x, y` on the unit circle, `z ∈ [-0.5, 0.5]`. So the
- * shapes are functions of the outline alone. `happy` lifts the middle into an arch
- * (`∩`), shrinks the height and widens slightly; the arch term is symmetric in `x`,
- * which is what lets the same geometry serve both eyes.
+ * Both shapes live in `lib/astro/eyeShape.ts` — pure functions over the unit circle, so
+ * the test can assert that the asleep eye really bows downward without a GL context. The
+ * prism is a unit cylinder: `x, y` on the unit circle, `z ∈ [-0.5, 0.5]`, so a shape is a
+ * function of the outline alone.
  */
-function happyTarget(x: number, y: number): [number, number] {
-  return [x * 1.06, 0.45 * y + 0.5 * (1 - x * x) - 0.15];
-}
-
-/** The dash target: the sheet's asleep eye is `90 × 28.7`, i.e. a fifth of the height. */
-function sleepyTarget(x: number, y: number): [number, number] {
-  return [x * 1.02, 0.14 * y];
-}
 
 export type EyeGeometry = CylinderGeometry;
 

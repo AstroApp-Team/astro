@@ -31,6 +31,22 @@ export function viewportToPixels(
 }
 
 /**
+ * The inverse: a pointer position in CSS pixels as `[-1, 1]` viewport space, y up.
+ *
+ * Dragging is why this exists. The drag handle sees `clientX/clientY` and the character's
+ * position lives in the camera's space, so the pointer has to be expressed in the same
+ * units the anchor is — and the y flip has to happen exactly once, in one place, or a
+ * drag up moves him down.
+ */
+export function pixelsToViewport(
+  point: ScreenPoint,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  return { x: (point.x / width) * 2 - 1, y: -((point.y / height) * 2 - 1) };
+}
+
+/**
  * Whether a press landed on him, given his centre and the radius of the tappable disc.
  *
  * The canvas layer is `pointer-events: none` (the page keeps its clicks), so the browser
@@ -63,6 +79,24 @@ export function gazeDirection(
   const length = Math.hypot(direction.x, direction.y);
   const scale = length > 1 ? 1 / length : 1;
   return { x: direction.x * scale, y: direction.y * scale };
+}
+
+/**
+ * What a press on the character means.
+ *
+ * The character is the page's start button, and a press is the whole interaction: it starts a
+ * conversation when there is none, and once one is open it is only a greeting. Hanging up is
+ * deliberately *not* something a press can do — he is draggable, so a press is also how a drag
+ * begins, and a control that ended a call every time it was poked would hang up by accident.
+ *
+ * Split out of the component because this is the product rule, not an implementation detail:
+ * `"start"` and `"greet"` are the two answers, and the test can hold the rule still while the
+ * event plumbing changes around it.
+ */
+export type TapIntent = "start" | "greet";
+
+export function tapIntent(live: boolean): TapIntent {
+  return live ? "greet" : "start";
 }
 
 /**

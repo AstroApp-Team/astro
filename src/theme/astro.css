@@ -17,10 +17,10 @@
  * `inset: 0` is required, not decorative: the canvas box must start at the viewport
  * origin, which is what the pointer normalisation in `lookFromPointer` assumes.
  *
- * The layer is transparent (`alpha: true` in the Canvas) so the page's own background —
- * Ionic's palette, which follows the OS setting — stays visible. The character carries
- * its own light: the halo is additive, and the body's colours are the sheet's ramp.
- * There is no dark box behind him, which is the whole point of an overlay.
+ * The layer is transparent (`alpha: true` in the Canvas) so the page's own background — the
+ * stylesheet's ink, pinned in `theme/variables.css` — stays visible. The character carries
+ * its own light: the halo is additive, and the body's colours are the sheet's ramp. There is
+ * no dark box behind him, which is the whole point of an overlay.
  */
 
 .astro-overlay {
@@ -40,6 +40,42 @@
 }
 
 /*
+ * The press target over the character — the one element in this layer that takes events.
+ *
+ * Everything else here is `pointer-events: none` so the page keeps its clicks; this disc is
+ * the exception, and it is why a tap on him starts the conversation instead of also pressing
+ * whatever button happens to be underneath.
+ *
+ * `touch-action: none` is load-bearing on a phone: without it the browser claims the gesture
+ * for the scroller and the drag only begins once the page has already scrolled. It costs the
+ * ability to scroll by starting the gesture on top of him, which is the price of a draggable
+ * character. The `:focus-visible` ring is the keyboard path — he is a real button with a
+ * label, so tab-then-enter starts the conversation too.
+ */
+.astro-handle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+}
+
+.astro-handle--dragging {
+  cursor: grabbing;
+}
+
+.astro-handle:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+/*
  * The no-GL-context notice, in the same corner as the character it replaces. `CanvasBoundary`
  * renders this markup, so the selectors are its own (`__title` / `__body` / `__detail`), and
  * `.mono` is the class it puts on the detail line.
@@ -50,10 +86,10 @@
   bottom: 12px;
   max-width: 340px;
   padding: 8px 10px;
-  border: 1px solid rgb(255 139 0 / 20%);
+  border: 1px solid rgb(var(--ion-color-primary-rgb) / 20%);
   border-radius: 10px;
-  background: rgb(26 7 3 / 82%);
-  color: #ffe9d8;
+  background: color-mix(in srgb, var(--astro-ink) 82%, transparent);
+  color: var(--astro-paper);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   letter-spacing: 0.04em;

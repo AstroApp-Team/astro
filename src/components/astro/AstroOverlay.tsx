@@ -22,20 +22,34 @@
  *    the halo on screen while still letting the rim sit near the edge.
  * 4. **The camera is orthographic.** See `CAMERA_DISTANCE` below — this is what makes the
  *    two eyes read as one aligned pair instead of two shapes at different scales.
+ * 5. **He is the start button, and he can be moved.** A press on him starts the
+ *    conversation (a second one there while it is live is just a greeting), and holding
+ *    and dragging puts him anywhere on screen. The press has to be a real DOM element —
+ *    `DragHandle` below — because the layer is `pointer-events: none`: a purely arithmetic
+ *    hit test can decide that a press *was* on him, but it cannot stop the button underneath
+ *    from also receiving it, and it cannot use pointer capture to keep a drag alive once the
+ *    finger outruns his disc.
  */
 
 import { Canvas, useThree } from "@react-three/fiber";
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { ASTRO_REACTION_MS } from "../../lib/astro/expression.ts";
 import {
   ASTRO_CORNER_HALO_WORLD,
+  anchoredPosition,
+  clampAnchor,
   cornerPosition,
   orthographicHalfExtent,
   orthographicZoom,
 } from "../../lib/astro/corner.ts";
-import { gazeDirection, hitsCharacter, viewportToPixels } from "../../lib/astro/interaction.ts";
+import {
+  gazeDirection,
+  pixelsToViewport,
+  tapIntent,
+  viewportToPixels,
+} from "../../lib/astro/interaction.ts";
 import { useAstroStore } from "../../lib/astro/store.ts";
 import { CanvasBoundary } from "../CanvasBoundary.tsx";
 import { AstroCharacter } from "./AstroCharacter.tsx";
@@ -96,6 +110,15 @@ const HALO_COVERAGE = 0.25;
  */
 const POKE_RADIUS_RATIO = 0.75;
 
+/**
+ * How far a press may travel before it becomes a drag instead of a tap.
+ *
+ * Not zero: a tap on a phone moves a few pixels, and a character whose every tap turned into
+ * a two-pixel drag would never start a conversation. Not large either, or the first part of a
+ * drag would be swallowed. Eight pixels is about a fingertip's wobble.
+ */
+const DRAG_SLOP_PX = 8;
+
 /** The character's plane. */
 const CHARACTER_Z = 0;
 
@@ -132,10 +155,13 @@ function lookDirectionFromPointer(event: PointerEvent): { x: number; y: number }
   return gazeDirection(pointer, useAstroStore.getState().lookOrigin);
 }
 
-/** The character's corner position for the current camera, read inside the canvas. */
+/** The character's position for the current camera, read inside the canvas. */
 function CornerCharacter() {
   const size = useThree((state) => state.size);
   const camera = useThree((state) => state.camera);
+  /* Subscribed, not read with `getState()`: a drag has to move the mesh, and this is the one
+     prop on the character that comes from the page. */
+  const anchor = useAstroStore((state) => state.anchor);
 
   /* Orthographic: R3F sizes the frustum in pixels (`left = -width/2`) and divides by
      `zoom`, so a world unit occupies `zoom` pixels. Only `zoom` is ours, and the matrix
@@ -144,7 +170,12 @@ function CornerCharacter() {
   camera.updateProjectionMatrix();
 
   const extent = orthographicHalfExtent(size.width, size.height, camera.zoom);
-  const position = cornerPosition(extent, CHARACTER_Z);
+  /* `null` anchor means the shipping corner; anything else is where the user dropped him,
+     clamped because a resize can move the edges in under it. */
+  const position =
+    anchor == null
+      ? cornerPosition(extent, CHARACTER_Z)
+      : anchoredPosition(anchor, extent, CHARACTER_Z);
 
   /*
    * His position in the *same* viewport space the pointer is written in, so the pointer
@@ -161,6 +192,153 @@ function CornerCharacter() {
   );
 
   return <AstroCharacter position={position} />;
+}
+
+/**
+ * The press target: a transparent disc over the character that is the only part of this
+ * layer a press can reach.
+ *
+ * It exists because the arithmetic hit test could not do two things. It could not *stop* the
+ * press: with the layer `pointer-events: none`, a tap on him also reached whatever button sat
+ * underneath, so starting a conversation by tapping the character would have pressed the
+ * page's own Start button as well. And it could not survive a drag: once the finger leaves
+ * his disc there is nothing left listening, and pointer capture needs an element to capture
+ * *to*. A real button gets both for free — and keyboard users get a labelled control.
+ *
+ * The disc is positioned from the same `[-1, 1]` numbers everything else uses, so it cannot
+ * drift from the character: percentages of the viewport need no resize listener, and the
+ * anchor and the look origin are already in that space.
+ */
+function DragHandle() {
+  const anchor = useAstroStore((state) => state.anchor);
+  const lookOrigin = useAstroStore((state) => state.lookOrigin);
+  const lookRadius = useAstroStore((state) => state.lookRadius);
+  const live = useAstroStore((state) => state.live);
+  const [dragging, setDragging] = useState(false);
+
+  const settleTimer = useRef<number | undefined>(undefined);
+  const drag = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    grabX: number;
+    grabY: number;
+    moved: boolean;
+  } | null>(null);
+
+  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+
+  const centre = anchor ?? lookOrigin;
+  const radius = lookRadius * POKE_RADIUS_RATIO;
+
+  /**
+   * Pointer pixels → an anchor, clamped by the character's own body radius.
+   *
+   * The zoom is recovered from the halo's on-screen radius (`lookRadius`), which is the one
+   * number the canvas publishes; with it the same `clampAnchor` the renderer uses applies
+   * here, so the handle and the mesh cannot disagree about where the edge is.
+   */
+  const anchorAt = (x: number, y: number) => {
+    const next = pixelsToViewport({ x, y }, window.innerWidth, window.innerHeight);
+    if (lookRadius <= 0) return next;
+
+    const zoom = lookRadius / ASTRO_CORNER_HALO_WORLD;
+    return clampAnchor(next, orthographicHalfExtent(window.innerWidth, window.innerHeight, zoom));
+  };
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    /* Capture, so a drag keeps arriving after the cursor leaves the disc — which it does
+       immediately, because the disc is small and a drag is not. */
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const origin = viewportToPixels(centre, window.innerWidth, window.innerHeight);
+    drag.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      /* The offset between the finger and his centre, so he does not jump to the cursor. */
+      grabX: event.clientX - origin.x,
+      grabY: event.clientY - origin.y,
+      moved: false,
+    };
+    setDragging(true);
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const current = drag.current;
+    if (current == null || current.pointerId !== event.pointerId) return;
+
+    if (Math.hypot(event.clientX - current.startX, event.clientY - current.startY) > DRAG_SLOP_PX) {
+      current.moved = true;
+    }
+    if (!current.moved) return;
+
+    useAstroStore
+      .getState()
+      .setAnchor(anchorAt(event.clientX - current.grabX, event.clientY - current.grabY));
+  };
+
+  /**
+   * Up ends the gesture, and a gesture that never moved is a tap.
+   *
+   * The tap is the character's whole job on this page: it starts the conversation when
+   * there is none. Once one is open it is only a greeting, because hanging up is the
+   * separate button's job — a character that also hung up would end calls by accident every
+   * time someone poked him.
+   */
+  const onPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const current = drag.current;
+    drag.current = null;
+    setDragging(false);
+    if (current == null || current.pointerId !== event.pointerId || current.moved) return;
+
+    const store = useAstroStore.getState();
+    store.react();
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => store.settle(), ASTRO_REACTION_MS.max);
+
+    if (tapIntent(store.live) !== "start") return;
+
+    /*
+     * He is the start button, but a locked page has no session to start — `voice` is `null`
+     * while the gate is up. A tap there still has to *answer*, or a first-time visitor taps
+     * the character and concludes nothing works: it puts the cursor in the password field,
+     * which is the one thing standing between them and a conversation.
+     */
+    if (store.voice) {
+      store.voice.start();
+      return;
+    }
+
+    document.querySelector<HTMLInputElement>("ion-input input")?.focus();
+  };
+
+  const onPointerCancel = () => {
+    drag.current = null;
+    setDragging(false);
+  };
+
+  return (
+    <button
+      type="button"
+      className={`astro-handle${dragging ? " astro-handle--dragging" : ""}`}
+      /* Hidden until the canvas has told us how big he is — a zero-radius disc is a control
+         that exists but cannot be hit. */
+      style={{
+        left: `${50 + centre.x * 50}%`,
+        top: `${50 - centre.y * 50}%`,
+        width: radius * 2,
+        height: radius * 2,
+        visibility: radius > 0 ? "visible" : "hidden",
+      }}
+      aria-label={live ? "Astro is listening — tap to greet him" : "Start talking to Astro"}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+    />
+  );
 }
 
 export default function AstroOverlay() {
@@ -192,52 +370,26 @@ export default function AstroOverlay() {
   }, []);
 
   /*
-   * A press, hit-tested in screen space.
+   * Every press is also a look.
    *
-   * This is the touch path as well as the mouse path — `pointerdown` covers both — and it
-   * has to be arithmetic because the layer is `pointer-events: none`: the browser never
-   * delivers a press to the canvas, so R3F's raycast never runs and `onPointerDown` on the
-   * mesh is dead code here. A press that lands outside his disc is not touched at all, so
-   * every button underneath keeps working.
+   * The touch equivalent of `pointermove`: a finger has no hover, so the point it lands on is
+   * the only "where the cursor is" it gets, and it is held there like a resting cursor. This
+   * stays on the window rather than on the handle because a press anywhere on the page should
+   * turn his eyes — that is the whole point of a corner presence — and the handle's own press
+   * is one of those presses.
+   *
+   * What is *not* here any more is the arithmetic hit test: the tap and the drag belong to
+   * `DragHandle`, which is the only element in this layer that events can reach. See its
+   * comment for why a distance test was not enough.
    */
   useEffect(() => {
-    let settleTimer: number | undefined;
-
     const poke = (event: PointerEvent) => {
-      const { lookOrigin, lookRadius, setLook, react, settle } = useAstroStore.getState();
-      const centre = viewportToPixels(lookOrigin, window.innerWidth, window.innerHeight);
-
-      /*
-       * Every press is also a look, and this runs before the hit test so a press anywhere in
-       * the page turns his eyes toward it. It is the touch equivalent of `pointermove`: a
-       * finger has no hover, so the point it lands on is the only "where the cursor is" it
-       * gets, and it is held there like a resting cursor rather than tracked.
-       */
       const look = lookDirectionFromPointer(event);
-      setLook(look.x, look.y);
-
-      if (
-        !hitsCharacter(
-          { x: event.clientX, y: event.clientY },
-          centre,
-          lookRadius * POKE_RADIUS_RATIO,
-        )
-      ) {
-        return;
-      }
-
-      react();
-      /* One reaction at a time: a second tap restarts the clock rather than stacking timers,
-         so a satisfied `happy` cannot outlive the last tap. */
-      window.clearTimeout(settleTimer);
-      settleTimer = window.setTimeout(() => settle(), ASTRO_REACTION_MS.max);
+      useAstroStore.getState().setLook(look.x, look.y);
     };
 
     window.addEventListener("pointerdown", poke);
-    return () => {
-      window.removeEventListener("pointerdown", poke);
-      window.clearTimeout(settleTimer);
-    };
+    return () => window.removeEventListener("pointerdown", poke);
   }, []);
 
   /*
@@ -282,6 +434,10 @@ export default function AstroOverlay() {
           <CornerCharacter />
         </Canvas>
       </CanvasBoundary>
+      {/* Outside the boundary on purpose: a WebView with no WebGL loses the character, and
+          with him the page's only start button would go too — the notice inside
+          `CanvasBoundary` is then the thing to press, which is why it is a real button. */}
+      <DragHandle />
     </div>,
     document.body,
   );

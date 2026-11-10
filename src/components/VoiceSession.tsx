@@ -1,7 +1,13 @@
 import { experimental_useRealtime, type Experimental_UseRealtimeOptions } from "@ai-sdk/react";
 import { IonButton, IonChip, IonIcon, IonNote, IonSpinner, IonText } from "@ionic/react";
 import { gateway } from "ai";
-import { micOffOutline, micOutline, terminalOutline, volumeHighOutline } from "ionicons/icons";
+import {
+  micOffOutline,
+  micOutline,
+  stopCircleOutline,
+  terminalOutline,
+  volumeHighOutline,
+} from "ionicons/icons";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -79,6 +85,14 @@ const EVENT_SPEECH_THROTTLE_MS = 5_000;
 export default function VoiceSession({ password }: { password: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Muted keeps the session open and stops the microphone.
+   *
+   * Deliberately not the same thing as hanging up: the socket bills by the second either
+   * way, so muting is the cheap gesture and ending is the expensive one. Leaving the tracks
+   * alive means unmuting does not re-prompt for permission.
+   */
+  const [muted, setMuted] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const lastActivityRef = useRef(0);
 
@@ -236,13 +250,16 @@ export default function VoiceSession({ password }: { password: string }) {
    * Events sent before the socket opens are dropped, so capture waits for
    * `connected` (which the SDK sets on the session-created event) rather than
    * starting right after `connect()` resolves.
+   *
+   * `muted` is a guard, not a note: without it this effect would restart capture the moment
+   * mute stopped it, and the mute button would blink and do nothing.
    */
   useEffect(() => {
-    if (status !== "connected" || isCapturing) return;
+    if (status !== "connected" || isCapturing || muted) return;
 
     const stream = streamRef.current;
     if (stream) startAudioCapture(stream);
-  }, [status, isCapturing, startAudioCapture]);
+  }, [status, isCapturing, muted, startAudioCapture]);
 
   /* Release the microphone if the page navigates away mid-conversation. */
   useEffect(() => {
@@ -334,19 +351,81 @@ export default function VoiceSession({ password }: { password: string }) {
 
   const isLive = status === "connected" || status === "connecting";
 
+  /**
+   * The character's start/stop, published for the overlay.
+   *
+   * He is the page's start button, but the microphone permission and the socket live here —
+   * so the overlay calls through the store rather than reaching into this component. The
+   * wrappers are stable (they read refs), because `start` and `stop` are rebound on every
+   * render and an effect that depended on them would re-register constantly.
+   */
+  const startRef = useRef(start);
+  useEffect(() => {
+    startRef.current = start;
+  });
+
+  useEffect(() => {
+    useAstroStore.getState().setVoice({
+      start: () => void startRef.current(),
+      /* `stopRef` already exists for the idle hang-up, and is re-pointed every render for
+         exactly this reason: `stop` closes over `realtime`, which the hook rebinds. */
+      stop: () => stopRef.current(),
+    });
+
+    return () => useAstroStore.getState().setVoice(null);
+  }, []);
+
+  /* What a tap on him means. Published here because this is where `status` lives. */
+  useEffect(() => {
+    useAstroStore.getState().setLive(isLive);
+  }, [isLive]);
+
+  const toggleMute = () => {
+    if (muted) {
+      setMuted(false);
+      return;
+    }
+
+    realtime.stopAudioCapture();
+    setMuted(true);
+  };
+
+  /* Hanging up while muted must not leave the next session muted. */
+  useEffect(() => {
+    if (!isLive) setMuted(false);
+  }, [isLive]);
+
   return (
     <>
       <div className="voice-controls">
+        {/**
+         * Astro is the start button — tapping him starts the conversation — so this block is
+         * the *other* two things: a way to stop and mute once it is running, and a plain
+         * fallback when it is not.
+         *
+         * The fallback is not dead weight: he is a canvas, and a WebView without WebGL gets
+         * `CanvasBoundary`'s notice instead of a character. A page whose only start control
+         * is a mesh that failed to compile has no start control at all.
+         */}
         {isLive ? (
-          <IonButton color="danger" expand="block" onClick={stop}>
-            <IonIcon slot="start" icon={micOffOutline} />
-            End conversation
-          </IonButton>
+          <>
+            <IonButton expand="block" fill="outline" color="tertiary" onClick={toggleMute}>
+              <IonIcon slot="start" icon={muted ? micOffOutline : micOutline} />
+              {muted ? "Unmute" : "Mute microphone"}
+            </IonButton>
+            <IonButton expand="block" color="danger" onClick={stop}>
+              <IonIcon slot="start" icon={stopCircleOutline} />
+              End conversation
+            </IonButton>
+          </>
         ) : (
-          <IonButton expand="block" onClick={() => void start()}>
-            <IonIcon slot="start" icon={micOutline} />
-            Start talking
-          </IonButton>
+          <>
+            <p className="voice-hint">Tap Astro, or press start, and just talk.</p>
+            <IonButton expand="block" fill="outline" onClick={() => void start()}>
+              <IonIcon slot="start" icon={micOutline} />
+              Start talking
+            </IonButton>
+          </>
         )}
 
         <div className="voice-status">
@@ -354,8 +433,14 @@ export default function VoiceSession({ password }: { password: string }) {
             {status === "connecting" && <IonSpinner name="dots" />}
             {status}
           </IonChip>
-          {isCapturing && (
-            <IonChip color="primary">
+          {muted && (
+            <IonChip color="medium" onClick={toggleMute}>
+              <IonIcon icon={micOffOutline} />
+              muted
+            </IonChip>
+          )}
+          {isCapturing && !muted && (
+            <IonChip color="tertiary">
               <IonIcon icon={micOutline} />
               listening
             </IonChip>
@@ -431,7 +516,7 @@ export default function VoiceSession({ password }: { password: string }) {
 
       {messages.length === 0 ? (
         <IonNote className="voice-empty">
-          Nothing said yet. Hit start, allow the microphone, and just talk — {VOICE_MODEL_ID}{" "}
+          Nothing said yet. Tap Astro, allow the microphone, and just talk — {VOICE_MODEL_ID}{" "}
           answers out loud and the transcript shows up here.
         </IonNote>
       ) : (

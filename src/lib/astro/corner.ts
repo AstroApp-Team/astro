@@ -13,7 +13,7 @@
  * expressed here so the corner arithmetic has one shape regardless.
  */
 
-import { ASTRO_V2_HALO_RADIUS } from "./astroV2.ts";
+import { ASTRO_V2_BODY_RADIUS, ASTRO_V2_HALO_RADIUS } from "./astroV2.ts";
 
 /** The halo's radius in world units — the quantity the inset is measured against. */
 export const ASTRO_CORNER_HALO_WORLD = ASTRO_V2_HALO_RADIUS;
@@ -117,6 +117,56 @@ export function orthographicZoom(
  * bottom of the frame is `-halfHeight`. Write it as `+halfHeight` and the character ends
  * up in the top-right with nothing to explain the move.
  */
+/**
+ * Where a dragged character sits, in the same `[-1, 1]` viewport space as the pointer.
+ *
+ * Normalised rather than in world units or pixels because the anchor outlives the viewport:
+ * rotated to landscape, a pixel anchor falls off the side and a world anchor lands at a
+ * different fraction of the screen. The fraction is the only coordinate that means the same
+ * thing on both.
+ */
+export type Anchor = { x: number; y: number };
+
+/**
+ * Keeps a dragged anchor inside the frame, so he cannot be dropped half off the screen —
+ * and cannot be put back once he is: the handle follows the anchor, so a body that is half
+ * outside has half a hit target.
+ *
+ * The margin is the body's own radius, not the halo's: the glow is meant to cross the edge
+ * (that is the corner's whole look), while the body is the thing that must stay grabbable.
+ */
+export function clampAnchor(
+  anchor: Anchor,
+  extent: HalfExtent,
+  radius: number = ASTRO_V2_BODY_RADIUS,
+): Anchor {
+  /* A viewport narrower than the body leaves no room to clamp into; `Math.min(1, …)` keeps
+     the margin from inverting the bounds and flipping him to the opposite edge. */
+  const marginX = Math.min(1, radius / extent.halfWidth);
+  const marginY = Math.min(1, radius / extent.halfHeight);
+
+  return {
+    x: Math.min(1 - marginX, Math.max(marginX - 1, anchor.x)),
+    y: Math.min(1 - marginY, Math.max(marginY - 1, anchor.y)),
+  };
+}
+
+/**
+ * The body's centre for a dragged anchor.
+ *
+ * Clamped on every frame rather than only while dragging, because a resize can move the
+ * edges in under an anchor that was legal when it was dropped — and a character parked past
+ * the new edge is unreachable, since his handle is drawn at the anchor too.
+ */
+export function anchoredPosition(
+  anchor: Anchor,
+  extent: HalfExtent,
+  characterZ = 0,
+): [number, number, number] {
+  const clamped = clampAnchor(anchor, extent);
+  return [clamped.x * extent.halfWidth, clamped.y * extent.halfHeight, characterZ];
+}
+
 export function cornerPosition(extent: HalfExtent, characterZ = 0): [number, number, number] {
   const { halfHeight, halfWidth } = extent;
   const inset = Math.min(

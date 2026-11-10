@@ -1,11 +1,21 @@
-/* Layout for the voice page. Colors come from Ionic's CSS variables so the
-   light/dark system palette in variables.css applies here too. */
+/* Layout for the voice page. Every colour is an `--ion-*` token: the stylesheet's palette is
+   pinned in variables.css, so nothing here names a hex — change the palette in one place and
+   the transcript, the chips and the buttons all move with it. */
 
 .voice-controls {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1.25rem;
+}
+
+/* The instruction that replaces the old "Start talking" headline: the character is the
+   button, so the copy explains him rather than standing where he used to be. */
+.voice-hint {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--ion-color-step-600, currentcolor);
 }
 
 .voice-status {

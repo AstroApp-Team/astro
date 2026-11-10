@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { isTransient } from "./expression.ts";
-import { faceForSession, gazeDirection, hitsCharacter, viewportToPixels } from "./interaction.ts";
+import {
+  faceForSession,
+  gazeDirection,
+  hitsCharacter,
+  pixelsToViewport,
+  tapIntent,
+  viewportToPixels,
+} from "./interaction.ts";
 import { useAstroStore } from "./store.ts";
 
 /**
@@ -174,5 +181,64 @@ describe("the expression store", () => {
 
     expect(useAstroStore.getState().look).toEqual({ x: 0.8, y: -0.4 });
     expect(useAstroStore.getState().expression).toBe("idle");
+  });
+});
+
+/**
+ * The coordinate pair has to be exact inverses, because a drag reads the pointer once and the
+ * renderer reads the anchor in the opposite direction: an error here moves him against the
+ * finger, which is the classic sign of a y flip applied twice (or skipped).
+ */
+describe("pointer coordinates", () => {
+  const width = 390;
+  const height = 844;
+
+  it("round-trips pixels through viewport space", () => {
+    for (const point of [
+      { x: 0, y: 0 },
+      { x: 195, y: 422 },
+      { x: 389, y: 843 },
+    ]) {
+      const back = viewportToPixels(pixelsToViewport(point, width, height), width, height);
+      expect(back.x).toBeCloseTo(point.x, 6);
+      expect(back.y).toBeCloseTo(point.y, 6);
+    }
+  });
+
+  it("puts the top of the screen at +1, because the canvas has y up", () => {
+    expect(pixelsToViewport({ x: 0, y: 0 }, width, height).y).toBeCloseTo(1, 10);
+    expect(pixelsToViewport({ x: 0, y: height }, width, height).y).toBeCloseTo(-1, 10);
+    expect(pixelsToViewport({ x: 0, y: 0 }, width, height).x).toBeCloseTo(-1, 10);
+  });
+});
+
+describe("a press on the character", () => {
+  it("starts a conversation when there is none", () => {
+    expect(tapIntent(false)).toBe("start");
+  });
+
+  it("only greets once one is open, because hanging up is the button's job", () => {
+    expect(tapIntent(true)).toBe("greet");
+  });
+});
+
+describe("the drag and voice fields", () => {
+  it("publishes a drag anchor and clears it back to the corner", () => {
+    useAstroStore.getState().setAnchor({ x: 0.2, y: -0.3 });
+    expect(useAstroStore.getState().anchor).toEqual({ x: 0.2, y: -0.3 });
+
+    useAstroStore.getState().setAnchor(null);
+    expect(useAstroStore.getState().anchor).toBeNull();
+  });
+
+  it("publishes the session's start/stop while the session is mounted", () => {
+    const voice = { start: () => {}, stop: () => {} };
+    useAstroStore.getState().setVoice(voice);
+    expect(useAstroStore.getState().voice).toBe(voice);
+
+    /* The gate replaces the session, so the handle must go with it: a press with no key
+       behind it would ask for the microphone and then fail to connect. */
+    useAstroStore.getState().setVoice(null);
+    expect(useAstroStore.getState().voice).toBeNull();
   });
 });

@@ -5,6 +5,8 @@ import {
   ASTRO_CORNER_EDGE_RATIO,
   ASTRO_CORNER_HALO_WORLD,
   ASTRO_CORNER_INSET_RATIO,
+  anchoredPosition,
+  clampAnchor,
   cornerPosition,
   orthographicHalfExtent,
   orthographicZoom,
@@ -158,5 +160,59 @@ describe("the perspective framing it replaced", () => {
        `clean-refactor` figures were measured against (fov 45 at z 7.5). */
     const { halfHeight } = visibleHalfExtent({ aspect: 1.6, cameraZ: 7.5, fovDeg: 45 });
     expect(halfHeight).toBeCloseTo(Math.tan((45 * Math.PI) / 360) * 7.5, 5);
+  });
+});
+
+/**
+ * Dragging.
+ *
+ * The anchor is stored in `[-1, 1]` viewport space — the same space the pointer and the look
+ * origin use — so these cases are about the two things that space costs: an anchor has to be
+ * clamped against a *body radius that grows relative to the frame as the frame shrinks*, and it
+ * has to survive a resize that moves the edges in under it.
+ */
+describe("dragging", () => {
+  const phone = orthographicHalfExtent(390, 844, orthographicZoom(390, 844, OVERLAY_COVERAGE));
+  const desktop = orthographicHalfExtent(1440, 900, orthographicZoom(1440, 900, OVERLAY_COVERAGE));
+
+  it("maps the centre of the frame to the origin", () => {
+    expect(anchoredPosition({ x: 0, y: 0 }, phone)).toEqual([0, 0, 0]);
+  });
+
+  it("maps the anchor as a fraction of the visible half extents", () => {
+    const [x, y] = anchoredPosition({ x: 0.5, y: -0.25 }, desktop);
+    expect(x).toBeCloseTo(desktop.halfWidth * 0.5, 10);
+    expect(y).toBeCloseTo(-desktop.halfHeight * 0.25, 10);
+  });
+
+  it("keeps the body inside the frame rather than letting it be dropped half off", () => {
+    const [x, y] = anchoredPosition({ x: 1, y: 1 }, phone);
+    expect(x + ASTRO_V2_BODY_RADIUS).toBeLessThanOrEqual(phone.halfWidth + 1e-10);
+    expect(y + ASTRO_V2_BODY_RADIUS).toBeLessThanOrEqual(phone.halfHeight + 1e-10);
+  });
+
+  it("clamps per axis, against whichever side of the frame is the scarcer one", () => {
+    /* The margin is the body radius over the half extent, so the clamp is not "a phone clamps
+       harder" — it is per axis. Portrait: width is scarce. Landscape: height is. Both facts
+       matter, because the halo is sized off the *longer* side, which makes the shorter side the
+       one the body crowds. */
+    const dropped = { x: 0.95, y: 0.95 };
+    const onPhone = clampAnchor(dropped, phone);
+    const onDesktop = clampAnchor(dropped, desktop);
+
+    expect(onPhone.x).toBeLessThan(onDesktop.x);
+    expect(onDesktop.y).toBeLessThan(onPhone.y);
+  });
+
+  it("leaves an anchor that already fits untouched", () => {
+    expect(clampAnchor({ x: 0.1, y: -0.2 }, desktop)).toEqual({ x: 0.1, y: -0.2 });
+  });
+
+  it("cannot invert its own bounds in a frame narrower than the body", () => {
+    /* The clamp margin is capped at 1, so a pathological viewport yields the centre rather
+       than a bound smaller than its own lower bound — which would flip him to the far edge. */
+    const tiny = { halfWidth: 0.01, halfHeight: 0.01 };
+    const clamped = clampAnchor({ x: 0.8, y: -0.8 }, tiny);
+    expect(clamped).toEqual({ x: 0, y: 0 });
   });
 });

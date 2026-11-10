@@ -49,8 +49,37 @@ export type AstroStore = {
    * ellipse on a phone, so a tap that looks like it lands on him misses by the aspect ratio.
    */
   lookRadius: number;
+  /**
+   * Where he was dragged to, in `[-1, 1]` viewport space, or `null` for the shipping corner.
+   *
+   * Normalised on purpose: the same anchor survives a rotation, a window resize and the
+   * jump from a browser to a phone, while a pixel or world-unit anchor does not.
+   */
+  anchor: { x: number; y: number } | null;
+  /** True between `pointerdown` and `pointerup` on his handle. */
+  dragging: boolean;
+  /**
+   * Is a conversation open (or opening)?
+   *
+   * The overlay needs this to decide what a tap on him means — start, or a greeting —
+   * and the answer lives in `VoiceSession`, so it is published here rather than
+   * duplicated as a second source of truth.
+   */
+  live: boolean;
+  /**
+   * The session's own start/stop, published by `VoiceSession` while it is mounted.
+   *
+   * The character is the start button, but the microphone permission and the socket
+   * belong to that component, so a tap sends a command through here instead of reaching
+   * over it. `null` while the gate is up: with no password there is nothing to start.
+   */
+  voice: { start(): void; stop(): void } | null;
   setLook(x: number, y: number): void;
   setLookOrigin(x: number, y: number, radius: number): void;
+  setAnchor(anchor: { x: number; y: number } | null): void;
+  setDragging(dragging: boolean): void;
+  setLive(live: boolean): void;
+  setVoice(voice: { start(): void; stop(): void } | null): void;
   /**
    * Show a state the session implies.
    *
@@ -79,6 +108,10 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
   look: { x: 0, y: 0 },
   lookOrigin: { x: 0, y: 0 },
   lookRadius: 0,
+  anchor: null,
+  dragging: false,
+  live: false,
+  voice: null,
 
   setLook(x, y) {
     set({ look: { x, y } });
@@ -86,6 +119,22 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
 
   setLookOrigin(x, y, radius) {
     set({ lookOrigin: { x, y }, lookRadius: radius });
+  },
+
+  setAnchor(anchor) {
+    set({ anchor });
+  },
+
+  setDragging(dragging) {
+    set({ dragging });
+  },
+
+  setLive(live) {
+    set({ live });
+  },
+
+  setVoice(voice) {
+    set({ voice });
   },
 
   setExpression(expression) {
@@ -121,6 +170,15 @@ export type AstroV2Store = {
   setTunable<K extends keyof AstroV2Tunables>(key: K, value: AstroV2Tunables[K]): void;
   reset(): void;
 };
+
+/*
+ * A handle for the dev overlay's own rigging: the expression store is otherwise unreachable
+ * from outside React, which made checking a face by eye — "show me `sleep` and let me look at
+ * the dash" — a code edit. Dev-only, so it cannot be poked at in a build.
+ */
+if (import.meta.env.DEV) {
+  (globalThis as { __astro?: typeof useAstroStore }).__astro = useAstroStore;
+}
 
 export const useAstroV2Store = create<AstroV2Store>((set) => ({
   tunables: ASTRO_V2_TUNABLES,
