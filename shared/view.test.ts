@@ -6,10 +6,10 @@ import {
   MAX_VIEW_STATE_BYTES,
   parseViewEvent,
   parseViewState,
-  sealViewHtml,
-  VIEW_CSP,
   VIEW_EVENT_TYPE,
   VIEW_STATE_TYPE,
+  removedSpecItems,
+  viewSpec,
   viewTitle,
 } from "./view.ts";
 
@@ -19,7 +19,7 @@ import {
  * writes the HTML, the published page writes the postMessage.
  */
 describe("checkViewHtml", () => {
-  const page = "<!doctype html><html><head></head><body>hi</body></html>";
+  const page = "<!doctype html><title>x</title><!-- spec\n- Says hi\n--><body>hi</body>";
 
   it("passes a self-contained document", () => {
     expect(checkViewHtml(page)).toEqual([]);
@@ -51,10 +51,10 @@ describe("checkViewHtml", () => {
   it("catches escaped template placeholders", () => {
     // Runs without erroring and renders "${day}" as text, so nothing else
     // would catch it before the user saw it on screen.
-    const escaped = String.raw`${page}<script>el.textContent = \`\${day}\`</script>`;
+    const escaped = String.raw`${page}<script>Astro.view((s) => html\`\${s.day}\`)</script>`;
     expect(checkViewHtml(escaped).join(" ")).toContain("escapes template placeholders");
     // The correct form must stay clean.
-    expect(checkViewHtml(page + "<script>el.textContent = `${day}`</script>")).toEqual([]);
+    expect(checkViewHtml(page + "<script>Astro.view((s) => html`${s.day}`)</script>")).toEqual([]);
   });
 
   it("leaves inline data URIs alone — they are the sanctioned way to embed", () => {
@@ -75,6 +75,44 @@ describe("checkViewHtml", () => {
       expect(checkViewHtml(page + use).join(" "), use).toContain(VIEW_STATE_TYPE);
     }
   });
+
+  it("requires a spec, because it is the only record of what the user asked for", () => {
+    expect(checkViewHtml("<title>x</title><p>hi</p>").join(" ")).toContain("no spec");
+    expect(checkViewHtml("<title>x</title><!-- spec\n--><p>hi</p>").join(" ")).toContain("no spec");
+  });
+
+  it("keeps the screen and the message channels with the runtime", () => {
+    const view = "<script>Astro.view(() => html`x`)</script>";
+    const bypasses = [
+      "<script>Astro.view(() => html`x`); el.innerHTML = '<b>x</b>'</script>",
+      "<script>Astro.view(() => html`x`); document.write('x')</script>",
+      `${view}<script>parent.postMessage({ type: "astro:event" }, "*")</script>`,
+      `${view}<script>addEventListener("message", () => {})</script>`,
+      "<script>document.getElementById('a').textContent = 1</script>",
+    ];
+
+    for (const bypass of bypasses) {
+      expect(checkViewHtml(page + bypass), bypass).not.toEqual([]);
+    }
+    expect(checkViewHtml(page + view)).toEqual([]);
+  });
+});
+
+describe("viewSpec", () => {
+  it("reads one item per dash line", () => {
+    const html = "<title>x</title>\n<!-- spec\n- Adds income\n  - Adds expenses  \n-->";
+    expect(viewSpec(html)).toEqual(["Adds income", "Adds expenses"]);
+  });
+
+  it("is null when there is no spec block", () => {
+    expect(viewSpec("<title>x</title><!-- note -->")).toBeNull();
+  });
+
+  it("lists what an edit dropped, and nothing it kept or added", () => {
+    const before = "<!-- spec\n- A\n- B\n- C\n-->";
+    const after = "<!-- spec\n- A\n- C, now blue\n- D\n-->";
+    expect(removedSpecItems(before, after)).toEqual(["B", "C"]);
+  });
 });
 
 describe("viewTitle", () => {
@@ -85,49 +123,6 @@ describe("viewTitle", () => {
   it("falls back for a page with none, or one still streaming in", () => {
     expect(viewTitle("<body>x</body>")).toBe("Page");
     expect(viewTitle("<head><title>Sna")).toBe("Page");
-  });
-});
-
-describe("sealViewHtml", () => {
-  it("puts the policy inside head, ahead of anything head contains", () => {
-    const sealed = sealViewHtml("<!doctype html><html><head><title>x</title></head></html>");
-    expect(sealed).toContain('<head><meta http-equiv="Content-Security-Policy"');
-    // Ahead of the title, or the title parses under no policy at all.
-    expect(sealed.indexOf("Content-Security-Policy")).toBeLessThan(sealed.indexOf("<title>"));
-  });
-
-  it("falls back to just after the doctype when there is no head", () => {
-    const sealed = sealViewHtml("<!doctype html><body>x</body>");
-    expect(sealed.startsWith("<!doctype html><meta http-equiv=")).toBe(true);
-  });
-
-  it("still seals a bare fragment", () => {
-    expect(sealViewHtml("<p>x</p>").startsWith("<meta http-equiv=")).toBe(true);
-  });
-
-  it("is idempotent — a sealed document round-trips unchanged", () => {
-    // The edit loop starts from the sealed html the client sent back, so a
-    // non-idempotent seal would stack one meta tag per edit.
-    const sealed = sealViewHtml("<!doctype html><html><head></head><body>x</body></html>");
-    expect(sealViewHtml(sealed)).toBe(sealed);
-  });
-
-  it("still adds our policy to a page that wrote its own", () => {
-    // The browser enforces every CSP present, so a model-written `default-src *`
-    // cannot loosen ours — but only if writing one does not skip the seal.
-    const sealed = sealViewHtml(
-      '<head><meta http-equiv="Content-Security-Policy" content="default-src *"></head>',
-    );
-    expect(sealed).toContain(`content="${VIEW_CSP}"`);
-  });
-
-  it("puts the base styles ahead of the page's own, so the page wins", () => {
-    const sealed = sealViewHtml("<head><style>body{background:red}</style></head>");
-    expect(sealed.indexOf("color-scheme:dark")).toBeLessThan(sealed.indexOf("background:red"));
-  });
-
-  it("seals a half-written document streamed mid-run", () => {
-    expect(sealViewHtml("<!doctype html><html><he")).toContain(`content="${VIEW_CSP}"`);
   });
 });
 

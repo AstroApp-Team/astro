@@ -26,7 +26,9 @@ import { useEffect, useRef, useState } from "react";
 import {
   AUDIO_FORMAT_TYPE,
   AUDIO_SAMPLE_RATE,
+  parseRebuildViewArgs,
   parseRenderViewArgs,
+  REBUILD_VIEW_TOOL_NAME,
   RENDER_VIEW_TOOL_NAME,
   VOICE_MODEL_ID,
   VOICE_NAME,
@@ -35,6 +37,7 @@ import {
 import { realtimeSetupUrl } from "../lib/api.ts";
 import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
 import { faceForSession } from "../lib/astro/interaction.ts";
+import { sealViewHtml } from "../lib/seal-view.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
 import { useMediaQuery } from "../lib/use-media-query.ts";
@@ -65,6 +68,11 @@ const sessionConfig = {
     "already on screen without losing the user's place, so changing a running " +
     "page (or game) mid-use is cheap and encouraged — for a tweak, describe " +
     "just the change.\n\n" +
+    "When a page has outgrown quick edits — the user says things are broken, " +
+    "inconsistent or missing, a change broke something else, or the app reports " +
+    "errors from the page — call rebuild_view instead: a stronger model rewrites " +
+    "it cleanly from the features asked for so far, keeping the user's data. It " +
+    "is slower, so tell the user it will take a moment.\n\n" +
     "render_view returns the moment the work starts, not when the page is " +
     "ready. Say something to fill the wait, then stop and let the user speak. " +
     "Messages that begin with '(app status)' are the app talking to you, not " +
@@ -112,6 +120,18 @@ export default function VoiceSession({ password }: { password: string }) {
 
   const viewBuilder = useViewBuilder({ password });
 
+  /**
+   * Clicks inside a published view reach the model the same way a finished
+   * build does: as state here, spoken from an effect. Errors the live page
+   * throws are kept too — they ride along with the next build request.
+   */
+  const {
+    frameRef,
+    event: viewEvent,
+    pageErrors,
+    onFrameLoad,
+  } = useViewEvents({ finishedHtml: viewBuilder.finishedHtml });
+
   const realtime = experimental_useRealtime({
     model: voiceModel,
     api: { token: realtimeSetupUrl(password) },
@@ -129,6 +149,25 @@ export default function VoiceSession({ password }: { password: string }) {
      * actually news.
      */
     onToolCall: ({ toolCall }) => {
+      const errors = pageErrors.map((error) => error.message);
+
+      if (toolCall.toolName === REBUILD_VIEW_TOOL_NAME) {
+        const args = parseRebuildViewArgs(toolCall.args);
+        if (args == null) {
+          return { ok: false, error: "rebuild_view needs a non-empty `reason` string." };
+        }
+        if (!viewBuilder.hasView) {
+          return { ok: false, error: "There is no page on screen to rebuild. Use render_view." };
+        }
+
+        viewBuilder.build(args.reason, { mode: "rebuild", pageErrors: errors });
+        return {
+          ok: true,
+          status: "rebuilding",
+          note: "A stronger model is rewriting the page; it takes a while. Tell the user, then wait — you will get an (app status) message when it lands.",
+        };
+      }
+
       if (toolCall.toolName !== RENDER_VIEW_TOOL_NAME) {
         return { ok: false, error: `Astro has no tool called ${toolCall.toolName}.` };
       }
@@ -138,7 +177,7 @@ export default function VoiceSession({ password }: { password: string }) {
         return { ok: false, error: "render_view needs a non-empty `request` string." };
       }
 
-      viewBuilder.build(args.request);
+      viewBuilder.build(args.request, { pageErrors: errors });
       return {
         ok: true,
         status: "building",
@@ -192,16 +231,12 @@ export default function VoiceSession({ password }: { password: string }) {
   }, [viewBuilder.report]);
 
   /**
-   * Clicks inside a published view reach the model the same way a finished
-   * build does: as state here, spoken from an effect.
-   *
    * Every event goes into the conversation, but a *spoken* reaction is
    * throttled: a game posts an event per click, and a voice that starts
    * talking on each one would make the page unplayable. Between utterances
    * the model still accumulates the events silently, so its next turn knows
    * everything that happened.
    */
-  const { frameRef, event: viewEvent, onFrameLoad } = useViewEvents();
   const lastSpokenEventRef = useRef(0);
 
   useEffect(() => {
@@ -211,6 +246,17 @@ export default function VoiceSession({ password }: { password: string }) {
     if (speak) lastSpokenEventRef.current = Date.now();
     reportRef.current(describeViewEvent(viewEvent), { speak });
   }, [viewEvent]);
+
+  /**
+   * A page error goes into the conversation silently: the user may not have
+   * noticed, but the model should know when it next decides whether a page
+   * needs a rebuild rather than another edit.
+   */
+  const latestPageError = pageErrors.at(-1);
+  useEffect(() => {
+    if (latestPageError == null) return;
+    reportRef.current(`The page threw an error: ${latestPageError.message}`, { speak: false });
+  }, [latestPageError]);
 
   /**
    * Connected time, shown beside the cost. Stopping on unmount matters: the
@@ -582,7 +628,7 @@ export default function VoiceSession({ password }: { password: string }) {
                 className="voice-view"
                 title={viewBuilder.screen.title}
                 sandbox="allow-scripts"
-                srcDoc={viewBuilder.screen.html}
+                srcDoc={sealViewHtml(viewBuilder.screen.html)}
                 onLoad={onFrameLoad}
               />
             )}

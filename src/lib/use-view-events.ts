@@ -3,9 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import {
   parseViewEvent,
   parseViewState,
+  VIEW_ERROR_TYPE,
   VIEW_STATE_TYPE,
   type ViewEvent,
 } from "../../shared/view.ts";
+
+/** Enough to show a pattern to the coding agent, few enough to fit `pageErrors`. */
+const MAX_PAGE_ERRORS = 5;
+
+/** A live page's uncaught error. The id makes a repeat of the same text news again. */
+export type PageError = { id: number; message: string };
 
 /**
  * The parent's side of both channels a published view has: events (things the
@@ -23,9 +30,21 @@ import {
  * function during render that touches one is what the React Compiler refuses to
  * optimize.
  */
-export function useViewEvents() {
+export function useViewEvents({ finishedHtml }: { finishedHtml: string | null }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [event, setEvent] = useState<ViewEvent | null>(null);
+
+  /**
+   * Errors are tagged with the page they came from and only count while that
+   * page is still the one on screen: an edit replaces the code that threw.
+   * `finishedHtml` is null while a draft is streaming in — a half-written
+   * script throws by construction, and that is not a bug worth reporting.
+   */
+  const [errors, setErrors] = useState<{ html: string; list: PageError[] }>({ html: "", list: [] });
+  const finishedHtmlRef = useRef(finishedHtml);
+  useEffect(() => {
+    finishedHtmlRef.current = finishedHtml;
+  }, [finishedHtml]);
 
   /**
    * A ref, not state: nothing renders from it. The page posts state whenever
@@ -41,6 +60,19 @@ export function useViewEvents() {
       const state = parseViewState(message.data);
       if (state != null) {
         savedStateRef.current = state.state;
+        return;
+      }
+
+      const error = parseViewError(message.data);
+      if (error != null) {
+        const html = finishedHtmlRef.current;
+        if (html == null) return;
+        setErrors((previous) => {
+          const list = previous.html === html ? previous.list : [];
+          if (list.some((known) => known.message === error)) return previous;
+          const id = (previous.list.at(-1)?.id ?? 0) + 1;
+          return { html, list: [...list, { id, message: error }].slice(-MAX_PAGE_ERRORS) };
+        });
         return;
       }
 
@@ -65,7 +97,20 @@ export function useViewEvents() {
     target.postMessage({ type: VIEW_STATE_TYPE, state: savedStateRef.current }, "*");
   };
 
-  return { frameRef, event, onFrameLoad };
+  const pageErrors = errors.html === finishedHtml ? errors.list : [];
+
+  return { frameRef, event, pageErrors, onFrameLoad };
+}
+
+/** The parent-side check for `astro:error`: a short string, nothing else. */
+export function parseViewError(data: unknown): string | null {
+  if (typeof data !== "object" || data === null) return null;
+
+  const { type, message } = data as { type?: unknown; message?: unknown };
+  if (type !== VIEW_ERROR_TYPE || typeof message !== "string" || message.trim() === "") {
+    return null;
+  }
+  return message.slice(0, 300);
 }
 
 /** Phrased for the voice model, which has to describe this out loud. */

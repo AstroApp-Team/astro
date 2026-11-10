@@ -1,9 +1,16 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import { describeProgress, viewTitle, type View, type ViewUIMessage } from "../../shared/view.ts";
+import {
+  describeProgress,
+  removedSpecItems,
+  viewTitle,
+  type View,
+  type ViewUIMessage,
+} from "../../shared/view.ts";
 import { viewUrl } from "./api.ts";
+import { runViewCheck } from "./view-check.ts";
 import { addViewCost } from "./voice-usage.ts";
 
 /**
@@ -15,8 +22,8 @@ const transport = new DefaultChatTransport<ViewUIMessage>({
   api: viewUrl(),
   /**
    * `/api/view` takes one request, not a transcript. The coding agent is
-   * stateless and reads whatever it is editing through `inspect_current_view`,
-   * so shipping the history would pay for the same HTML on every turn.
+   * stateless and gets the page it is editing as `currentHtml`, so shipping the
+   * history would pay for the same HTML on every turn.
    */
   prepareSendMessagesRequest: ({ messages, body }) => ({
     body: { ...body, request: lastText(messages) },
@@ -29,6 +36,16 @@ function lastText(messages: ViewUIMessage[]): string {
 }
 
 /**
+ * How many times a failed runtime check is sent straight back to the coding
+ * agent before the page is reported as landed-with-problems. Each round is a
+ * few seconds on the fast model; past two, the page needs a rebuild, and that
+ * is the voice model's call.
+ */
+const MAX_AUTO_FIXES = 2;
+
+export type BuildMode = "edit" | "rebuild";
+
+/**
  * News the voice agent has to be told, because nobody said it out loud. The id
  * makes each one distinct: two identical failures in a row are still two
  * things worth mentioning, and state that compares equal would swallow the
@@ -39,14 +56,14 @@ export type ViewReport = { id: number; text: string };
 /**
  * Drives the coding agent and holds whatever it last published.
  *
+ * Every finished page is run once in a hidden frame (`runViewCheck`) before it
+ * is reported. Problems go straight back to the agent as a fix request, up to
+ * `MAX_AUTO_FIXES` times, without bothering the voice model.
+ *
  * `report` is published as state rather than fired through a callback so the
  * caller can send it from an effect. The voice session reaches its socket
  * through a ref, and handing a ref-reading callback down through render is
  * what makes the React Compiler skip the component entirely.
- *
- * Only landing and failing are reported. Progress in between stays on screen
- * and out of the conversation — narrating every step aloud would be worse than
- * silence.
  */
 export function useViewBuilder({ password }: { password: string }) {
   const [view, setView] = useState<View | null>(null);
@@ -67,7 +84,61 @@ export function useViewBuilder({ password }: { password: string }) {
    */
   const [failure, setFailure] = useState<string | null>(null);
 
+  /**
+   * One user request, across the automatic fix rounds it may take. `baseline`
+   * is the page as it was before the request, so the report can say which
+   * spec items the whole run dropped. `landed` is the page a request has
+   * finished with, checked once its stream has closed.
+   */
+  const runRef = useRef({
+    id: 0,
+    fixes: 0,
+    baseline: null as string | null,
+    landed: null as View | null,
+  });
+
   const say = (text: string) => setReport((previous) => ({ id: (previous?.id ?? 0) + 1, text }));
+
+  const send = (
+    request: string,
+    options: { mode: BuildMode; currentHtml: string | null; pageErrors?: string[] },
+  ) => {
+    void sendMessage(
+      { text: request },
+      {
+        body: {
+          password,
+          mode: options.mode,
+          ...(options.currentHtml != null && { currentHtml: options.currentHtml }),
+          ...(options.pageErrors != null &&
+            options.pageErrors.length > 0 && { pageErrors: options.pageErrors }),
+        },
+      },
+    );
+  };
+
+  /** Runs once the stream has closed, so a fix request never overlaps it. */
+  const check = async (landed: View) => {
+    const run = runRef.current;
+    const id = run.id;
+    setStatus("Checking the page…");
+    const problems = await runViewCheck(landed.html);
+    if (runRef.current.id !== id) return;
+
+    if (problems.length > 0 && run.fixes < MAX_AUTO_FIXES) {
+      run.fixes += 1;
+      setStatus(`Fixing ${problems.length} problem${problems.length === 1 ? "" : "s"}…`);
+      send(
+        "Running the page found these problems. Fix them without changing anything else:\n" +
+          problems.map((problem) => `- ${problem}`).join("\n"),
+        { mode: "edit", currentHtml: landed.html },
+      );
+      return;
+    }
+
+    setStatus(null);
+    say(describeLanding(landed, run.baseline, problems));
+  };
 
   const { sendMessage } = useChat<ViewUIMessage>({
     transport,
@@ -79,9 +150,14 @@ export function useViewBuilder({ password }: { password: string }) {
       if (part.type === "data-view") {
         setView(part.data);
         setDraft(null);
-        setStatus(null);
-        say(`The page is on screen, titled "${part.data.title}".`);
+        runRef.current.landed = part.data;
       }
+    },
+    onFinish: ({ isAbort, isError }) => {
+      const landed = runRef.current.landed;
+      runRef.current.landed = null;
+      if (isAbort || isError || landed == null) return;
+      void check(landed);
     },
     onError: (error) => {
       setDraft(null);
@@ -100,14 +176,51 @@ export function useViewBuilder({ password }: { password: string }) {
    * re-binds `onToolCall` on every render, so the closure that reaches this is
    * always the current one.
    */
-  const build = (request: string) => {
-    setStatus("Starting…");
+  const build = (
+    request: string,
+    { mode = "edit", pageErrors }: { mode?: BuildMode; pageErrors?: string[] } = {},
+  ) => {
+    runRef.current = {
+      id: runRef.current.id + 1,
+      fixes: 0,
+      baseline: view?.html ?? null,
+      landed: null,
+    };
+    setStatus(mode === "rebuild" ? "Rebuilding the app — this takes a little while…" : "Starting…");
     setFailure(null);
-    void sendMessage(
-      { text: request },
-      { body: { password, ...(view != null && { currentHtml: view.html }) } },
-    );
+    send(request, {
+      mode,
+      currentHtml: view?.html ?? null,
+      ...(pageErrors != null && { pageErrors }),
+    });
   };
 
-  return { screen, status, failure, report, build };
+  return {
+    screen,
+    /** The finished page, or null while a draft is on screen instead. */
+    finishedHtml: draft == null ? (view?.html ?? null) : null,
+    hasView: view != null,
+    status,
+    failure,
+    report,
+    build,
+  };
+}
+
+/** Phrased for the voice model, which decides what is worth saying aloud. */
+export function describeLanding(landed: View, baseline: string | null, problems: string[]): string {
+  let text = `The page is on screen, titled "${landed.title}".`;
+
+  const removed = baseline == null ? [] : removedSpecItems(baseline, landed.html);
+  if (removed.length > 0) {
+    text +=
+      ` It no longer lists these features: ${removed.join("; ")}. If the user did not ask ` +
+      "for that, have them put back.";
+  }
+  if (problems.length > 0) {
+    text +=
+      ` A check still finds problems: ${problems.join("; ")}. If the page keeps misbehaving, ` +
+      "rebuild_view rewrites it cleanly.";
+  }
+  return text;
 }

@@ -263,6 +263,9 @@ importers:
       hono:
         specifier: 4.13.3
         version: 4.13.3
+      htm:
+        specifier: 3.1.1
+        version: 3.1.1
       ionicons:
         specifier: 8.1.0
         version: 8.1.0
@@ -305,7 +308,7 @@ importers:
         version: 1.53.1(@voidzero-dev/vite-plus-core@1.5.1(@types/node@24.10.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@6.0.3))(wrangler@4.125.0)
       '@cloudflare/vitest-plugin':
         specifier: 1.6.0
-        version: 1.6.0(@types/node@24.10.1)(vitest@5.1.0)
+        version: 1.6.0(@types/node@24.10.1)(vitest@5.1.0(@types/node@24.10.1)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0(vitest@5.1.0))(@voidzero-dev/vite-plus-core@1.5.1(@types/node@24.10.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@6.0.3))(happy-dom@21.0.4))
       '@testing-library/react':
         specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.2.3(@types/react@19.2.7))(@types/react@19.2.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -2747,6 +2750,9 @@ packages:
     resolution: {integrity: sha512-r8AO2mYHoLxSHkgafNeC/BXyb2vWRxD3jem4Ts+ptav8oTG5FIRifAjuJEmZI4bSvvc2ns0GxmIYiZnHqN3mMw==}
     engines: {node: '>=16.9.0'}
 
+  htm@3.1.1:
+    resolution: {integrity: sha512-983Vyg8NwUE7JkZ6NmOqpCZ+sh1bKv2iYTlUkzlWmA5JD2acKoxd4KVxbMmxX/85mtfdnDmTFoNKcg5DGAvxNQ==}
+
   html-dom-parser@5.1.8:
     resolution: {integrity: sha512-MCIUng//mF2qTtGHXJWr6OLfHWmg3Pm8ezpfiltF83tizPWY17JxT4dRLE8lykJ5bChJELoY3onQKPbufJHxYA==}
 
@@ -3620,7 +3626,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@cloudflare/vitest-plugin@1.6.0(@types/node@24.10.1)(vitest@5.1.0)':
+  '@cloudflare/vitest-plugin@1.6.0(@types/node@24.10.1)(vitest@5.1.0(@types/node@24.10.1)(@vitest/browser-preview@5.1.0)(@vitest/ui@5.1.0(vitest@5.1.0))(@voidzero-dev/vite-plus-core@1.5.1(@types/node@24.10.1)(esbuild@0.28.2)(tsx@4.23.12)(typescript@6.0.3))(happy-dom@21.0.4))':
     dependencies:
       cjs-module-lexer: 1.2.3
       esbuild: 0.28.2
@@ -5198,6 +5204,8 @@ snapshots:
       - utf-8-validate
 
   hono@4.13.3: {}
+
+  htm@3.1.1: {}
 
   html-dom-parser@5.1.8:
     dependencies:

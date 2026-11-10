@@ -21,6 +21,10 @@ export const PasswordSchema = z.object({
 export const ViewRequestSchema = PasswordSchema.extend({
   request: z.string().min(1).max(2000),
   currentHtml: z.string().max(MAX_VIEW_HTML_BYTES).optional(),
+  /** `rebuild` hands the page to the strong model for a rewrite from its spec. */
+  mode: z.enum(["edit", "rebuild"]).default("edit"),
+  /** What the page on screen threw while in use — the bugs no static check sees. */
+  pageErrors: z.array(z.string().max(300)).max(5).optional(),
 });
 
 /**
