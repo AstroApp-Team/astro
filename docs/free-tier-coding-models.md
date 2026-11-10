@@ -7,6 +7,10 @@ Researched 2026-08-24, when `VIEW_MODEL_ID` moved from `openai/gpt-oss-120b` to
 is `deepseek/deepseek-v4.1-flash-1017`. This page stays as the record of the
 free-tier choice, and is the fallback if the credits run out.
 
+**Then 2026-11-10:** `VIEW_MODEL_ID` is `anthropic/claude-haiku-5.5` — cheaper
+than DeepSeek, and its provider streams tool arguments, which live rendering
+needs. The measurements are on `VIEW_MODEL_ID` in `worker/view-agent.ts`.
+
 ## What the free tier actually gates
 
 `https://vercel.com/ai-gateway/models` carries a per-model `availableToFreeTier`

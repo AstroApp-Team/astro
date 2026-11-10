@@ -554,7 +554,7 @@ export default function VoiceSession({ password }: { password: string }) {
             </aside>
           )}
           <div className="voice-stage">
-            {viewBuilder.view == null ? (
+            {viewBuilder.screen == null ? (
               <div className="voice-stage__empty">
                 <p>Tap Astro and just talk.</p>
                 <IonNote>
@@ -573,13 +573,16 @@ export default function VoiceSession({ password }: { password: string }) {
                * `onLoad` hands the previous page's saved state to the new one —
                * this is what lets the coding agent edit a game mid-play without
                * resetting the score.
+               *
+               * `screen` changes every few hundred milliseconds while a page
+               * streams in, so the user watches it being built.
                */
               <iframe
                 ref={frameRef}
                 className="voice-view"
-                title={viewBuilder.view.title}
+                title={viewBuilder.screen.title}
                 sandbox="allow-scripts"
-                srcDoc={viewBuilder.view.html}
+                srcDoc={viewBuilder.screen.html}
                 onLoad={onFrameLoad}
               />
             )}

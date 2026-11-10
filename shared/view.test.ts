@@ -7,8 +7,10 @@ import {
   parseViewEvent,
   parseViewState,
   sealViewHtml,
+  VIEW_CSP,
   VIEW_EVENT_TYPE,
   VIEW_STATE_TYPE,
+  viewTitle,
 } from "./view.ts";
 
 /**
@@ -58,6 +60,32 @@ describe("checkViewHtml", () => {
   it("leaves inline data URIs alone — they are the sanctioned way to embed", () => {
     expect(checkViewHtml(`${page}<img src="data:image/gif;base64,R0lGOD">`)).toEqual([]);
   });
+
+  it("catches browser storage, which throws on the sandbox's opaque origin", () => {
+    // Found live: asked for a high score that "survives restarts", the model
+    // reached for localStorage — a SecurityError that stops the whole script.
+    const uses = [
+      "<script>localStorage.setItem('high', 3)</script>",
+      "<script>const s = window.sessionStorage</script>",
+      "<script>indexedDB.open('x')</script>",
+      "<script>document.cookie = 'a=1'</script>",
+    ];
+
+    for (const use of uses) {
+      expect(checkViewHtml(page + use).join(" "), use).toContain(VIEW_STATE_TYPE);
+    }
+  });
+});
+
+describe("viewTitle", () => {
+  it("reads the page's own <title>", () => {
+    expect(viewTitle("<head><title> Snake </title></head>")).toBe("Snake");
+  });
+
+  it("falls back for a page with none, or one still streaming in", () => {
+    expect(viewTitle("<body>x</body>")).toBe("Page");
+    expect(viewTitle("<head><title>Sna")).toBe("Page");
+  });
 });
 
 describe("sealViewHtml", () => {
@@ -82,6 +110,24 @@ describe("sealViewHtml", () => {
     // non-idempotent seal would stack one meta tag per edit.
     const sealed = sealViewHtml("<!doctype html><html><head></head><body>x</body></html>");
     expect(sealViewHtml(sealed)).toBe(sealed);
+  });
+
+  it("still adds our policy to a page that wrote its own", () => {
+    // The browser enforces every CSP present, so a model-written `default-src *`
+    // cannot loosen ours — but only if writing one does not skip the seal.
+    const sealed = sealViewHtml(
+      '<head><meta http-equiv="Content-Security-Policy" content="default-src *"></head>',
+    );
+    expect(sealed).toContain(`content="${VIEW_CSP}"`);
+  });
+
+  it("puts the base styles ahead of the page's own, so the page wins", () => {
+    const sealed = sealViewHtml("<head><style>body{background:red}</style></head>");
+    expect(sealed.indexOf("color-scheme:dark")).toBeLessThan(sealed.indexOf("background:red"));
+  });
+
+  it("seals a half-written document streamed mid-run", () => {
+    expect(sealViewHtml("<!doctype html><html><he")).toContain(`content="${VIEW_CSP}"`);
   });
 });
 

@@ -8,10 +8,10 @@
  *
  * Three layers hold the freedom in:
  *
- *   1. `publish_view` is the only way out of the agent loop, so the Worker
- *      never has to dig an artifact out of prose.
- *   2. `checkViewHtml` is a static gate the agent can call itself and fix
- *      against — its problem list is the agent's feedback signal.
+ *   1. The page only leaves the agent loop through its tools (`write_view`,
+ *      `edit_view`), so the Worker never has to dig an artifact out of prose.
+ *   2. `checkViewHtml` runs on every tool result, so its problem list is the
+ *      agent's feedback signal — and a run only ends on a page that passes.
  *   3. The iframe renders with `sandbox="allow-scripts"` and *no*
  *      `allow-same-origin`, which puts the document on an opaque origin: no
  *      parent DOM, no cookies, no storage. `sealViewHtml` adds the CSP that
@@ -34,9 +34,15 @@ export const MAX_VIEW_HTML_BYTES = 96 * 1024;
  * the model to get right, and it cannot be talked out of it. `'unsafe-inline'`
  * looks alarming and is not: inline script *is* the artifact, and `default-src
  * 'none'` means that script can reach nothing outside its own document.
+ *
+ * `'unsafe-eval'` for the same reason: eval only runs more code inside the same
+ * jail. Without it `Function(expr)()` throws — and that is how a model writes
+ * every calculator, which then answers "Error" to 7×12 with nothing wrong in
+ * the page to point at.
  */
 export const VIEW_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:";
+  "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval'; " +
+  "img-src data:; font-src data:";
 
 /** The one message shape the parent will listen to. Anything else is dropped. */
 export const VIEW_EVENT_TYPE = "astro:event";
@@ -57,7 +63,13 @@ export const VIEW_STATE_TYPE = "astro:state";
  */
 export const MAX_VIEW_STATE_BYTES = 32 * 1024;
 
-export type View = { title: string; html: string; summary: string };
+export type View = { title: string; html: string };
+
+/** The page's own `<title>`, so the agent names a page by writing it once. */
+export function viewTitle(html: string): string {
+  const title = /<title[^>]*>([^<]*)<\/title>/i.exec(html)?.[1]?.trim();
+  return title != null && title !== "" ? title.slice(0, 80) : "Page";
+}
 
 /** What a view is allowed to tell the voice agent about. */
 export type ViewEvent = { name: string; value?: string | number | boolean };
@@ -71,7 +83,6 @@ export type ViewEvent = { name: string; value?: string | number | boolean };
 export type ViewProgress =
   | { phase: "writing" }
   | { phase: "editing" }
-  | { phase: "checking" }
   | { phase: "fixing"; problems: string[] };
 
 /** One line of status for the user, from the same data. */
@@ -81,8 +92,6 @@ export function describeProgress(progress: ViewProgress): string {
       return "Writing the page…";
     case "editing":
       return "Editing the page…";
-    case "checking":
-      return "Checking it…";
     case "fixing":
       return `Fixing ${progress.problems.length} problem${
         progress.problems.length === 1 ? "" : "s"
@@ -92,15 +101,19 @@ export function describeProgress(progress: ViewProgress): string {
 
 /**
  * The stream from `/api/view`, typed end to end: `data-progress` is transient
- * (status, not history), `data-view` is the finished document, and
- * `data-cost` is one step's bill, sent as each step ends so a build that
- * fails is still paid for on screen.
+ * (status, not history); `data-draft` is the sealed page as it stands mid-run —
+ * half-written while `write_view` streams, patched after each `edit_view`;
+ * `data-view` is the finished document; and `data-cost` is one step's bill,
+ * sent as each step ends so a build that fails is still paid for on screen.
+ *
+ * A draft is shown but never sent back as `currentHtml`: only a `data-view`
+ * passed the checks, so a run that fails leaves the last good page to edit.
  *
  * `UIMessage`'s first parameter is metadata, which this stream has none of.
  */
 export type ViewUIMessage = UIMessage<
   never,
-  { progress: ViewProgress; view: View; cost: { usd: number } }
+  { progress: ViewProgress; draft: { html: string }; view: View; cost: { usd: number } }
 >;
 
 const EXTERNAL_URL_PATTERNS: [RegExp, string][] = [
@@ -153,6 +166,21 @@ export function checkViewHtml(html: string): string[] {
   }
 
   /**
+   * Every storage API throws a SecurityError on the sandbox's opaque origin,
+   * and a throw at startup takes the whole script down with it — the page
+   * renders and nothing responds. Models reach for `localStorage` by reflex
+   * whenever something should "survive", so this is caught, not just
+   * mentioned in the prompt.
+   */
+  if (/\b(?:localStorage|sessionStorage|indexedDB)\b|\bdocument\s*\.\s*cookie\b/.test(html)) {
+    problems.push(
+      "The document uses browser storage (localStorage, sessionStorage, indexedDB or " +
+        "cookies), which throws in this sandbox and stops the script. Keep the value in a " +
+        `variable, and if it must survive your edits, use the "${VIEW_STATE_TYPE}" message.`,
+    );
+  }
+
+  /**
    * `\${x}` inside a template literal is the literal text "${x}", not the value
    * of x — so the page renders its own source. Models reach for this escape
    * when they are thinking about the JSON they are writing the code into, and
@@ -170,10 +198,31 @@ export function checkViewHtml(html: string): string[] {
 }
 
 /**
- * Adds the CSP the sandbox cannot set on its own. A `<meta http-equiv>` policy
- * only applies to content that parses after it, so it goes as early as the
- * document allows: inside `<head>` if there is one, otherwise ahead of
- * everything, where the parser will hoist it into the implied head.
+ * A few lines of classless defaults, injected ahead of the page's own styles
+ * so the agent can skip styling entirely and still get a page that is legible,
+ * fills the frame, has finger-sized controls and sits on the app's own ink
+ * background. Anything the page writes overrides it. The agent's prompt tells
+ * it what is here — keep the two in step.
+ */
+export const VIEW_BASE_CSS =
+  ":root{color-scheme:dark;font:18px/1.4 system-ui,sans-serif}" +
+  "*{box-sizing:border-box}" +
+  "html,body{margin:0;min-height:100%}" +
+  "body{padding:16px;background:#1a152c;color:#f3effa}" +
+  "button,input,select,textarea{font:inherit;color:inherit;padding:.5em .8em;" +
+  "border:1px solid #4a4266;border-radius:10px;background:#2a2344}" +
+  "button{cursor:pointer}button:active{background:#3a3159}" +
+  "canvas,svg{max-width:100%}";
+
+/**
+ * Adds the CSP the sandbox cannot set on its own, and the base stylesheet. A
+ * `<meta http-equiv>` policy only applies to content that parses after it, so
+ * it goes as early as the document allows: inside `<head>` if there is one,
+ * otherwise ahead of everything, where the parser will hoist it into the
+ * implied head.
+ *
+ * Also runs on half-written documents streamed mid-run: everything that
+ * reaches the iframe goes through here.
  */
 export function sealViewHtml(html: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${VIEW_CSP}">`;
@@ -181,23 +230,27 @@ export function sealViewHtml(html: string): string {
   /**
    * Idempotent on purpose: an edited page starts from the *sealed* document
    * the client sent back, so re-sealing on every publish would stack a meta
-   * tag per edit.
+   * tag per edit. Keyed on our exact tag rather than any CSP meta — a page
+   * that writes its own, looser policy still gets ours, and the browser
+   * enforces both.
    */
-  if (html.includes('http-equiv="Content-Security-Policy"')) return html;
+  if (html.includes(meta)) return html;
+
+  const seal = `${meta}<style>${VIEW_BASE_CSS}</style>`;
 
   const head = /<head\b[^>]*>/i.exec(html);
   if (head != null) {
     const at = head.index + head[0].length;
-    return html.slice(0, at) + meta + html.slice(at);
+    return html.slice(0, at) + seal + html.slice(at);
   }
 
   const doctype = /<!doctype html>/i.exec(html);
   if (doctype != null) {
     const at = doctype.index + doctype[0].length;
-    return html.slice(0, at) + meta + html.slice(at);
+    return html.slice(0, at) + seal + html.slice(at);
   }
 
-  return meta + html;
+  return seal + html;
 }
 
 /**
