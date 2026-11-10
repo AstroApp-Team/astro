@@ -5,14 +5,14 @@ allowBuilds:
   esbuild: true
 
 catalog:
-  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
-  vite-plus: 0.2.9
+  vite: npm:@voidzero-dev/vite-plus-core@1.5.1
+  vite-plus: 1.5.1
 
-  # Vitest must match the version bundled inside vite-plus exactly.
-  # @cloudflare/vitest-plugin peers on ^4.1.0 and fails if two copies resolve.
-  vitest: 4.1.10
-  "@vitest/runner": 4.1.10
-  "@vitest/snapshot": 4.1.10
+  # Vitest must match the version bundled inside vite-plus exactly, or
+  # @cloudflare/vitest-plugin resolves two copies and fails. `vp migrate`
+  # re-pins both entries when vite-plus moves.
+  vitest: 5.1.0
+  "@vitest/snapshot": 5.1.0
 
   react: 19.2.8
   react-dom: 19.2.8
@@ -20,14 +20,14 @@ catalog:
   "@types/react-dom": 19.2.3
 
 overrides:
-  vite: "catalog:"
-  # Force a single Vitest instance across the tree.
-  vitest: "catalog:"
-  "@vitest/runner": "catalog:"
   "@vitest/snapshot": "catalog:"
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
 
 peerDependencyRules:
   allowAny:
     - vite
+    - vitest
   allowedVersions:
     vite: "*"
+    vitest: "*"

@@ -288,6 +288,8 @@ export default function VoiceSession({ password }: { password: string }) {
   const start = async () => {
     setError(null);
     setNotice(null);
+    /* Hanging up while muted must not leave the next session muted. */
+    setMuted(false);
 
     /*
      * `navigator.mediaDevices` is undefined outside a secure context, and reading
@@ -433,11 +435,6 @@ export default function VoiceSession({ password }: { password: string }) {
     setMuted(true);
   };
 
-  /* Hanging up while muted must not leave the next session muted. */
-  useEffect(() => {
-    if (!isLive) setMuted(false);
-  }, [isLive]);
-
   /**
    * The transcript is a sheet, not a column: the app the coding agent builds is
    * the page, and the conversation is something you open. A transcript sharing
@@ -457,15 +454,17 @@ export default function VoiceSession({ password }: { password: string }) {
     if (transcriptOpen) transcriptEndRef.current?.scrollIntoView({ block: "end" });
   }, [transcriptOpen, messages]);
 
-  const activity = muted
-    ? "muted"
-    : isPlaying
-      ? "speaking"
-      : isCapturing
-        ? "listening"
-        : status === "connecting"
-          ? "connecting"
-          : null;
+  const activity = !isLive
+    ? null
+    : muted
+      ? "muted"
+      : isPlaying
+        ? "speaking"
+        : isCapturing
+          ? "listening"
+          : status === "connecting"
+            ? "connecting"
+            : null;
 
   return (
     <>

@@ -46,3 +46,4 @@ dist-ssr
 # platform would silently drop it. Capacitor ships a .gitignore inside each
 # platform that already excludes build output, `local.properties` and the
 # copied web assets, so tracking the folder costs almost nothing.
+.vitest/

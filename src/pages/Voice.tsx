@@ -12,7 +12,6 @@ import {
 import { lockOpenOutline, trashOutline } from "ionicons/icons";
 import { useState } from "react";
 
-import AstroOverlay from "../components/astro/AstroOverlay.tsx";
 import PasswordGate from "../components/PasswordGate.tsx";
 import VoiceSession from "../components/VoiceSession.tsx";
 import { setPassword, usePassword } from "../lib/password.ts";
@@ -31,50 +30,39 @@ export default function Voice() {
   const usd = usageToUsd(useVoiceUsage());
 
   return (
-    <>
-      <IonPage>
-        <IonHeader>
-          <IonToolbar>
-            <IonTitle>Astro</IonTitle>
-            {password !== "" && (
-              <IonButtons slot="end">
-                {/* The total only; the breakdown and the reset are in the transcript sheet. */}
-                <IonNote className="voice-cost" title="Spent so far">
-                  ${usd.toFixed(4)}
-                </IonNote>
-                <IonButton
-                  onClick={() => setSessionKey((key) => key + 1)}
-                  title="Clear the conversation"
-                >
-                  <IonIcon slot="icon-only" icon={trashOutline} />
-                </IonButton>
-                <IonButton onClick={() => setPassword("")} title="Forget the password">
-                  <IonIcon slot="icon-only" icon={lockOpenOutline} />
-                </IonButton>
-              </IonButtons>
-            )}
-          </IonToolbar>
-        </IonHeader>
+    <IonPage>
+      <IonHeader>
+        <IonToolbar>
+          <IonTitle>Astro</IonTitle>
+          {password !== "" && (
+            <IonButtons slot="end">
+              {/* The total only; the breakdown and the reset are in the transcript sheet. */}
+              <IonNote className="voice-cost" title="Spent so far">
+                ${usd.toFixed(4)}
+              </IonNote>
+              <IonButton
+                onClick={() => setSessionKey((key) => key + 1)}
+                title="Clear the conversation"
+              >
+                <IonIcon slot="icon-only" icon={trashOutline} />
+              </IonButton>
+              <IonButton onClick={() => setPassword("")} title="Forget the password">
+                <IonIcon slot="icon-only" icon={lockOpenOutline} />
+              </IonButton>
+            </IonButtons>
+          )}
+        </IonToolbar>
+      </IonHeader>
 
-        {/* `VoiceSession` brings its own content, footer bar and transcript sheet: the
+      {/* `VoiceSession` brings its own content, footer bar and transcript sheet: the
             generated app is the whole page, and the conversation is something you open. */}
-        {password === "" ? (
-          <IonContent className="ion-padding">
-            <PasswordGate />
-          </IonContent>
-        ) : (
-          <VoiceSession key={sessionKey} password={password} />
-        )}
-      </IonPage>
-
-      {/*
-       * The character is drawn over this page, not inside it, and whether or not the
-       * password is in place: a phone can be handed over and the WebGL path checked in
-       * the WebView with no Gateway key and no socket. He is in the bottom-right corner,
-       * and the layer is `pointer-events: none`, so nothing underneath him stops working.
-       * The page keeps that corner clear: the footer bar packs its buttons to the left.
-       */}
-      <AstroOverlay />
-    </>
+      {password === "" ? (
+        <IonContent className="ion-padding">
+          <PasswordGate />
+        </IonContent>
+      ) : (
+        <VoiceSession key={sessionKey} password={password} />
+      )}
+    </IonPage>
   );
 }

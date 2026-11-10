@@ -10,6 +10,10 @@ Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.de
 
 `vp <name>` runs a built-in command. `vp run <name>` runs a `package.json` script or a `vite.config.ts` task. Scripts cannot overwrite built-ins, so `vp dev` and `vp run dev` may do different things. Check `package.json` and `vite.config.ts` first, and run `vp run <name>` when the project defines a script or task with that name.
 
+## Running Scripts
+
+Run TypeScript and JavaScript files with `vpx <file>`, for example `vpx ./scripts/seed.ts --dry-run`. It handles enums, decorators, JSX, and tsconfig `paths`, so do not add `tsx` or `ts-node` to run scripts. `vpx --watch <file>` reruns the file when a file it uses changes, in place of `tsx watch`. `vp node <file>` runs plain Node.js.
+
 ## Tool Versions
 
 Run `vp toolchain` to show versions and relationships in the active Vite+
@@ -53,8 +57,11 @@ projects (`app`, `worker`, `node`) share strict settings from
   `worker/index.ts` into separate statements silently degrades RPC types to
   `any` — the client still compiles, it just stops type-checking.
 - **Import test helpers from `vite-plus/test`, never `vitest`.** Vite+ re-exports
-  its bundled Vitest 4.1.10; `vitest` is pinned in the catalog to that exact
-  version because `@cloudflare/vitest-plugin` needs to resolve one copy.
+  its bundled Vitest (`vp toolchain vitest` shows which); `vitest` is pinned in
+  the catalog to that exact version because `@cloudflare/vitest-plugin` needs to
+  resolve one copy. To upgrade Vite+, run `vp upgrade <version>` then `vp migrate`:
+  it re-pins `vite-plus`, the `vite` alias and `vitest` together. Delete the
+  Vitest-compat shims it adds to `vite.config.ts` if the tests pass without them.
 - **`cloudflare()` is disabled under Vitest** (see the `isVitest` guard in
   `vite.config.ts`). Vite+ injects `resolve.external` into every environment and
   the Cloudflare plugin rejects that on Worker environments, so `vp test` cannot
