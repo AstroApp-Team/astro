@@ -22,7 +22,11 @@ export default defineConfig({
     // experimental; the stable fallback is:
     //   react(), babel({ presets: [reactCompilerPreset()] })
     // via @rolldown/plugin-babel + babel-plugin-react-compiler.
-    react({ compiler: true }),
+    //
+    // `all_errors` turns a skipped component into a build error. The default
+    // only logs a warning, which is how VoiceSession and AstroOverlay went
+    // uncompiled without anyone noticing.
+    react({ compiler: { panicThreshold: "all_errors" } }),
     ...(isVitest ? [] : [cloudflare()]),
   ]),
 
@@ -62,7 +66,7 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["src/**/*.test.ts", "worker/**/*.test.ts", "shared/**/*.test.ts"],
+          include: ["src/**/*.test.{ts,tsx}", "worker/**/*.test.ts", "shared/**/*.test.ts"],
           // *.workers.test.ts belongs to the workers project below; without this
           // the node project also matches it and fails on `cloudflare:test`.
           exclude: ["**/*.workers.test.ts"],

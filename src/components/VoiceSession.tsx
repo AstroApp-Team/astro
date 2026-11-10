@@ -36,6 +36,7 @@ import { realtimeSetupUrl } from "../lib/api.ts";
 import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
 import { faceForSession } from "../lib/astro/interaction.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
+import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
@@ -88,13 +89,6 @@ const sessionConfig = {
  * One conversation. The parent remounts this with a new `key` to clear it —
  * the hook keeps its store in a ref, so a remount is what starts a fresh one.
  */
-/**
- * An unattended open session is a leak: the microphone keeps streaming into a
- * conversation whose whole history is re-billed on every turn. Two guards
- * close it: leaving the tab, and going quiet for this long.
- */
-const IDLE_TIMEOUT_MS = 2 * 60_000;
-const IDLE_CHECK_MS = 5_000;
 
 /** How often the voice may *speak about* page events. See the effect below. */
 const EVENT_SPEECH_THROTTLE_MS = 5_000;
@@ -111,7 +105,6 @@ export default function VoiceSession({ password }: { password: string }) {
    */
   const [muted, setMuted] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
-  const lastActivityRef = useRef(0);
 
   const viewBuilder = useViewBuilder({ password });
 
@@ -154,14 +147,6 @@ export default function VoiceSession({ password }: { password: string }) {
         const usd = voiceTurnUsd(event.raw);
         if (usd != null) addVoiceCost(usd);
       }
-
-      if (
-        event.type === "speech-started" ||
-        event.type === "audio-delta" ||
-        event.type === "input-transcription-completed"
-      ) {
-        lastActivityRef.current = Date.now();
-      }
     },
     onError: (sessionError) => setError(sessionError.message),
   });
@@ -173,13 +158,8 @@ export default function VoiceSession({ password }: { password: string }) {
    * person saying it. It goes in as a *user* item because that is the only role
    * the realtime protocol accepts from a client — hence the prefix, which the
    * instructions explain so the model does not read these aloud.
-   *
-   * Also counts as activity. A build the user is watching in silence should
-   * not trip the idle hang-up.
    */
   const reportToVoice = (report: string, { speak = true } = {}) => {
-    lastActivityRef.current = Date.now();
-
     realtime.sendEvent({
       type: "conversation-item-create",
       item: { type: "text-message", role: "user", text: `(app status) ${report}` },
@@ -384,35 +364,33 @@ export default function VoiceSession({ password }: { password: string }) {
   useEffect(() => {
     if (status !== "connected") return;
 
-    lastActivityRef.current = Date.now();
-
-    const hangUp = (why: string) => {
-      setNotice(why);
-      stopRef.current();
-    };
-
     const onVisibilityChange = () => {
-      if (document.hidden) hangUp("Hung up when the tab went to the background.");
+      if (!document.hidden) return;
+      setNotice("Hung up when the tab went to the background.");
+      stopRef.current();
     };
 
     /* Closing the tab kills the socket; this banks the last seconds of the clock. */
     const onPageHide = () => stopSessionClock();
 
-    const idleTimer = setInterval(() => {
-      if (Date.now() - lastActivityRef.current > IDLE_TIMEOUT_MS) {
-        hangUp("Hung up after two minutes of silence.");
-      }
-    }, IDLE_CHECK_MS);
-
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", onPageHide);
 
     return () => {
-      clearInterval(idleTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pagehide", onPageHide);
     };
   }, [status]);
+
+  /* Two minutes with no sign of life ends the call. See `useIdleHangUp`. */
+  useIdleHangUp(
+    status === "connected",
+    { messages, isPlaying, report: viewBuilder.report, viewEvent },
+    () => {
+      setNotice("Hung up after two minutes of silence.");
+      stopRef.current();
+    },
+  );
 
   const isLive = status === "connected" || status === "connecting";
 
