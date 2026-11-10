@@ -47,3 +47,6 @@ dist-ssr
 # platform that already excludes build output, `local.properties` and the
 # copied web assets, so tracking the folder costs almost nothing.
 .vitest/
+
+# Claude Code worktrees (see .claude/hooks/worktree-create.sh)
+.claude/worktrees/
