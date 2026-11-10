@@ -1,11 +1,21 @@
-/* Layout for the voice page. Colors come from Ionic's CSS variables so the
-   light/dark system palette in variables.css applies here too. */
+/* Layout for the voice page. Every colour is an `--ion-*` token: the stylesheet's palette is
+   pinned in variables.css, so nothing here names a hex — change the palette in one place and
+   the transcript, the chips and the buttons all move with it. */
 
 .voice-controls {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   margin-bottom: 1.25rem;
+}
+
+/* The instruction that replaces the old "Start talking" headline: the character is the
+   button, so the copy explains him rather than standing where he used to be. */
+.voice-hint {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--ion-color-step-600, currentcolor);
 }
 
 .voice-status {
@@ -38,13 +48,13 @@
   border-radius: 0.75rem;
   padding: 0.6rem 0.9rem;
   max-width: 85%;
-  background: var(--ion-color-step-100, rgb(128 128 128 / 12%));
+  background: var(--ion-background-color-step-100, rgb(128 128 128 / 12%));
   color: var(--ion-text-color, currentcolor);
 }
 
 .voice-turn--user {
   align-self: flex-end;
-  background: var(--ion-color-step-200, rgb(128 128 128 / 22%));
+  background: var(--ion-background-color-step-200, rgb(128 128 128 / 22%));
 }
 
 /* Explicit mid-tone rather than opacity: 0.6 of the text color over a tinted
@@ -82,7 +92,7 @@
   padding: 0.75rem 0.9rem;
   margin-bottom: 1.25rem;
   border-radius: 0.75rem;
-  background: var(--ion-color-step-100, rgb(128 128 128 / 12%));
+  background: var(--ion-background-color-step-100, rgb(128 128 128 / 12%));
   color: var(--ion-text-color, currentcolor);
 }
 

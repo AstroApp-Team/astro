@@ -1,0 +1,118 @@
+/**
+ * Astro as a corner presence over the voice page.
+ *
+ * The layer is a body-level `position: fixed` overlay with **`pointer-events: none`**.
+ * That property is what makes the shape usable: the canvas covers the whole viewport, and
+ * the page's buttons, inputs and scroll must keep working underneath it. It also means the
+ * canvas is never a hit target, so nothing here raycasts — the pointer is read from a window
+ * listener in `AstroOverlay.tsx`.
+ *
+ * `pointer-events: none` here is **not sufficient on its own**. R3F writes
+ * `pointer-events: auto` inline on its own root div (r3f only sets `none` when given an
+ * `eventSource`), and an inline style outranks this rule, so the canvas re-enables hit
+ * testing and covers every control on the page. The fix has to be the `style` prop on
+ * `<Canvas>` in `AstroOverlay.tsx`; losing it looks exactly like "no input field and a dead
+ * Unlock button", because that is what a full-viewport transparent canvas above the page is.
+ *
+ * `inset: 0` is required, not decorative: the canvas box must start at the viewport
+ * origin, which is what the pointer normalisation in `lookFromPointer` assumes.
+ *
+ * The layer is transparent (`alpha: true` in the Canvas) so the page's own background — the
+ * stylesheet's ink, pinned in `theme/variables.css` — stays visible. The character carries
+ * its own light: the halo is additive, and the body's colours are the sheet's ramp. There is
+ * no dark box behind him, which is the whole point of an overlay.
+ */
+
+.astro-overlay {
+  position: fixed;
+  inset: 0;
+  /* Above the page's own content, below the Studio panel (`#theatrejs-studio-root` is
+     100) so the rigging overlay on a dev desktop is never covered by the glow. */
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* R3F sizes its container to this box. Without `inset: 0` above, the box would be 0×0
+   and the character would be invisible with no error. */
+.astro-overlay > div {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * The press target over the character — the one element in this layer that takes events.
+ *
+ * Everything else here is `pointer-events: none` so the page keeps its clicks; this disc is
+ * the exception, and it is why a tap on him starts the conversation instead of also pressing
+ * whatever button happens to be underneath.
+ *
+ * `touch-action: none` is load-bearing on a phone: without it the browser claims the gesture
+ * for the scroller and the drag only begins once the page has already scrolled. It costs the
+ * ability to scroll by starting the gesture on top of him, which is the price of a draggable
+ * character. The `:focus-visible` ring is the keyboard path — he is a real button with a
+ * label, so tab-then-enter starts the conversation too.
+ */
+.astro-handle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: transparent;
+  cursor: grab;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+}
+
+.astro-handle--dragging {
+  cursor: grabbing;
+}
+
+.astro-handle:focus-visible {
+  outline: 2px solid var(--ion-color-primary);
+  outline-offset: 2px;
+}
+
+/*
+ * The no-GL-context notice, in the same corner as the character it replaces. `CanvasBoundary`
+ * renders this markup, so the selectors are its own (`__title` / `__body` / `__detail`), and
+ * `.mono` is the class it puts on the detail line.
+ */
+.canvas-fallback {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  max-width: 340px;
+  padding: 8px 10px;
+  border: 1px solid rgb(var(--ion-color-primary-rgb) / 20%);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--astro-ink) 82%, transparent);
+  color: var(--astro-paper);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  /* Same rule as the layer above: a notice that cannot be drawn must not eat a press. */
+  pointer-events: none;
+}
+
+.canvas-fallback__title {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.canvas-fallback__body {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.canvas-fallback__detail {
+  display: block;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

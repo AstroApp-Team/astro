@@ -1,11 +1,185 @@
 /**
- * Ionic theme variables. Ionic ships light and dark palettes; importing the
- * system palette makes the app follow the OS setting on web and native.
+ * Ionic theme variables.
  *
- * Full variable reference: https://ionicframework.com/docs/theming/css-variables
+ * The palette is the stylesheet's — `assets/astro-stylesheet.svg`, "Paleta de Cores" —
+ * and nothing here is invented: the six printed swatches are the whole vocabulary, and
+ * every surface, border and label below is one of them or a mix of two.
+ *
+ *   #FF8B00  laranja   primary      the character's top stop, the accent
+ *   #FA6B2F  âmbar     secondary    the character's mid stop
+ *   #FE3402  brasa     danger       the character's bottom stop; also the only red
+ *   #EDCA99  areia     tertiary     warm neutral, for a quiet filled button
+ *   #FEFBF5  papel     text         the eye cream: the app's ink on a dark page
+ *   #1A152C  tinta     background   the sheet's own page colour
+ *
+ * Two consequences worth stating, because they are the reasons this file overrides so
+ * much rather than just `--ion-color-primary`:
+ *
+ * 1. **The app is dark regardless of the OS.** `palettes/dark.system.css` is still
+ *    imported (Ionic's internals read `--ion-background-color-step-*`), but the ink page
+ *    is not a preference here: a warm orange glow on a white page is a smudge, and the
+ *    character is always on screen. Hence `:root.ios, :root.md` below — the system
+ *    palette sets background and text at that specificity, so a bare `:root` would lose.
+ * 2. **The greys are mixes, not greys.** Ionic's step scale is a neutral ramp; used as-is
+ *    it puts cool grey bubbles on a navy page and the two look like different palettes.
+ *    Every step here is `#FEFBF5` mixed into `#1A152C`, which keeps the transcript and
+ *    the composer on the same temperature as the character.
  */
+
 @import "@ionic/react/css/palettes/dark.system.css";
 
 :root {
+  /* The stylesheet's six, as the vocabulary everything else is derived from. */
+  --astro-ink: #1a152c;
+  --astro-paper: #fefbf5;
+  --astro-orange: #ff8b00;
+  --astro-amber: #fa6b2f;
+  --astro-ember: #fe3402;
+  --astro-sand: #edca99;
+
   --ion-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Orange is the brand, so it is used where a filled, affirmative control is wanted. */
+  --ion-color-primary: #ff8b00;
+  --ion-color-primary-rgb: 255, 139, 0;
+  --ion-color-primary-contrast: #1a152c;
+  --ion-color-primary-contrast-rgb: 26, 21, 44;
+  --ion-color-primary-shade: #e07a00;
+  --ion-color-primary-tint: #ff971a;
+
+  --ion-color-secondary: #fa6b2f;
+  --ion-color-secondary-rgb: 250, 107, 47;
+  --ion-color-secondary-contrast: #1a152c;
+  --ion-color-secondary-contrast-rgb: 26, 21, 44;
+  --ion-color-secondary-shade: #dc5e29;
+  --ion-color-secondary-tint: #fa7a44;
+
+  --ion-color-tertiary: #edca99;
+  --ion-color-tertiary-rgb: 237, 202, 153;
+  --ion-color-tertiary-contrast: #1a152c;
+  --ion-color-tertiary-contrast-rgb: 26, 21, 44;
+  --ion-color-tertiary-shade: #d1b287;
+  --ion-color-tertiary-tint: #efcfa3;
+
+  /* Ember. The only colour in the palette that reads as an alarm, so it is `danger`. */
+  --ion-color-danger: #fe3402;
+  --ion-color-danger-rgb: 254, 52, 2;
+  --ion-color-danger-contrast: #fefbf5;
+  --ion-color-danger-contrast-rgb: 254, 251, 245;
+  --ion-color-danger-shade: #e02e02;
+  --ion-color-danger-tint: #fe481b;
+
+  /* The sheet has no green: a "connected" state is orange, and the sand carries the rest. */
+  --ion-color-success: #ff8b00;
+  --ion-color-success-rgb: 255, 139, 0;
+  --ion-color-success-contrast: #1a152c;
+  --ion-color-success-contrast-rgb: 26, 21, 44;
+  --ion-color-success-shade: #e07a00;
+  --ion-color-success-tint: #ff971a;
+
+  --ion-color-warning: #fa6b2f;
+  --ion-color-warning-rgb: 250, 107, 47;
+  --ion-color-warning-contrast: #1a152c;
+  --ion-color-warning-contrast-rgb: 26, 21, 44;
+  --ion-color-warning-shade: #dc5e29;
+  --ion-color-warning-tint: #fa7a44;
+
+  /* `light` is a raised surface, `medium` a muted label, `dark` the text — the same
+     inversion Ionic's own dark palette uses, in the sheet's colours. */
+  --ion-color-light: #252036;
+  --ion-color-light-rgb: 37, 32, 54;
+  --ion-color-light-contrast: #fefbf5;
+  --ion-color-light-contrast-rgb: 254, 251, 245;
+  --ion-color-light-shade: #211c30;
+  --ion-color-light-tint: #3b364a;
+
+  --ion-color-medium: #75717c;
+  --ion-color-medium-rgb: 117, 113, 124;
+  --ion-color-medium-contrast: #fefbf5;
+  --ion-color-medium-contrast-rgb: 254, 251, 245;
+  --ion-color-medium-shade: #67636d;
+  --ion-color-medium-tint: #837f8a;
+
+  --ion-color-dark: #fefbf5;
+  --ion-color-dark-rgb: 254, 251, 245;
+  --ion-color-dark-contrast: #1a152c;
+  --ion-color-dark-contrast-rgb: 26, 21, 44;
+  --ion-color-dark-shade: #e0ddd8;
+  --ion-color-dark-tint: #fefcf6;
+
+  /* Legacy step scale: paper mixed into ink, so `step-50` is nearest the text. */
+  --ion-color-step-50: #f3f0eb;
+  --ion-color-step-100: #e7e4e1;
+  --ion-color-step-150: #dcd8d7;
+  --ion-color-step-200: #d0cdcd;
+  --ion-color-step-300: #bab6b9;
+  --ion-color-step-400: #a39fa5;
+  --ion-color-step-500: #8c8890;
+  --ion-color-step-600: #75717c;
+  --ion-color-step-700: #5e5a68;
+  --ion-color-step-800: #484354;
+  --ion-color-step-900: #312c40;
+  --ion-color-step-950: #252036;
+}
+
+/*
+ * Ionic sets background and text on `:root.ios` / `:root.md` from the system palette,
+ * which outranks a bare `:root`, so both platforms are named here. This is what makes
+ * the page ink whatever the OS is set to.
+ */
+:root,
+:root.ios,
+:root.md {
+  --ion-background-color: #1a152c;
+  --ion-background-color-rgb: 26, 21, 44;
+  --ion-text-color: #fefbf5;
+  --ion-text-color-rgb: 254, 251, 245;
+
+  /* Surfaces that step toward the text: toolbar, cards, fields. */
+  --ion-background-color-step-50: #201a33;
+  --ion-background-color-step-100: #252036;
+  --ion-background-color-step-150: #2b2540;
+  --ion-background-color-step-200: #302a48;
+  --ion-background-color-step-250: #363051;
+  --ion-background-color-step-300: #3c355a;
+  --ion-background-color-step-350: #423a63;
+  --ion-background-color-step-400: #484354;
+  --ion-background-color-step-450: #524c63;
+  --ion-background-color-step-500: #5e5a68;
+  --ion-background-color-step-550: #6a6573;
+  --ion-background-color-step-600: #75717c;
+  --ion-background-color-step-650: #817d88;
+  --ion-background-color-step-700: #8c8890;
+  --ion-background-color-step-750: #98949c;
+  --ion-background-color-step-800: #a39fa5;
+  --ion-background-color-step-850: #afabb0;
+  --ion-background-color-step-900: #bab6b9;
+  --ion-background-color-step-950: #c6c2c4;
+
+  /* The reverse direction, for muted labels on a raised surface. */
+  --ion-text-color-step-50: #c6c2c4;
+  --ion-text-color-step-100: #bab6b9;
+  --ion-text-color-step-150: #afabb0;
+  --ion-text-color-step-200: #a39fa5;
+  --ion-text-color-step-250: #98949c;
+  --ion-text-color-step-300: #8c8890;
+  --ion-text-color-step-350: #817d88;
+  --ion-text-color-step-400: #75717c;
+  --ion-text-color-step-450: #6a6573;
+  --ion-text-color-step-500: #5e5a68;
+  --ion-text-color-step-550: #524c63;
+  --ion-text-color-step-600: #484354;
+  --ion-text-color-step-650: #423a63;
+  --ion-text-color-step-700: #3c355a;
+  --ion-text-color-step-750: #363051;
+  --ion-text-color-step-800: #302a48;
+  --ion-text-color-step-850: #2b2540;
+  --ion-text-color-step-900: #252036;
+  --ion-text-color-step-950: #201a33;
+
+  --ion-item-background: #1a152c;
+  --ion-toolbar-background: #1a152c;
+  --ion-toolbar-border-color: #302a48;
+  --ion-card-background: #252036;
+  --ion-tab-bar-background: #201a33;
 }

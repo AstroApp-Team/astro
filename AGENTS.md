@@ -83,9 +83,13 @@ projects (`app`, `worker`, `node`) share strict settings from
   `pnpm run cap:sync`; a bare `cap sync` after a web build produces an app that
   resolves `/api/*` against `https://localhost`, which the local asset server
   answers with `index.html` — it reads as a backend outage, not a build slip.
-- **SPA deep links only fall back with a real navigation request.** `curl /voice`
-  returns 404; a browser (or `-H "Sec-Fetch-Mode: navigate"`) gets index.html.
-  That is expected, not a routing bug.
+- **`run_worker_first: ["/api/*"]` is what makes every deep link fall back.**
+  With it, `curl /voice` gets index.html too; drop it and only requests carrying
+  `Sec-Fetch-Mode: navigate` do, so a WebView or iframe reads a 404.
+- **Astro is a full-viewport `pointer-events: none` overlay.** R3F writes
+  `pointer-events: auto` inline on its root, so the `style` prop on `<Canvas>` in
+  `AstroOverlay.tsx` is what keeps the page clickable; lose it and every control
+  goes dead with no error.
 
 ### Realtime voice
 
