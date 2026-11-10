@@ -139,9 +139,16 @@ projects (`app`, `worker`, `node`) share strict settings from
   requests and comes back as `currentHtml` — unsealed: only the page's own
   source ever crosses the wire.
 - **Sealing happens in the browser, right before `srcdoc`.** `sealViewHtml`
-  (`src/lib/seal-view.ts`) adds the CSP, `VIEW_BASE_CSS`, htm's Preact
-  standalone build and `src/lib/view-runtime.js` (both imported `?raw`). Seal
-  on the Worker again and ~17 KB of runtime rides into every edit prompt.
+  (`src/lib/seal-view.ts`) adds `VIEW_BASE_CSS`, htm's Preact standalone
+  build and `src/lib/view-runtime.js` (both imported `?raw`). Seal on the
+  Worker again and ~17 KB of runtime rides into every edit prompt.
+- **Pages are free on purpose.** No CSP, and `VIEW_SANDBOX` grants everything
+  but `allow-top-navigation` (same origin included), so a page can load CDN
+  libraries, `fetch`, use storage and ask for devices. Security is not a goal
+  here; a request the page cannot fulfil is a broken promise from the voice
+  model. Do not re-fence it — `checkViewHtml` only enforces the page's shape.
+  Three.js ships no global build since r160: it is imported from esm.sh in a
+  `type="module"` script.
 - **Every page is written against the `Astro` runtime.** `Astro.state` (one
   JSON object), ``Astro.view((s, a) => html`...`)`` and `Astro.actions`, each
   in its own `<script>` in that order so the view paints while the page still
@@ -155,7 +162,8 @@ projects (`app`, `worker`, `node`) share strict settings from
   dropped, so a silently deleted feature gets noticed and asked back.
 - **A finished page is run before it is reported.** `runViewCheck` loads it in
   a hidden check-mode frame: the runtime renders it, runs every action that
-  takes no arguments from the starting state, and posts `astro:check`.
+  takes no arguments from the starting state, runs `Astro.start` for 500 ms, and
+  posts `astro:check` — failed `<script src>` loads included.
   Problems go straight back to the agent, up to `MAX_AUTO_FIXES` times. Arity
   is what makes this safe — never smoke-test actions that take arguments.
   Errors the live page throws (`astro:error`) ride along with the next build

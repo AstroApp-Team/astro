@@ -155,8 +155,15 @@ and sized, rounded buttons and inputs. Only add CSS for layout (grid, flex, size
 in a sandboxed iframe that fills the screen, often phone-width.
 
 Rules:
-- No imports, libraries, external URLs, or network of any kind. Draw with SVG, canvas, or CSS.
-- No storage: localStorage, sessionStorage, indexedDB and cookies all throw here.
+- Libraries are welcome when they were asked for or save real work (3D, charts, maps, physics).
+  Load them from a CDN with a pinned version; nothing is preloaded but the Astro runtime. A
+  global build goes in its own tag before the scripts that use it:
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>. An ES-module-only library
+  (Three.js, for one) is imported inside a module script that also does the work:
+  <script type="module">import * as THREE from "https://esm.sh/three@0.170.0"; Astro.start(...)</script>.
+- The page may use fetch (public APIs that allow CORS), localStorage, the camera, mic and
+  location, fullscreen, and alert/confirm. Astro.state already survives your edits; use
+  localStorage only for something that must outlive the app being closed.
 - Plain JavaScript. Do not escape template placeholders: write \`\${value}\`, never \`\\\${value}\`.`;
 
 /**

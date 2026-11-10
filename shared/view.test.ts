@@ -25,21 +25,23 @@ describe("checkViewHtml", () => {
     expect(checkViewHtml(page)).toEqual([]);
   });
 
-  it("catches every way out to the network", () => {
-    const escapes = [
-      '<script src="https://cdn.example.com/x.js"></script>',
-      '<link href="//fonts.example.com/f.css" rel="stylesheet">',
+  it("lets a page reach the network, load libraries and use storage", () => {
+    // Found live: asked for a Three.js scene, the agent wrote one — and the old
+    // gate's only answer was to strip the library out. A page may do all this.
+    const view = "<script>Astro.view(() => html`x`)</script>";
+    const uses = [
+      '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>',
+      '<script type="module">import * as THREE from "https://esm.sh/three@0.170.0"</script>',
+      '<link href="https://fonts.googleapis.com/css2?family=Inter" rel="stylesheet">',
       "<style>body { background: url(https://example.com/bg.png) }</style>",
-      "<style>@import 'x.css';</style>",
-      "<script>fetch('/x')</script>",
-      "<script>new WebSocket('wss://x')</script>",
-      "<script>new EventSource('/x')</script>",
-      "<script>navigator.sendBeacon('/x')</script>",
-      '<iframe src="data:text/html,x"></iframe>',
+      "<script>fetch('https://api.example.com/x')</script>",
+      "<script>localStorage.setItem('high', 3)</script>",
+      '<iframe src="https://www.youtube.com/embed/x"></iframe>',
+      "<script>new Worker(u).postMessage(1); w.addEventListener('message', f)</script>",
     ];
 
-    for (const escape of escapes) {
-      expect(checkViewHtml(page + escape), escape).not.toEqual([]);
+    for (const use of uses) {
+      expect(checkViewHtml(page + view + use), use).toEqual([]);
     }
   });
 
@@ -61,21 +63,6 @@ describe("checkViewHtml", () => {
     expect(checkViewHtml(`${page}<img src="data:image/gif;base64,R0lGOD">`)).toEqual([]);
   });
 
-  it("catches browser storage, which throws on the sandbox's opaque origin", () => {
-    // Found live: asked for a high score that "survives restarts", the model
-    // reached for localStorage — a SecurityError that stops the whole script.
-    const uses = [
-      "<script>localStorage.setItem('high', 3)</script>",
-      "<script>const s = window.sessionStorage</script>",
-      "<script>indexedDB.open('x')</script>",
-      "<script>document.cookie = 'a=1'</script>",
-    ];
-
-    for (const use of uses) {
-      expect(checkViewHtml(page + use).join(" "), use).toContain(VIEW_STATE_TYPE);
-    }
-  });
-
   it("requires a spec, because it is the only record of what the user asked for", () => {
     expect(checkViewHtml("<title>x</title><p>hi</p>").join(" ")).toContain("no spec");
     expect(checkViewHtml("<title>x</title><!-- spec\n--><p>hi</p>").join(" ")).toContain("no spec");
@@ -88,6 +75,7 @@ describe("checkViewHtml", () => {
       "<script>Astro.view(() => html`x`); document.write('x')</script>",
       `${view}<script>parent.postMessage({ type: "astro:event" }, "*")</script>`,
       `${view}<script>addEventListener("message", () => {})</script>`,
+      `${view}<script>window.addEventListener("message", () => {})</script>`,
       "<script>document.getElementById('a').textContent = 1</script>",
     ];
 

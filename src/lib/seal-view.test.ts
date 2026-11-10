@@ -1,7 +1,7 @@
 import { Window } from "happy-dom";
 import { describe, expect, it } from "vite-plus/test";
 
-import { sealViewHtml, VIEW_CSP } from "./seal-view.ts";
+import { sealViewHtml, VIEW_BASE_CSS } from "./seal-view.ts";
 
 const COUNTER = `<!doctype html><title>Counter</title>
 <!-- spec
@@ -45,9 +45,9 @@ async function load(
 const tick = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("sealViewHtml", () => {
-  it("adds the CSP once, even when sealed twice", () => {
+  it("adds the runtime once, even when sealed twice", () => {
     const once = sealViewHtml(COUNTER);
-    expect(once.split(VIEW_CSP).length - 1).toBe(1);
+    expect(once.split(VIEW_BASE_CSS).length - 1).toBe(1);
     expect(sealViewHtml(once)).toBe(once);
   });
 
@@ -114,6 +114,17 @@ describe("the Astro runtime", () => {
     const problems = posted.find((m) => m.type === "astro:check")?.["problems"] as string[];
 
     expect(problems.join(" ")).toContain("never calls Astro.view");
+  });
+
+  it("runs Astro.start in the check, so a library that never loaded is caught", async () => {
+    // Found live: a Three.js scene read `window.THREE`, which nothing had loaded.
+    // Render and actions were fine; only the start callback threw.
+    const page = `${COUNTER}<script>Astro.start(() => { new window.THREE.Scene() })</script>`;
+    const { posted } = await load(page, { check: true });
+    await tick(600);
+    const problems = posted.find((m) => m.type === "astro:check")?.["problems"] as string[];
+
+    expect(problems.join(" ")).toContain("Astro.start");
   });
 
   it("stays quiet towards the voice assistant while checking", async () => {
