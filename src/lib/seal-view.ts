@@ -10,19 +10,30 @@ import runtime from "./view-runtime.js?raw";
  */
 
 /**
- * Injected rather than written by the agent — one less rule for the model to
- * get right, and it cannot be talked out of it. `'unsafe-inline'` looks
- * alarming and is not: inline script *is* the artifact, and `default-src
- * 'none'` means that script can reach nothing outside its own document.
+ * What a page may do. Deliberately wide open: a page is the user's own app,
+ * asked for out loud, and anything it cannot do is a feature the voice
+ * assistant promised and could not deliver. So it can load libraries from a
+ * CDN, call public APIs, use storage, open dialogs, popups and downloads, go
+ * fullscreen, and ask for the camera, microphone or location.
  *
- * `'unsafe-eval'` for the same reason: eval only runs more code inside the same
- * jail. Without it `Function(expr)()` throws — and that is how a model writes
- * every calculator, which then answers "Error" to 7×12 with nothing wrong in
- * the page to point at.
+ * The one thing held back is `allow-top-navigation`: a page that navigates the
+ * app away ends the voice session it is part of.
  */
-export const VIEW_CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline' 'unsafe-eval'; " +
-  "img-src data:; font-src data:";
+export const VIEW_SANDBOX =
+  "allow-scripts allow-same-origin allow-forms allow-modals allow-popups " +
+  "allow-popups-to-escape-sandbox allow-downloads allow-pointer-lock allow-presentation";
+
+/** Permissions policy for the frame (`allow=`). The OS still asks the user. */
+export const VIEW_ALLOW =
+  "camera; microphone; geolocation; fullscreen; clipboard-read; clipboard-write; autoplay; " +
+  "display-capture; screen-wake-lock; web-share; accelerometer; gyroscope; magnetometer; " +
+  "midi; xr-spatial-tracking";
+
+/**
+ * The check frame gets the same powers, minus the ones that would surface in
+ * front of the user from a frame they cannot see: dialogs and popups.
+ */
+export const VIEW_CHECK_SANDBOX = "allow-scripts allow-same-origin allow-forms";
 
 /**
  * A few lines of classless defaults, injected ahead of the page's own styles
@@ -45,11 +56,10 @@ export const VIEW_BASE_CSS =
 const inline = (source: string) => source.replaceAll("</script", "<\\/script");
 
 /**
- * Adds the CSP the sandbox cannot set on its own, the base stylesheet, and the
- * `Astro` runtime (htm + Preact, then `view-runtime.js`). A `<meta
- * http-equiv>` policy only applies to content that parses after it, so it goes
- * as early as the document allows: inside `<head>` if there is one, otherwise
- * ahead of everything, where the parser will hoist it into the implied head.
+ * Adds the base stylesheet and the `Astro` runtime (htm + Preact, then
+ * `view-runtime.js`), as early as the document allows: inside `<head>` if
+ * there is one, otherwise ahead of everything — the page's own scripts call
+ * `Astro`, so the runtime has to have run first.
  *
  * `check: true` builds the hidden copy that `runViewCheck` loads: the runtime
  * then exercises the page on load and reports instead of running it.
@@ -58,13 +68,13 @@ const inline = (source: string) => source.replaceAll("</script", "<\\/script");
  * reaches an iframe goes through here.
  */
 export function sealViewHtml(html: string, { check = false } = {}): string {
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${VIEW_CSP}">`;
+  const style = `<style data-astro>${VIEW_BASE_CSS}</style>`;
 
   /** Idempotent, keyed on our exact tag, so sealing twice never stacks a second copy. */
-  if (html.includes(meta)) return html;
+  if (html.includes(style)) return html;
 
   const seal =
-    `${meta}<style>${VIEW_BASE_CSS}</style>` +
+    style +
     (check ? "<script data-astro>window.__astroCheck=true</script>" : "") +
     // The UMD build registers on `this`; a classic script's `this` is the
     // window in browsers but not in every DOM, so it is passed explicitly.

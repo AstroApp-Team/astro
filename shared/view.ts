@@ -6,17 +6,17 @@
  * against it), so keep this file runtime-agnostic — no Node, DOM, or Workers
  * globals.
  *
- * Three layers hold the freedom in:
+ * Two layers give the page its shape — not its powers:
  *
  *   1. The page only leaves the agent loop through its tools (`write_view`,
  *      `edit_view`), so the Worker never has to dig an artifact out of prose.
  *   2. `checkViewHtml` runs on every tool result, so its problem list is the
  *      agent's feedback signal — and a run only ends on a page that passes.
- *   3. The iframe renders with `sandbox="allow-scripts"` and *no*
- *      `allow-same-origin`, which puts the document on an opaque origin: no
- *      parent DOM, no cookies, no storage. `sealViewHtml` (src/lib/seal-view.ts)
- *      adds the CSP that closes the last hole, network access, plus the
- *      `Astro` runtime every page is written against.
+ *
+ * What a page *may do* is deliberately broad — network, CDN libraries,
+ * storage, devices — and lives in `VIEW_SANDBOX` (src/lib/seal-view.ts). A
+ * request the page cannot fulfil is a broken promise from the voice assistant,
+ * so nothing here exists to fence the page in.
  *
  * Everything that crosses the wire is the page's own source — sealing happens
  * in the browser, right before a document becomes a `srcdoc`.
@@ -140,28 +140,12 @@ export type ViewUIMessage = UIMessage<
   { progress: ViewProgress; draft: { html: string }; view: View; cost: { usd: number } }
 >;
 
-const EXTERNAL_URL_PATTERNS: [RegExp, string][] = [
-  [
-    /(?:src|href)\s*=\s*["']?(?:https?:)?\/\//i,
-    "loads something over the network with src= or href=",
-  ],
-  [/url\(\s*["']?(?:https?:)?\/\//i, "loads something over the network with url()"],
-  [/@import\b/i, "uses @import"],
-  [/\bfetch\s*\(/, "calls fetch()"],
-  [/\bXMLHttpRequest\b/, "uses XMLHttpRequest"],
-  [/\bWebSocket\b/, "opens a WebSocket"],
-  [/\bEventSource\b/, "opens an EventSource"],
-  [/\bnavigator\s*\.\s*sendBeacon\b/, "calls navigator.sendBeacon"],
-  [/<(?:iframe|object|embed)\b/i, "embeds a nested frame"],
-];
-
 /**
  * The static gate. Returns human-readable problems — phrased as instructions
  * the model can act on, because this list is handed straight back to it.
  *
- * Deliberately short: the sandbox is the real boundary, so this only has to
- * catch the things that would make a view *silently* fail (a blocked font, a
- * stripped image) rather than everything a document could theoretically do.
+ * Deliberately short: it only catches what makes a page silently wrong or
+ * structurally tangled, never what a page is allowed to do.
  */
 export function checkViewHtml(html: string): string[] {
   const problems: string[] = [];
@@ -177,30 +161,6 @@ export function checkViewHtml(html: string): string[] {
       `The document is ${Math.round(bytes / 1024)}KB, over the ${Math.round(
         MAX_VIEW_HTML_BYTES / 1024,
       )}KB limit. Make it smaller.`,
-    );
-  }
-
-  for (const [pattern, description] of EXTERNAL_URL_PATTERNS) {
-    if (pattern.test(html)) {
-      problems.push(
-        `The document ${description}. Nothing can leave this page — inline every ` +
-          `asset, use system fonts, and draw images with SVG, canvas, or CSS.`,
-      );
-    }
-  }
-
-  /**
-   * Every storage API throws a SecurityError on the sandbox's opaque origin,
-   * and a throw at startup takes the whole script down with it — the page
-   * renders and nothing responds. Models reach for `localStorage` by reflex
-   * whenever something should "survive", so this is caught, not just
-   * mentioned in the prompt.
-   */
-  if (/\b(?:localStorage|sessionStorage|indexedDB)\b|\bdocument\s*\.\s*cookie\b/.test(html)) {
-    problems.push(
-      "The document uses browser storage (localStorage, sessionStorage, indexedDB or " +
-        "cookies), which throws in this sandbox and stops the script. Keep the value in a " +
-        `variable, and if it must survive your edits, use the "${VIEW_STATE_TYPE}" message.`,
     );
   }
 
@@ -224,7 +184,11 @@ export function checkViewHtml(html: string): string[] {
         "Astro.view(...); change state in an action and let the view re-render.",
     );
   }
-  if (/\bpostMessage\b|addEventListener\(\s*["']message["']/.test(html)) {
+  /** The page's own channel to the app — a Web Worker's `postMessage` is fine. */
+  if (
+    /\b(?:parent|top|opener)\s*\.\s*postMessage\b/.test(html) ||
+    /(?:^|[^.\w]|\b(?:window|self)\s*\.\s*)addEventListener\(\s*["']message["']/.test(html)
+  ) {
     problems.push(
       "The page handles messages itself. The runtime already saves and restores " +
         "Astro.state; to tell the voice assistant something, call Astro.emit(name, value).",

@@ -1,11 +1,12 @@
 import { VIEW_CHECK_TYPE } from "../../shared/view.ts";
-import { sealViewHtml } from "./seal-view.ts";
+import { sealViewHtml, VIEW_CHECK_SANDBOX } from "./seal-view.ts";
 
 /**
- * Long enough for any page that is not stuck, short enough that a stuck one
- * does not hold the build open. A page that never reports is itself a problem.
+ * Long enough for any page that is not stuck — including one that pulls a
+ * library off a CDN first — short enough that a stuck one does not hold the
+ * build open. A page that never reports is itself a problem.
  */
-const CHECK_TIMEOUT_MS = 5_000;
+const CHECK_TIMEOUT_MS = 10_000;
 
 /**
  * Runs a finished page once, out of sight, and returns what broke.
@@ -13,14 +14,15 @@ const CHECK_TIMEOUT_MS = 5_000;
  * The Worker cannot do this — it has no DOM, and model-written code must never
  * run next to the Gateway key — so the browser does, in a second sandboxed
  * frame that the user never sees. The runtime in check mode renders the page,
- * runs every action that takes no arguments from the starting state, and posts
- * the problems; check mode also mutes `Astro.emit`, `Astro.start` and state
- * saving, so nothing here reaches the voice model or the live page.
+ * runs every action that takes no arguments from the starting state, then runs
+ * `Astro.start` and lets it go for a moment, and posts the problems — scripts
+ * that failed to load included. Check mode mutes `Astro.emit` and state saving,
+ * so nothing here reaches the voice model or the live page.
  */
 export function runViewCheck(html: string): Promise<string[]> {
   return new Promise((resolve) => {
     const frame = document.createElement("iframe");
-    frame.sandbox.add("allow-scripts");
+    frame.setAttribute("sandbox", VIEW_CHECK_SANDBOX);
     frame.setAttribute("aria-hidden", "true");
     frame.tabIndex = -1;
     // Laid out (so canvas and layout code behave as on screen) but invisible.

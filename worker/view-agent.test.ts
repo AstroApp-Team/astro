@@ -223,7 +223,7 @@ describe("buildView", () => {
      * not end the run: the problems go back to the model as the tool result.
      */
     const progress: ViewProgress[] = [];
-    const script = '<script src="https://cdn.example.com/x.js"></script>';
+    const script = "<script>el.innerHTML = 'x'</script>";
 
     const view = await buildView({
       model: scriptedModel([
@@ -236,9 +236,9 @@ describe("buildView", () => {
       onCost: noop,
     });
 
-    expect(view.html).not.toContain("cdn.example.com");
+    expect(view.html).not.toContain("innerHTML");
     const fixing = progress.find((update) => update.phase === "fixing");
-    expect(fixing?.problems.join(" ")).toContain("network");
+    expect(fixing?.problems.join(" ")).toContain("writes HTML into the DOM");
   });
 
   it("fails loudly when the agent never reaches a working page", async () => {

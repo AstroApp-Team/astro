@@ -37,7 +37,7 @@ import {
 import { realtimeSetupUrl } from "../lib/api.ts";
 import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
 import { faceForSession } from "../lib/astro/interaction.ts";
-import { sealViewHtml } from "../lib/seal-view.ts";
+import { sealViewHtml, VIEW_ALLOW, VIEW_SANDBOX } from "../lib/seal-view.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
 import { useMediaQuery } from "../lib/use-media-query.ts";
@@ -610,11 +610,10 @@ export default function VoiceSession({ password }: { password: string }) {
               </div>
             ) : (
               /**
-               * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
-               * whole security model: the document lands on an opaque origin, so
-               * it cannot reach this page's DOM, cookies, or storage. The two are
-               * only safe apart — adding `allow-same-origin` back would hand a
-               * model-written page the run of the app.
+               * `VIEW_SANDBOX` / `VIEW_ALLOW` open nearly everything — see
+               * `seal-view.ts` for what and why. The page shares this app's
+               * origin, so it can use storage and load libraries; it just cannot
+               * navigate the app away.
                *
                * `onLoad` hands the previous page's saved state to the new one —
                * this is what lets the coding agent edit a game mid-play without
@@ -627,7 +626,8 @@ export default function VoiceSession({ password }: { password: string }) {
                 ref={frameRef}
                 className="voice-view"
                 title={viewBuilder.screen.title}
-                sandbox="allow-scripts"
+                sandbox={VIEW_SANDBOX}
+                allow={VIEW_ALLOW}
                 srcDoc={sealViewHtml(viewBuilder.screen.html)}
                 onLoad={onFrameLoad}
               />
