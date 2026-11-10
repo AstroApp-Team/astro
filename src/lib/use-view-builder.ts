@@ -59,6 +59,13 @@ export function useViewBuilder({ password }: { password: string }) {
   const [draft, setDraft] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [report, setReport] = useState<ViewReport | null>(null);
+  /**
+   * The last build failure, kept on screen until the next build starts.
+   * Telling only the voice model was not enough: it paraphrases ("I ran into a
+   * problem, let me try again") and retries, and the actual reason showed up
+   * nowhere a person could read it.
+   */
+  const [failure, setFailure] = useState<string | null>(null);
 
   const say = (text: string) => setReport((previous) => ({ id: (previous?.id ?? 0) + 1, text }));
 
@@ -79,6 +86,8 @@ export function useViewBuilder({ password }: { password: string }) {
     onError: (error) => {
       setDraft(null);
       setStatus(null);
+      setFailure(error.message);
+      console.error("Building the page failed:", error);
       say(`Building the page failed: ${error.message}`);
     },
   });
@@ -93,11 +102,12 @@ export function useViewBuilder({ password }: { password: string }) {
    */
   const build = (request: string) => {
     setStatus("Starting…");
+    setFailure(null);
     void sendMessage(
       { text: request },
       { body: { password, ...(view != null && { currentHtml: view.html }) } },
     );
   };
 
-  return { screen, status, report, build };
+  return { screen, status, failure, report, build };
 }
