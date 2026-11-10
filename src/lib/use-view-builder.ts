@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useState } from "react";
 
-import { describeProgress, type View, type ViewUIMessage } from "../../shared/view.ts";
+import { describeProgress, viewTitle, type View, type ViewUIMessage } from "../../shared/view.ts";
 import { viewUrl } from "./api.ts";
 import { addViewCost } from "./voice-usage.ts";
 
@@ -50,6 +50,13 @@ export type ViewReport = { id: number; text: string };
  */
 export function useViewBuilder({ password }: { password: string }) {
   const [view, setView] = useState<View | null>(null);
+  /**
+   * The page mid-run, painted as it streams in. Kept apart from `view`
+   * because it has not passed the checks: it is what the user sees, never what
+   * goes back as `currentHtml`, and a failed run drops it to reveal the last
+   * good page again.
+   */
+  const [draft, setDraft] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [report, setReport] = useState<ViewReport | null>(null);
 
@@ -59,19 +66,25 @@ export function useViewBuilder({ password }: { password: string }) {
     transport,
     onData: (part) => {
       if (part.type === "data-progress") setStatus(describeProgress(part.data));
+      if (part.type === "data-draft") setDraft(part.data.html);
       if (part.type === "data-cost") addViewCost(part.data.usd);
 
       if (part.type === "data-view") {
         setView(part.data);
+        setDraft(null);
         setStatus(null);
-        say(`The page is on screen. It is titled "${part.data.title}". ${part.data.summary}`);
+        say(`The page is on screen, titled "${part.data.title}".`);
       }
     },
     onError: (error) => {
+      setDraft(null);
       setStatus(null);
       say(`Building the page failed: ${error.message}`);
     },
   });
+
+  /** What to render: the page being written if there is one, else the last good one. */
+  const screen: View | null = draft != null ? { title: viewTitle(draft), html: draft } : view;
 
   /**
    * `view` is read at call time rather than through a ref: the realtime hook
@@ -86,5 +99,5 @@ export function useViewBuilder({ password }: { password: string }) {
     );
   };
 
-  return { view, status, report, build };
+  return { screen, status, report, build };
 }

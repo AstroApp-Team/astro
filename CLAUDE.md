@@ -131,12 +131,22 @@ projects (`app`, `worker`, `node`) share strict settings from
 - **Set both audio formats explicitly.** Leave them out and the provider picks
   its own while the browser captures/plays at `sampleRate` — a mismatch is
   garbled audio, not an error.
-- **The coding agent edits a draft; `publish_view` takes no HTML.** The loop in
-  `worker/view-agent.ts` holds the document in a mutable `draft` the tools
-  mutate (`write_view`/`edit_view`), and publishing publishes the draft. The
-  client's `view.html` is the source of truth _between_ requests — it comes
-  back as `currentHtml`, already sealed, which is why `sealViewHtml` must stay
-  idempotent.
+- **The coding agent edits a draft, and the run ends on the first passing step.**
+  The loop in `worker/view-agent.ts` holds the document in a mutable `draft`
+  that `write_view`/`edit_view` mutate; every tool result carries
+  `checkViewHtml`, and there is no publish step (it cost a whole model
+  round-trip). The client's `view.html` is the source of truth _between_
+  requests — it comes back as `currentHtml`, already sealed, which is why
+  `sealViewHtml` must stay idempotent.
+- **Live rendering depends on the provider streaming tool arguments.** Drafts
+  reach the iframe from `write_view`'s `onInputDelta` (as `data-draft`), which
+  only fires under `agent.stream()` and only if the provider streams input.
+  Haiku 5.5 does; DeepSeek on Baseten sends the whole input as one delta, so
+  the page appears all at once. Check before switching `VIEW_MODEL_ID`.
+- **Keep the coding agent's output small.** `reasoning: "none"`, a "simplest
+  thing that works" prompt, and `VIEW_BASE_CSS` injected by `sealViewHtml` (so
+  pages need no styling) took a calculator from 48 s to ~5 s. Any styling or
+  "polish" rule added to the prompt is paid for in seconds on every build.
 - **`astro:state` is what keeps a game alive across an edit.** The page posts
   its state to the parent whenever it changes; the parent keeps only the latest
   and posts it back into the new frame on `load`. The parent never inspects the

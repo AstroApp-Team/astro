@@ -109,8 +109,10 @@ const api = new Hono<AppEnv>()
    * It streams because the caller is a voice conversation: the browser answers
    * the model's tool call immediately and then has ten or twenty seconds to
    * account for, and a silent request is indistinguishable from a dead one.
-   * `data-progress` is transient — status, not history — and `data-view` is the
-   * finished document. `data-cost` is transient too: the client banks it.
+   * `data-progress` is transient — status, not history — and so is
+   * `data-draft`, the page as it is being written, which the client paints
+   * immediately. `data-view` is the finished document. `data-cost` is
+   * transient too: the client banks it.
    */
   .post("/view", zValidator("json", ViewRequestSchema), (c) => {
     const { password, request, currentHtml } = c.req.valid("json");
@@ -132,6 +134,7 @@ const api = new Hono<AppEnv>()
           currentHtml,
           onProgress: (progress) =>
             writer.write({ type: "data-progress", data: progress, transient: true }),
+          onDraft: (html) => writer.write({ type: "data-draft", data: { html }, transient: true }),
           onCost: (usd) => writer.write({ type: "data-cost", data: { usd }, transient: true }),
         });
 

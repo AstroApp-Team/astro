@@ -1,4 +1,4 @@
-import { MockLanguageModelV4, mockValues } from "ai/test";
+import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 import { describe, expect, it } from "vite-plus/test";
 
 import { sealViewHtml, type ViewProgress } from "../shared/view.ts";
@@ -9,6 +9,9 @@ import { buildView, gatewayCostUsd } from "./view-agent.ts";
  * these tests exercise the real `ToolLoopAgent`, the real tools, and the real
  * draft state, with only the provider replaced. Stubbing `fetch` instead would
  * test the Gateway's wire format, which is not ours.
+ *
+ * The mock *streams*, input deltas and all, because the loop does: drafts
+ * reach the screen from `onInputDelta`, which a generate-only mock never hits.
  */
 
 const usage = {
@@ -16,78 +19,164 @@ const usage = {
   outputTokens: { total: 20, text: 20, reasoning: undefined },
 } as const;
 
-/** One turn of the loop: the model asks for exactly one tool call. */
-function calls(toolName: string, input: object) {
-  return {
-    content: [
-      {
-        type: "tool-call" as const,
-        toolCallId: `call-${toolName}`,
-        toolName,
-        input: JSON.stringify(input),
-      },
-    ],
-    finishReason: { unified: "tool-calls" as const, raw: undefined },
-    usage,
-    warnings: [],
-  };
-}
+/** Read off the mock rather than imported: `@ai-sdk/provider` is not a direct dependency. */
+type LanguageModelV4StreamPart =
+  Awaited<ReturnType<MockLanguageModelV4["doStream"]>>["stream"] extends ReadableStream<infer Part>
+    ? Part
+    : never;
 
-const GOOD_PAGE = "<!doctype html><html><head></head><body><h1>blue</h1></body></html>";
+type Call = { toolName: string; input: object };
+type Turn = { calls: Call[]; cost?: string };
 
-const PUBLISH = { title: "Page", summary: "A page." };
+/** One tool call, in one turn of the loop. */
+const call = (toolName: string, input: object): Turn => ({ calls: [{ toolName, input }] });
 
 /**
- * Drives the agent through a fixed script of turns, in order. `mockValues`
- * repeats its last value once the script runs out, which is what lets a short
- * script stand in for a model that never stops.
+ * A turn as a provider streams it: each call's input arrives as JSON in
+ * small deltas before the call itself, so a delta can end mid-string — the
+ * same shape `onInputDelta` sees from a real model.
  */
-function scriptedModel(turns: ReturnType<typeof calls>[]) {
-  const next = mockValues(...turns);
-  return new MockLanguageModelV4({ doGenerate: async () => next() });
+function streamTurn({ calls, cost }: Turn, turnIndex: number): LanguageModelV4StreamPart[] {
+  const parts: LanguageModelV4StreamPart[] = [{ type: "stream-start", warnings: [] }];
+
+  calls.forEach(({ toolName, input }, callIndex) => {
+    const id = `call-${turnIndex}-${callIndex}`;
+    const json = JSON.stringify(input);
+
+    parts.push({ type: "tool-input-start", id, toolName });
+    for (let at = 0; at < json.length; at += 24) {
+      parts.push({ type: "tool-input-delta", id, delta: json.slice(at, at + 24) });
+    }
+    parts.push({ type: "tool-input-end", id });
+    parts.push({ type: "tool-call", toolCallId: id, toolName, input: json });
+  });
+
+  parts.push({
+    type: "finish",
+    finishReason: { unified: "tool-calls", raw: undefined },
+    usage,
+    ...(cost != null && { providerMetadata: { gateway: { cost } } }),
+  });
+  return parts;
 }
 
+/**
+ * Drives the agent through a fixed script of turns, in order, repeating the
+ * last one once the script runs out — which is what lets a short script stand
+ * in for a model that never stops. Each turn gets a fresh stream; a
+ * `ReadableStream` can only be read once.
+ */
+function scriptedModel(turns: Turn[]) {
+  let next = 0;
+  const model = new MockLanguageModelV4({
+    doStream: async () => {
+      const index = Math.min(next, turns.length - 1);
+      next += 1;
+      return { stream: convertArrayToReadableStream(streamTurn(turns[index]!, index)) };
+    },
+  });
+  return model;
+}
+
+const GOOD_PAGE =
+  "<!doctype html><html><head><title>Answer</title></head><body><h1>blue</h1></body></html>";
+
+const noop = () => {};
+
 describe("buildView", () => {
-  it("publishes the draft write_view left behind, with the CSP added", async () => {
+  it("finishes in one step once write_view leaves a passing page", async () => {
+    /**
+     * There is no publish step: a page that passes its checks ends the run
+     * on the spot. A second model round-trip here is the latency this design
+     * exists to remove.
+     */
+    const model = scriptedModel([call("write_view", { html: GOOD_PAGE })]);
+
     const view = await buildView({
-      model: scriptedModel([
-        calls("write_view", { html: GOOD_PAGE }),
-        calls("publish_view", { title: "The answer", summary: "It is blue." }),
-      ]),
+      model,
       request: "show me the answer",
-      onProgress: () => {},
-      onCost: () => {},
+      onProgress: noop,
+      onDraft: noop,
+      onCost: noop,
     });
 
-    expect(view.title).toBe("The answer");
-    expect(view.summary).toBe("It is blue.");
-    // The agent never writes the policy; the Worker adds it so the model
-    // cannot be talked out of it.
+    expect(model.doStreamCalls).toHaveLength(1);
+    expect(view.title).toBe("Answer");
+    // The agent never writes the policy or the base styles; the Worker adds
+    // them, so the model cannot be talked out of the first or forget the
+    // second.
     expect(view.html).toContain('<meta http-equiv="Content-Security-Policy"');
+    expect(view.html).toContain("<style>:root{color-scheme:dark");
     expect(view.html).toContain("<h1>blue</h1>");
   });
 
-  it("edits the current page in place instead of rewriting it", async () => {
-    /**
-     * The point of the whole design: the model changes one snippet and the
-     * rest of the document — which it never re-emitted — survives verbatim.
-     */
-    const progress: ViewProgress[] = [];
+  it("paints the page while write_view is still streaming", async () => {
+    const drafts: string[] = [];
 
     const view = await buildView({
-      model: scriptedModel([
-        calls("edit_view", { oldText: "<h1>blue</h1>", newText: "<h1>red</h1>" }),
-        calls("publish_view", { title: "Edited", summary: "Now red." }),
-      ]),
+      model: scriptedModel([call("write_view", { html: GOOD_PAGE })]),
+      request: "show me the answer",
+      onProgress: noop,
+      onDraft: (html) => drafts.push(html),
+      onCost: noop,
+    });
+
+    /**
+     * The first draft goes out off the first delta — half a document, sealed
+     * like any other — and the last is the finished page.
+     */
+    expect(drafts.length).toBeGreaterThan(1);
+    expect(drafts[0]).not.toContain("<h1>blue</h1>");
+    expect(drafts[0]).toContain("Content-Security-Policy");
+    expect(drafts.at(-1)).toBe(view.html);
+  });
+
+  it("edits the current page in place, in one step", async () => {
+    /**
+     * The point of edit_view: the model changes one snippet and the rest of
+     * the document — which it never re-emitted — survives verbatim.
+     */
+    const progress: ViewProgress[] = [];
+    const drafts: string[] = [];
+    const model = scriptedModel([
+      call("edit_view", { oldText: "<h1>blue</h1>", newText: "<h1>red</h1>" }),
+    ]);
+
+    const view = await buildView({
+      model,
       request: "make it red",
       currentHtml: GOOD_PAGE,
       onProgress: (update) => progress.push(update),
-      onCost: () => {},
+      onDraft: (html) => drafts.push(html),
+      onCost: noop,
+    });
+
+    expect(model.doStreamCalls).toHaveLength(1);
+    expect(view.html).toContain("<h1>red</h1>");
+    expect(view.html).toContain("<title>Answer</title>");
+    expect(drafts).toEqual([view.html]);
+    expect(progress.map((update) => update.phase)).toContain("editing");
+  });
+
+  it("applies several edits from one step together", async () => {
+    const view = await buildView({
+      model: scriptedModel([
+        {
+          calls: [
+            { toolName: "edit_view", input: { oldText: "blue", newText: "red" } },
+            { toolName: "edit_view", input: { oldText: "Answer", newText: "Colour" } },
+          ],
+        },
+      ]),
+      request: "make it red and rename it",
+      currentHtml: GOOD_PAGE,
+      onProgress: noop,
+      onDraft: noop,
+      onCost: noop,
     });
 
     expect(view.html).toContain("<h1>red</h1>");
-    expect(view.html).toContain("<!doctype html><html><head>");
-    expect(progress.map((update) => update.phase)).toContain("editing");
+    expect(view.title).toBe("Colour");
   });
 
   it("feeds a failed edit back so the agent can retry", async () => {
@@ -95,14 +184,14 @@ describe("buildView", () => {
 
     const view = await buildView({
       model: scriptedModel([
-        calls("edit_view", { oldText: "<h1>green</h1>", newText: "<h1>red</h1>" }),
-        calls("edit_view", { oldText: "<h1>blue</h1>", newText: "<h1>red</h1>" }),
-        calls("publish_view", PUBLISH),
+        call("edit_view", { oldText: "<h1>green</h1>", newText: "<h1>red</h1>" }),
+        call("edit_view", { oldText: "<h1>blue</h1>", newText: "<h1>red</h1>" }),
       ]),
       request: "make it red",
       currentHtml: GOOD_PAGE,
       onProgress: (update) => progress.push(update),
-      onCost: () => {},
+      onDraft: noop,
+      onCost: noop,
     });
 
     expect(view.html).toContain("<h1>red</h1>");
@@ -120,14 +209,14 @@ describe("buildView", () => {
 
     const view = await buildView({
       model: scriptedModel([
-        calls("edit_view", { oldText: "<p>x</p>", newText: "<p>y</p>" }),
-        calls("edit_view", { oldText: "<p>x</p>", newText: "<p>y</p>", replaceAll: true }),
-        calls("publish_view", PUBLISH),
+        call("edit_view", { oldText: "<p>x</p>", newText: "<p>y</p>" }),
+        call("edit_view", { oldText: "<p>x</p>", newText: "<p>y</p>", replaceAll: true }),
       ]),
       request: "change x to y",
       currentHtml: twice,
-      onProgress: () => {},
-      onCost: () => {},
+      onProgress: noop,
+      onDraft: noop,
+      onCost: noop,
     });
 
     expect(view.html).not.toContain("<p>x</p>");
@@ -139,94 +228,79 @@ describe("buildView", () => {
      * The client sends back the *sealed* document, so every edit cycle would
      * stack another meta tag if sealing were not idempotent.
      */
-    const sealed = sealViewHtml(GOOD_PAGE);
-
     const view = await buildView({
-      model: scriptedModel([
-        calls("edit_view", { oldText: "blue", newText: "red" }),
-        calls("publish_view", PUBLISH),
-      ]),
+      model: scriptedModel([call("edit_view", { oldText: "blue", newText: "red" })]),
       request: "make it red",
-      currentHtml: sealed,
-      onProgress: () => {},
-      onCost: () => {},
+      currentHtml: sealViewHtml(GOOD_PAGE),
+      onProgress: noop,
+      onDraft: noop,
+      onCost: noop,
     });
 
-    const metas = view.html.match(/Content-Security-Policy/g) ?? [];
-    expect(metas).toHaveLength(1);
+    expect(view.html.match(/Content-Security-Policy/g) ?? []).toHaveLength(1);
   });
 
-  it("refuses to publish a draft that fails the checks, and lets the agent fix it", async () => {
+  it("keeps going after a page that fails the checks, until it is fixed", async () => {
     /**
-     * The real failure this guards: on the first live run the model published
-     * without ever checking. The gate runs inside publish_view itself, and a
-     * rejection keeps the loop alive instead of ending it.
+     * A failing write is still drawn — the user sees it arrive — but it does
+     * not end the run: the problems go back to the model as the tool result.
      */
     const progress: ViewProgress[] = [];
+    const script = '<script src="https://cdn.example.com/x.js"></script>';
 
     const view = await buildView({
       model: scriptedModel([
-        calls("write_view", {
-          html: `${GOOD_PAGE}<script src="https://cdn.example.com/x.js"></script>`,
-        }),
-        calls("publish_view", PUBLISH),
-        calls("edit_view", {
-          oldText: '<script src="https://cdn.example.com/x.js"></script>',
-          newText: "",
-        }),
-        calls("publish_view", PUBLISH),
+        call("write_view", { html: GOOD_PAGE.replace("</body>", `${script}</body>`) }),
+        call("edit_view", { oldText: script, newText: "" }),
       ]),
       request: "show me the answer",
       onProgress: (update) => progress.push(update),
-      onCost: () => {},
+      onDraft: noop,
+      onCost: noop,
     });
 
     expect(view.html).not.toContain("cdn.example.com");
-    expect(progress.filter((update) => update.phase === "checking").length).toBeGreaterThan(1);
     const fixing = progress.find((update) => update.phase === "fixing");
     expect(fixing?.problems.join(" ")).toContain("network");
   });
 
-  it("fails loudly when the agent stops without publishing", async () => {
+  it("fails loudly when the agent never reaches a working page", async () => {
     /**
-     * `mockValues` repeats its last value once exhausted, so this is a model
-     * that edits forever — the step cap is what ends it. Silently returning
-     * nothing here would leave the voice agent waiting on a page that is never
-     * coming.
+     * A model that misses the same edit forever — the step cap is what ends
+     * it. Silently returning the old page here would leave the voice agent
+     * waiting on a change that is never coming.
      */
     await expect(
       buildView({
-        model: scriptedModel([calls("edit_view", { oldText: "blue", newText: "red" })]),
+        model: scriptedModel([call("edit_view", { oldText: "green", newText: "red" })]),
         request: "make it red",
         currentHtml: GOOD_PAGE,
-        onProgress: () => {},
-        onCost: () => {},
+        onProgress: noop,
+        onDraft: noop,
+        onCost: noop,
       }),
-    ).rejects.toThrow(/without publishing/);
+    ).rejects.toThrow(/without a working page/);
   });
 
-  it("reports what every step cost, including a run that never publishes", async () => {
+  it("reports what every step cost, including a run that never succeeds", async () => {
     /**
      * The bill arrives per step because a failed build spends money too — a
      * total reported only on success would hide exactly the expensive runs.
      */
-    const billed = (turn: ReturnType<typeof calls>) => ({
-      ...turn,
-      providerMetadata: { gateway: { cost: "0.0000243" } },
-    });
     const costs: number[] = [];
 
     await expect(
       buildView({
-        model: new MockLanguageModelV4({
-          doGenerate: async () => billed(calls("edit_view", { oldText: "blue", newText: "red" })),
-        }),
+        model: scriptedModel([
+          { ...call("edit_view", { oldText: "green", newText: "red" }), cost: "0.0000243" },
+        ]),
         request: "make it red",
         currentHtml: GOOD_PAGE,
-        onProgress: () => {},
+        onProgress: noop,
+        onDraft: noop,
         onCost: (usd) => costs.push(usd),
       }),
-    ).rejects.toThrow(/without publishing/);
+    ).rejects.toThrow(/without a working page/);
 
     expect(costs.length).toBeGreaterThan(1);
     expect(costs.every((usd) => usd === 0.0000243)).toBe(true);
