@@ -8,8 +8,13 @@ import "@ionic/react/css/core.css";
 import "@ionic/react/css/normalize.css";
 import "@ionic/react/css/structure.css";
 import "@ionic/react/css/typography.css";
+/* `ion-padding` and friends live here; without it the class is a no-op. */
+import "@ionic/react/css/padding.css";
 import "./theme/variables.css";
 import "./theme/voice.css";
+/* Astro's overlay. The character paints over the page, so the file has no Ionic theme
+   variables in it — the only sheet colours in the app are here and in the shaders. */
+import "./theme/astro.css";
 
 import App from "./App.tsx";
 import { queryClient } from "./lib/query.ts";

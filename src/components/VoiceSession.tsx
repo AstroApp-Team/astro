@@ -1,7 +1,26 @@
 import { experimental_useRealtime, type Experimental_UseRealtimeOptions } from "@ai-sdk/react";
-import { IonButton, IonChip, IonIcon, IonNote, IonSpinner, IonText } from "@ionic/react";
+import {
+  IonBadge,
+  IonButton,
+  IonButtons,
+  IonContent,
+  IonFooter,
+  IonHeader,
+  IonIcon,
+  IonModal,
+  IonNote,
+  IonSpinner,
+  IonTitle,
+  IonToolbar,
+} from "@ionic/react";
 import { gateway } from "ai";
-import { micOffOutline, micOutline, terminalOutline, volumeHighOutline } from "ionicons/icons";
+import {
+  chatbubblesOutline,
+  micOffOutline,
+  micOutline,
+  stopCircleOutline,
+  terminalOutline,
+} from "ionicons/icons";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -14,9 +33,13 @@ import {
   voiceTurnUsd,
 } from "../../shared/realtime.ts";
 import { realtimeSetupUrl } from "../lib/api.ts";
+import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
+import { faceForSession } from "../lib/astro/interaction.ts";
+import { useAstroStore } from "../lib/astro/store.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
+import UsageMeter from "./UsageMeter.tsx";
 
 /**
  * Both of these are compared by identity inside the hook: a fresh object on
@@ -79,6 +102,14 @@ const EVENT_SPEECH_THROTTLE_MS = 5_000;
 export default function VoiceSession({ password }: { password: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Muted keeps the session open and stops the microphone.
+   *
+   * Deliberately not the same thing as hanging up: the socket bills by the second either
+   * way, so muting is the cheap gesture and ending is the expensive one. Leaving the tracks
+   * alive means unmuting does not re-prompt for permission.
+   */
+  const [muted, setMuted] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const lastActivityRef = useRef(0);
 
@@ -210,16 +241,49 @@ export default function VoiceSession({ password }: { password: string }) {
   }, [status]);
 
   /**
+   * The session's lifecycle, shown as a face.
+   *
+   * The store is the only channel between this component and the character — the
+   * same rule the rest of the page follows, and the reason the hero never reaches
+   * into a mesh: this writes a derived expression, the hero draws it. Reading it
+   * from `status` alone (rather than from the transcript) is what keeps a turn with
+   * no text at all — a tool call — from showing nothing.
+   *
+   * The cleanup parks the character when the session goes away. `Clear` remounts
+   * this component and `Forget the password` replaces it with the gate, and without
+   * a cleanup the last face of a dead session — `look-right`, say — would stay on
+   * the screen as if something were still happening.
+   */
+  useEffect(() => {
+    const face = faceForSession({
+      status,
+      isCapturing,
+      isPlaying,
+      hasError: error != null,
+    });
+    useAstroStore.getState().syncSession(face.expression, face.sustained);
+
+    return () => {
+      /* Unmounting (Clear, Forget password) must not leave a dead session's face up, and it
+         must not leave him asleep either: `idle` is the state a visitor finds him in. */
+      useAstroStore.getState().syncSession(ASTRO_DEFAULT_EXPRESSION, true);
+    };
+  }, [status, isCapturing, isPlaying, error]);
+
+  /**
    * Events sent before the socket opens are dropped, so capture waits for
    * `connected` (which the SDK sets on the session-created event) rather than
    * starting right after `connect()` resolves.
+   *
+   * `muted` is a guard, not a note: without it this effect would restart capture the moment
+   * mute stopped it, and the mute button would blink and do nothing.
    */
   useEffect(() => {
-    if (status !== "connected" || isCapturing) return;
+    if (status !== "connected" || isCapturing || muted) return;
 
     const stream = streamRef.current;
     if (stream) startAudioCapture(stream);
-  }, [status, isCapturing, startAudioCapture]);
+  }, [status, isCapturing, muted, startAudioCapture]);
 
   /**
    * The model must never hear itself. Wired earphones on a laptop combo jack
@@ -244,6 +308,24 @@ export default function VoiceSession({ password }: { password: string }) {
   const start = async () => {
     setError(null);
     setNotice(null);
+
+    /*
+     * `navigator.mediaDevices` is undefined outside a secure context, and reading
+     * `.getUserMedia` off it throws the `TypeError` that used to surface here as
+     * "The microphone could not be opened (TypeError)." — accurate, unactionable, and it
+     * pointed at the device when the problem was the URL. Browsers expose the microphone on
+     * `https`, on `localhost`, and inside the app's own WebView; a LAN address such as
+     * `http://192.168.1.5:5199`, which is exactly where a phone test starts, gets nothing.
+     */
+    if (navigator.mediaDevices?.getUserMedia === undefined) {
+      setError(
+        window.isSecureContext === false
+          ? "The microphone needs https or localhost — this page was opened over plain http."
+          : "This browser exposes no microphone API.",
+      );
+      return;
+    }
+
     try {
       // Requested inside the click so the permission prompt lands in the
       // user's gesture, and so the AudioContext is allowed to make sound.
@@ -263,7 +345,18 @@ export default function VoiceSession({ password }: { password: string }) {
       return;
     }
 
-    await realtime.connect();
+    /*
+     * A second failure point, and a separate message: by here the microphone is open, so a
+     * `TypeError` is the socket or the audio graph, not permission. Left uncaught it was an
+     * unhandled rejection — no message on screen at all.
+     */
+    try {
+      await realtime.connect();
+    } catch (cause) {
+      const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+      setError(`The conversation could not be opened (${detail}).`);
+      stopRef.current();
+    }
   };
 
   const stop = () => {
@@ -323,137 +416,260 @@ export default function VoiceSession({ password }: { password: string }) {
 
   const isLive = status === "connected" || status === "connecting";
 
+  /**
+   * The character's start/stop, published for the overlay.
+   *
+   * He is the page's start button, but the microphone permission and the socket live here —
+   * so the overlay calls through the store rather than reaching into this component. The
+   * wrappers are stable (they read refs), because `start` and `stop` are rebound on every
+   * render and an effect that depended on them would re-register constantly.
+   */
+  const startRef = useRef(start);
+  useEffect(() => {
+    startRef.current = start;
+  });
+
+  useEffect(() => {
+    useAstroStore.getState().setVoice({
+      start: () => void startRef.current(),
+      /* `stopRef` already exists for the idle hang-up, and is re-pointed every render for
+         exactly this reason: `stop` closes over `realtime`, which the hook rebinds. */
+      stop: () => stopRef.current(),
+    });
+
+    return () => useAstroStore.getState().setVoice(null);
+  }, []);
+
+  /* What a tap on him means. Published here because this is where `status` lives. */
+  useEffect(() => {
+    useAstroStore.getState().setLive(isLive);
+  }, [isLive]);
+
+  const toggleMute = () => {
+    if (muted) {
+      setMuted(false);
+      return;
+    }
+
+    realtime.stopAudioCapture();
+    setMuted(true);
+  };
+
+  /* Hanging up while muted must not leave the next session muted. */
+  useEffect(() => {
+    if (!isLive) setMuted(false);
+  }, [isLive]);
+
+  /**
+   * The transcript is a sheet, not a column: the app the coding agent builds is
+   * the page, and the conversation is something you open. A transcript sharing
+   * the app's scroll pushed the app off screen with every line.
+   */
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [seenTurns, setSeenTurns] = useState(0);
+  const unread = transcriptOpen ? 0 : Math.max(0, messages.length - seenTurns);
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+
+  const closeTranscript = () => {
+    setTranscriptOpen(false);
+    setSeenTurns(messages.length);
+  };
+
+  useEffect(() => {
+    if (transcriptOpen) transcriptEndRef.current?.scrollIntoView({ block: "end" });
+  }, [transcriptOpen, messages]);
+
+  const activity = muted
+    ? "muted"
+    : isPlaying
+      ? "speaking"
+      : isCapturing
+        ? "listening"
+        : status === "connecting"
+          ? "connecting"
+          : null;
+
   return (
     <>
-      <div className="voice-controls">
-        {isLive ? (
-          <IonButton color="danger" expand="block" onClick={stop}>
-            <IonIcon slot="start" icon={micOffOutline} />
-            End conversation
-          </IonButton>
-        ) : (
-          <IonButton expand="block" onClick={() => void start()}>
-            <IonIcon slot="start" icon={micOutline} />
-            Start talking
-          </IonButton>
-        )}
-
-        <div className="voice-status">
-          <IonChip color={status === "connected" ? "success" : "medium"}>
-            {status === "connecting" && <IonSpinner name="dots" />}
-            {status}
-          </IonChip>
-          {isCapturing && (
-            <IonChip color="primary">
-              <IonIcon icon={micOutline} />
-              listening
-            </IonChip>
-          )}
-          {isPlaying && (
-            <IonChip color="secondary">
-              <IonIcon icon={volumeHighOutline} />
-              speaking
-            </IonChip>
-          )}
-        </div>
-
-        {error != null && (
-          <IonText color="danger">
-            <p>{error}</p>
-          </IonText>
-        )}
-
-        {notice != null && <IonNote>{notice}</IonNote>}
-      </div>
-
-      {/**
-       * The coding agent's output. `status` is what the run is doing right now,
-       * built from the agent's own lifecycle rather than a spinner — the page
-       * takes ten or twenty seconds and the wait should say why.
-       */}
-      {viewBuilder.status != null && (
-        <div className="voice-building">
-          <IonSpinner name="dots" />
-          <IonNote>{viewBuilder.status}</IonNote>
-        </div>
-      )}
-
-      {viewBuilder.view != null && (
-        <div className="voice-view-panel">
-          {/**
-           * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
-           * whole security model: the document lands on an opaque origin, so
-           * it cannot reach this page's DOM, cookies, or storage. The two are
-           * only safe apart — adding `allow-same-origin` back would hand a
-           * model-written page the run of the app.
-           */}
-          {/**
-           * `onLoad` hands the previous page's saved state to the new one —
-           * this is what lets the coding agent edit a game mid-play without
-           * resetting the score.
-           */}
-          <iframe
-            ref={frameRef}
-            className="voice-view"
-            title={viewBuilder.view.title}
-            sandbox="allow-scripts"
-            srcDoc={viewBuilder.view.html}
-            onLoad={onFrameLoad}
-          />
-          <IonNote className="voice-view-panel__title">{viewBuilder.view.title}</IonNote>
-        </div>
-      )}
-
-      {/**
-       * Dev-only, and the fastest way to tell the two bring-up failures apart:
-       * `audio-delta` arriving with nothing audible is the playback path, no
-       * `audio-delta` at all is the session config.
-       */}
-      {import.meta.env.DEV && events.length > 0 && (
-        <pre className="voice-events">
-          {events
-            .slice(-12)
-            .map((event) => event.type)
-            .join(" · ")}
-        </pre>
-      )}
-
-      {messages.length === 0 ? (
-        <IonNote className="voice-empty">
-          Nothing said yet. Hit start, allow the microphone, and just talk — {VOICE_MODEL_ID}{" "}
-          answers out loud and the transcript shows up here.
-        </IonNote>
-      ) : (
-        <div className="voice-transcript">
-          {messages.map((message) => (
-            <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
-              <span className="voice-turn__role">{message.role}</span>
-              {/**
-               * Rendered part by part rather than joined into one string: a
-               * turn that only calls a tool has no text at all, and collapsing
-               * the parts would make a working call look like a dropped reply.
-               * Part indexes are stable — the reducer updates parts in place.
-               */}
-              {message.parts.map((part, index) => {
-                if (part.type === "text") return <p key={index}>{part.text}</p>;
-
-                if (part.type === "dynamic-tool") {
-                  return (
-                    <p key={part.toolCallId} className="voice-turn__tool">
-                      <IonIcon icon={terminalOutline} />
-                      {part.toolName || "…"}
-                      {part.state === "input-streaming" ? "" : `(${JSON.stringify(part.input)})`}
-                      {part.state === "output-available" && " ✓"}
-                    </p>
-                  );
-                }
-
-                return null;
-              })}
+      <IonContent scrollY={false}>
+        <div className="voice-stage">
+          {viewBuilder.view == null ? (
+            <div className="voice-stage__empty">
+              <p>Tap Astro and just talk.</p>
+              <IonNote>
+                Ask for something (a game, a timer, a checklist) and it shows up here, full screen.{" "}
+                {VOICE_MODEL_ID} answers out loud.
+              </IonNote>
             </div>
-          ))}
+          ) : (
+            /**
+             * `sandbox="allow-scripts"` **without** `allow-same-origin` is the
+             * whole security model: the document lands on an opaque origin, so
+             * it cannot reach this page's DOM, cookies, or storage. The two are
+             * only safe apart — adding `allow-same-origin` back would hand a
+             * model-written page the run of the app.
+             *
+             * `onLoad` hands the previous page's saved state to the new one —
+             * this is what lets the coding agent edit a game mid-play without
+             * resetting the score.
+             */
+            <iframe
+              ref={frameRef}
+              className="voice-view"
+              title={viewBuilder.view.title}
+              sandbox="allow-scripts"
+              srcDoc={viewBuilder.view.html}
+              onLoad={onFrameLoad}
+            />
+          )}
+
+          {/**
+           * Floated over the top of the stage so a status never moves the app.
+           * `status` is what the coding agent is doing right now, built from its
+           * own lifecycle rather than a spinner — the page takes ten or twenty
+           * seconds and the wait should say why.
+           */}
+          <div className="voice-banners">
+            {viewBuilder.status != null && (
+              <div className="voice-banner">
+                <IonSpinner name="dots" />
+                <span>{viewBuilder.status}</span>
+              </div>
+            )}
+            {error != null && (
+              <div className="voice-banner voice-banner--error" role="alert">
+                {error}
+              </div>
+            )}
+            {notice != null && <div className="voice-banner">{notice}</div>}
+          </div>
         </div>
-      )}
+      </IonContent>
+
+      <IonFooter>
+        <IonToolbar>
+          {/**
+           * Astro is the start button — tapping him starts the conversation — so
+           * this bar is the *other* things: stop and mute once it is running, and
+           * a plain fallback when it is not. The fallback is not dead weight: a
+           * WebView without WebGL gets `CanvasBoundary`'s notice instead of a
+           * character, and then this is the only start control.
+           *
+           * Everything is packed to the left: the bottom-right is Astro's corner,
+           * and his tap target there would swallow a button under it.
+           */}
+          <div className="voice-bar">
+            {isLive ? (
+              <>
+                <IonButton
+                  fill="outline"
+                  color="tertiary"
+                  onClick={toggleMute}
+                  title={muted ? "Unmute" : "Mute microphone"}
+                >
+                  <IonIcon slot="icon-only" icon={muted ? micOffOutline : micOutline} />
+                </IonButton>
+                <IonButton color="danger" onClick={stop}>
+                  <IonIcon slot="start" icon={stopCircleOutline} />
+                  End
+                </IonButton>
+              </>
+            ) : (
+              <IonButton fill="outline" onClick={() => void start()}>
+                <IonIcon slot="start" icon={micOutline} />
+                Start
+              </IonButton>
+            )}
+
+            <IonButton
+              fill="clear"
+              className="voice-bar__transcript"
+              onClick={() => setTranscriptOpen(true)}
+              title="Show the transcript"
+            >
+              <IonIcon slot="icon-only" icon={chatbubblesOutline} />
+              {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
+            </IonButton>
+
+            {activity != null && (
+              <IonNote className="voice-bar__activity">
+                {status === "connecting" && <IonSpinner name="dots" />}
+                {activity}
+              </IonNote>
+            )}
+          </div>
+        </IonToolbar>
+      </IonFooter>
+
+      <IonModal
+        isOpen={transcriptOpen}
+        onDidDismiss={closeTranscript}
+        breakpoints={[0, 0.6, 1]}
+        initialBreakpoint={0.6}
+      >
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>Transcript</IonTitle>
+            <IonButtons slot="end">
+              <IonButton onClick={closeTranscript}>Close</IonButton>
+            </IonButtons>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="ion-padding">
+          <UsageMeter />
+
+          {/**
+           * Dev-only, and the fastest way to tell the two bring-up failures apart:
+           * `audio-delta` arriving with nothing audible is the playback path, no
+           * `audio-delta` at all is the session config.
+           */}
+          {import.meta.env.DEV && events.length > 0 && (
+            <pre className="voice-events">
+              {events
+                .slice(-12)
+                .map((event) => event.type)
+                .join(" · ")}
+            </pre>
+          )}
+
+          {messages.length === 0 ? (
+            <IonNote className="voice-empty">Nothing said yet.</IonNote>
+          ) : (
+            <div className="voice-transcript">
+              {messages.map((message) => (
+                <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
+                  <span className="voice-turn__role">{message.role}</span>
+                  {/**
+                   * Rendered part by part rather than joined into one string: a
+                   * turn that only calls a tool has no text at all, and collapsing
+                   * the parts would make a working call look like a dropped reply.
+                   * Part indexes are stable — the reducer updates parts in place.
+                   */}
+                  {message.parts.map((part, index) => {
+                    if (part.type === "text") return <p key={index}>{part.text}</p>;
+
+                    if (part.type === "dynamic-tool") {
+                      return (
+                        <p key={part.toolCallId} className="voice-turn__tool">
+                          <IonIcon icon={terminalOutline} />
+                          {part.toolName || "…"}
+                          {part.state === "input-streaming"
+                            ? ""
+                            : `(${JSON.stringify(part.input)})`}
+                          {part.state === "output-available" && " ✓"}
+                        </p>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+          <div ref={transcriptEndRef} />
+        </IonContent>
+      </IonModal>
     </>
   );
 }

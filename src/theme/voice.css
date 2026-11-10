@@ -1,17 +1,112 @@
-/* Layout for the voice page. Colors come from Ionic's CSS variables so the
-   light/dark system palette in variables.css applies here too. */
+/* Layout for the voice page. Every colour is an `--ion-*` token: the stylesheet's palette is
+   pinned in variables.css, so nothing here names a hex — change the palette in one place and
+   the transcript, the chips and the buttons all move with it. */
 
-.voice-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
+/* The generated app is the page: the stage fills the content box edge to edge and
+   never scrolls, so nothing the conversation does can push the app around. */
+.voice-stage {
+  position: absolute;
+  inset: 0;
 }
 
-.voice-status {
+/* A published view sizes itself to this box, so the box has to have a size —
+   an iframe with no height collapses and the page looks like it never landed. */
+.voice-view {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+  /* Opaque on purpose: a published view sets its own background, and a
+     translucent frame would let the app bleed through it. */
+  background: var(--ion-background-color, #fff);
+}
+
+.voice-stage__empty {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 0 1.5rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.voice-stage__empty p {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.voice-stage__empty ion-note {
+  max-width: 26rem;
+}
+
+/* Statuses float over the top of the stage, so a "building…" or an error never
+   resizes the app underneath. Clicks pass through to the app between them. */
+.voice-banners {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.voice-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  /* The `-rgb` token is comma-separated, which only the legacy `rgba()` form accepts. */
+  background: rgba(var(--ion-background-color-rgb, 26, 21, 44), 0.88);
+  color: var(--ion-text-color, currentcolor);
+  font-size: 0.85rem;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 35%);
+  pointer-events: auto;
+}
+
+.voice-banner--error {
+  border-radius: 0.75rem;
+  color: var(--ion-color-danger);
+}
+
+/* The footer bar. Packed to the left: the bottom-right corner is Astro's, and his
+   tap target there takes every press in that patch of screen. */
+.voice-bar {
+  display: flex;
+  align-items: center;
   gap: 0.25rem;
+  padding: 0 0.5rem;
+}
+
+.voice-bar__transcript {
+  position: relative;
+}
+
+.voice-bar__badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.65rem;
+}
+
+.voice-bar__activity {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+
+.voice-cost {
+  padding: 0 0.5rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .voice-empty {
@@ -38,13 +133,13 @@
   border-radius: 0.75rem;
   padding: 0.6rem 0.9rem;
   max-width: 85%;
-  background: var(--ion-color-step-100, rgb(128 128 128 / 12%));
+  background: var(--ion-background-color-step-100, rgb(128 128 128 / 12%));
   color: var(--ion-text-color, currentcolor);
 }
 
 .voice-turn--user {
   align-self: flex-end;
-  background: var(--ion-color-step-200, rgb(128 128 128 / 22%));
+  background: var(--ion-background-color-step-200, rgb(128 128 128 / 22%));
 }
 
 /* Explicit mid-tone rather than opacity: 0.6 of the text color over a tinted
@@ -73,44 +168,6 @@
   word-break: break-all;
 }
 
-/* The coding agent's output, kept above the transcript so it reads as the
-   thing being talked about rather than another line of conversation. */
-.voice-building {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0.9rem;
-  margin-bottom: 1.25rem;
-  border-radius: 0.75rem;
-  background: var(--ion-color-step-100, rgb(128 128 128 / 12%));
-  color: var(--ion-text-color, currentcolor);
-}
-
-.voice-view-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 1.25rem;
-}
-
-/* A published view sizes itself to this box, so the box has to have a size —
-   an iframe with no height collapses and the page looks like it never landed. */
-.voice-view {
-  width: 100%;
-  height: min(60vh, 30rem);
-  border: none;
-  border-radius: 0.75rem;
-  /* Opaque on purpose: a published view sets its own background, and a
-     translucent frame would let the app bleed through it. */
-  background: var(--ion-background-color, #fff);
-  display: block;
-}
-
-.voice-view-panel__title {
-  font-size: 0.75rem;
-  text-align: center;
-}
-
 .voice-events {
   font-size: 0.65rem;
   color: var(--ion-color-step-600, rgb(128 128 128));
@@ -129,9 +186,16 @@
 
 .usage-meter {
   display: flex;
-  flex-direction: column;
-  padding: 0.4rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
   font-size: 0.9rem;
+}
+
+.usage-meter__text {
+  display: flex;
+  flex-direction: column;
 }
 
 .usage-meter__detail {
