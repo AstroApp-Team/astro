@@ -33,7 +33,13 @@
 
 import { Canvas, useThree } from "@react-three/fiber";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 
 import { ASTRO_REACTION_MS } from "../../lib/astro/expression.ts";
 import {
@@ -159,17 +165,28 @@ function lookDirectionFromPointer(event: PointerEvent): { x: number; y: number }
 function CornerCharacter() {
   const size = useThree((state) => state.size);
   const camera = useThree((state) => state.camera);
+  const getThree = useThree((state) => state.get);
   /* Subscribed, not read with `getState()`: a drag has to move the mesh, and this is the one
      prop on the character that comes from the page. */
   const anchor = useAstroStore((state) => state.anchor);
 
   /* Orthographic: R3F sizes the frustum in pixels (`left = -width/2`) and divides by
-     `zoom`, so a world unit occupies `zoom` pixels. Only `zoom` is ours, and the matrix
-     has to be rebuilt because R3F does not know it changed. */
-  camera.zoom = orthographicZoom(size.width, size.height, HALO_COVERAGE);
-  camera.updateProjectionMatrix();
+     `zoom`, so a world unit occupies `zoom` pixels. Only `zoom` is ours. */
+  const zoom = orthographicZoom(size.width, size.height, HALO_COVERAGE);
 
-  const extent = orthographicHalfExtent(size.width, size.height, camera.zoom);
+  /* Applied in a layout effect, not during render, and on a camera read from `get()`
+     rather than the subscribed `camera`: the React Compiler (panicThreshold
+     `all_errors`, see vite.config.ts) rejects mutating a value a hook returned. The
+     layout effect still lands before the next frame is drawn. The matrix has to be
+     rebuilt because R3F does not know the zoom changed. `camera` stays in the deps so
+     a replaced camera gets the zoom too. */
+  useLayoutEffect(() => {
+    const live = getThree().camera;
+    live.zoom = zoom;
+    live.updateProjectionMatrix();
+  }, [getThree, camera, zoom]);
+
+  const extent = orthographicHalfExtent(size.width, size.height, zoom);
   /* `null` anchor means the shipping corner; anything else is where the user dropped him,
      clamped because a resize can move the edges in under it. */
   const position =
@@ -182,14 +199,18 @@ function CornerCharacter() {
    * handler can subtract it. Orthographic projection makes this arithmetic rather than a
    * matrix: the frame spans `±halfWidth`, and three's camera space has y up, which is the
    * same convention as screen space with y up.
+   *
+   * Published from an effect: writing to a store during render is a side effect the
+   * React Compiler refuses to compile around.
    */
-  useAstroStore.getState().setLookOrigin(
-    position[0] / extent.halfWidth,
-    position[1] / extent.halfHeight,
-    /* `zoom` is pixels per world unit, so this is the glow's radius on screen — the one
-         quantity the press handler needs and the canvas is the only place that knows. */
-    ASTRO_CORNER_HALO_WORLD * camera.zoom,
-  );
+  const originX = position[0] / extent.halfWidth;
+  const originY = position[1] / extent.halfHeight;
+  /* `zoom` is pixels per world unit, so this is the glow's radius on screen — the one
+     quantity the press handler needs and the canvas is the only place that knows. */
+  const haloRadiusPx = ASTRO_CORNER_HALO_WORLD * zoom;
+  useLayoutEffect(() => {
+    useAstroStore.getState().setLookOrigin(originX, originY, haloRadiusPx);
+  }, [originX, originY, haloRadiusPx]);
 
   return <AstroCharacter position={position} />;
 }
