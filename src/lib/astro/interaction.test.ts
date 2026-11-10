@@ -17,14 +17,19 @@ import { useAstroStore } from "./store.ts";
  * without a voice session, so it is tested as the pure function it is.
  */
 describe("faceForSession", () => {
-  it("shows a resting face for a closed session", () => {
+  it("shows an awake resting face for a closed session, not a sleeping one", () => {
+    /*
+     * A dozing mascot beside an empty password field reads as "nothing here is awake". He
+     * stays `idle` instead, which is the one face that follows the cursor, so the page has
+     * something alive in it while the visitor decides.
+     */
     const face = faceForSession({
       status: "disconnected",
       isCapturing: false,
       isPlaying: false,
       hasError: false,
     });
-    expect(face.expression).toBe("doze");
+    expect(face.expression).toBe("idle");
     expect(face.sustained).toBe(true);
   });
 
@@ -156,7 +161,10 @@ describe("the expression store", () => {
     expect(useAstroStore.getState().expression).toBe("look-right");
   });
 
-  it("a press on a sleeping character wakes him instead of starting a greeting", () => {
+  it("a press on a sleeping character still wakes him, for any face that lands there", () => {
+    /* Nothing puts him to sleep any more; the wake path stays because a face can still be
+       written by the page (a debug picker, a future state), and a tap that leaves him asleep
+       would be the one press that does nothing. */
     useAstroStore.getState().syncSession("sleep", true);
     useAstroStore.getState().react();
     expect(useAstroStore.getState().expression).toBe("doze");

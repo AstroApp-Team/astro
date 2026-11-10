@@ -19,6 +19,7 @@ import {
   VOICE_NAME,
 } from "../../shared/realtime.ts";
 import { realtimeSetupUrl } from "../lib/api.ts";
+import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
 import { faceForSession } from "../lib/astro/interaction.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
@@ -242,7 +243,9 @@ export default function VoiceSession({ password }: { password: string }) {
     useAstroStore.getState().syncSession(face.expression, face.sustained);
 
     return () => {
-      useAstroStore.getState().syncSession("doze", true);
+      /* Unmounting (Clear, Forget password) must not leave a dead session's face up, and it
+         must not leave him asleep either: `idle` is the state a visitor finds him in. */
+      useAstroStore.getState().syncSession(ASTRO_DEFAULT_EXPRESSION, true);
     };
   }, [status, isCapturing, isPlaying, error]);
 
@@ -271,6 +274,24 @@ export default function VoiceSession({ password }: { password: string }) {
   const start = async () => {
     setError(null);
     setNotice(null);
+
+    /*
+     * `navigator.mediaDevices` is undefined outside a secure context, and reading
+     * `.getUserMedia` off it throws the `TypeError` that used to surface here as
+     * "The microphone could not be opened (TypeError)." — accurate, unactionable, and it
+     * pointed at the device when the problem was the URL. Browsers expose the microphone on
+     * `https`, on `localhost`, and inside the app's own WebView; a LAN address such as
+     * `http://192.168.1.5:5199`, which is exactly where a phone test starts, gets nothing.
+     */
+    if (navigator.mediaDevices?.getUserMedia === undefined) {
+      setError(
+        window.isSecureContext === false
+          ? "The microphone needs https or localhost — this page was opened over plain http."
+          : "This browser exposes no microphone API.",
+      );
+      return;
+    }
+
     try {
       // Requested inside the click so the permission prompt lands in the
       // user's gesture, and so the AudioContext is allowed to make sound.
@@ -290,7 +311,18 @@ export default function VoiceSession({ password }: { password: string }) {
       return;
     }
 
-    await realtime.connect();
+    /*
+     * A second failure point, and a separate message: by here the microphone is open, so a
+     * `TypeError` is the socket or the audio graph, not permission. Left uncaught it was an
+     * unhandled rejection — no message on screen at all.
+     */
+    try {
+      await realtime.connect();
+    } catch (cause) {
+      const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
+      setError(`The conversation could not be opened (${detail}).`);
+      stopRef.current();
+    }
   };
 
   const stop = () => {

@@ -29,29 +29,41 @@
  */
 
 /**
+ * How far the closed eye is scaled up beyond the sheet's ratio so its curve survives at
+ * phone size.
+ *
+ * The sheet draws the sleeping sliver at `28.7 / 833` of the body, and on a 111 px phone
+ * body that is `3.8 px` — the sag lands under a pixel and the shape reads as a dash, which
+ * is precisely what "make his sleep expression look like the sheet" was asking to fix. So
+ * the sliver is `1.8×` the sheet's height. Faithful in *shape* (taper, sag, lens points),
+ * deliberately thicker in *scale*: `6.0 px` tall with a `1.7 px` sag is the smallest that
+ * still reads as a curved lid. It stays well under the open eye's `19.3 px`.
+ */
+export const SLEEP_EYE_LEGIBILITY = 1.8;
+
+/**
  * Half the sliver's thickness at its middle, in geometry units.
  *
- * Chosen from the sheet rather than by eye, and the arithmetic is worth keeping because the
- * two axes are not the same size. The dash's on-screen bbox should be `28.7 / 90 = 0.319`
- * of its own width; the shape is `2.04` units wide and `2 · DASH_HALF + DASH_DROOP = 0.34`
- * units tall, and the mesh scales those by `0.0498` and `0.0953` world units respectively —
- * `0.0324 / 0.1016 = 0.319`, exactly the sheet's ratio, and `3.3 px` of sliver on a 111 px
- * phone body.
+ * Derived from the sheet, and the arithmetic is worth keeping because the two axes are not
+ * the same size. The dash's on-screen bbox is `2.04` units wide and
+ * `2 · DASH_HALF + DASH_DROOP = 0.62` units tall, and the mesh scales those by `0.0498` and
+ * `0.0953` world units — `0.0591 / 0.1016 = 0.58`, i.e. the sheet's `28.7 / 90 = 0.319`
+ * times `SLEEP_EYE_LEGIBILITY`.
  *
  * (It used to be `0.14 · y`: the right height, the wrong shape — a rectangle, which reads
  * as a dash rather than as a closed eye.)
  */
-const DASH_HALF = 0.12;
+const DASH_HALF = 0.12 * SLEEP_EYE_LEGIBILITY;
 
 /**
  * How far the **lower** edge sags in the middle, in geometry units.
  *
  * Applied to the lower rim only (`(1 - y) / 2`): a bar whose two edges bow together reads
- * as a dash that slid down, while the sheet's eyelid has a top edge that stays put. `0.10`
- * is `42%` of the sliver's full thickness — enough to see the curve at phone size, where
- * the sag is about a pixel and a half on a 2× screen.
+ * as a dash that slid down, while the sheet's eyelid has a top edge that stays put. `0.18`
+ * is `29%` of the sliver's full thickness and `1.7 px` of sag at phone size — the smallest
+ * amount that still reads as a curve rather than a straight edge.
  */
-const DASH_DROOP = 0.1;
+const DASH_DROOP = 0.18;
 
 /** How much thinner the ends are than the middle, as a fraction of `DASH_HALF`. */
 const DASH_TAPER = 0.4;

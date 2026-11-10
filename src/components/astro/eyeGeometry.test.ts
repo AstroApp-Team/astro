@@ -85,13 +85,14 @@ describe("the eye geometry", () => {
     expect(open.height / open.width).toBeCloseTo(111 / 58, 1);
   });
 
-  it("flattens to the sheet's 28.7 : 90 sliver when asleep", () => {
+  it("flattens to the sheet's sliver when asleep, scaled for legibility", () => {
     const asleep = bounds(ASLEEP);
     const open = bounds(OPEN);
 
-    expect(asleep.height / asleep.width).toBeCloseTo(28.7 / 90, 1);
-    /* A third of the open eye's height, not a thin line and not a bar. */
-    expect(asleep.height / open.height).toBeCloseTo(0.17, 1);
+    /* Same shape as the drawing, `1.8×` its height — see SLEEP_EYE_LEGIBILITY. */
+    expect(asleep.height / asleep.width).toBeCloseTo((28.7 / 90) * 1.8, 1);
+    /* Around a third of the open eye's height: a closed lid, not a hairline. */
+    expect(asleep.height / open.height).toBeCloseTo(0.31, 1);
   });
 
   it("hangs its lowest point from the middle, which is the downward curve", () => {

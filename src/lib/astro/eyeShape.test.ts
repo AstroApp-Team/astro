@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { ASTRO_V2_EYE } from "./astroV2.ts";
-import { happyTarget, sleepyTarget } from "./eyeShape.ts";
+import { happyTarget, SLEEP_EYE_LEGIBILITY, sleepyTarget } from "./eyeShape.ts";
 
 /**
  * The eye shapes, asserted in the space they are built in.
@@ -52,13 +52,22 @@ describe("the asleep eye", () => {
     expect(thickness(0.96)).toBeLessThan(thickness(0) * 0.5);
   });
 
-  it("lands on the sheet's 28.7 : 90 aspect on screen", () => {
+  it("lands on the sheet's 28.7 : 90 aspect on screen, times the legibility scale", () => {
     /* Both axes of the mesh are scaled differently, so this is the only assertion that ties
-       the geometry back to the drawing. `28.7 / 90` is the sheet's own ratio. */
+       the geometry back to the drawing. The shape is the sheet's; only the scale is raised,
+       because `28.7 / 833` of a 111 px body is 3.8 px, where the sag is unreadable. */
     const halfWidth = sleepyTarget(1, 0)[0];
     const aspect = screenAspect(2 * halfWidth, top(0) - bottom(0));
 
-    expect(aspect).toBeCloseTo(28.7 / 90, 1);
+    expect(aspect).toBeCloseTo((28.7 / 90) * SLEEP_EYE_LEGIBILITY, 1);
+  });
+
+  it("keeps the sheet's shape: taper, sag and lens points are unchanged by the scale-up", () => {
+    /* The scale multiplies thickness only; widths and taper ratios stay the sheet's, so the
+       sliver is a thicker copy of the drawing rather than a different eyelid. */
+    /* The sheet's `2 · 0.12 + 0.10 = 0.34`, times the scale: the ratios are untouched. */
+    expect(top(0) - bottom(0)).toBeCloseTo(0.34 * SLEEP_EYE_LEGIBILITY, 6);
+    expect(top(0.96) - bottom(0.96)).toBeLessThan((top(0) - bottom(0)) * 0.5);
   });
 
   it("is symmetric in x, so one geometry can serve both eyes", () => {

@@ -21,12 +21,25 @@ export default function PasswordGate() {
     },
   });
 
+  /*
+   * `disabled` used to guard the empty field, and it read as "the button is broken": Ionic dims
+   * a disabled button to a muted `--background` with dark text, and on the ink/orange palette
+   * that pair is nearly invisible. A tap that does nothing is worse than a tap that explains
+   * itself, so the button stays live and an empty submit says what is missing.
+   */
+  const [emptySubmit, setEmptySubmit] = useState(false);
+
   return (
     <form
       className="password-gate"
       onSubmit={(event) => {
         event.preventDefault();
-        if (value.length > 0) unlock.mutate(value);
+        if (value.length === 0) {
+          setEmptySubmit(true);
+          return;
+        }
+        setEmptySubmit(false);
+        unlock.mutate(value);
       }}
     >
       <IonNote>This app makes paid voice calls, so it is behind a shared password.</IonNote>
@@ -45,12 +58,21 @@ export default function PasswordGate() {
         autocapitalize="off"
         spellcheck={false}
         enterkeyhint="go"
-        onIonInput={(event) => setValue(event.detail.value ?? "")}
+        onIonInput={(event) => {
+          setValue(event.detail.value ?? "");
+          setEmptySubmit(false);
+        }}
       />
 
-      <IonButton expand="block" type="submit" disabled={value.length === 0 || unlock.isPending}>
+      <IonButton expand="block" type="submit" disabled={unlock.isPending}>
         {unlock.isPending ? "Checking…" : "Unlock"}
       </IonButton>
+
+      {emptySubmit && (
+        <IonText color="danger">
+          <p>Enter the shared password.</p>
+        </IonText>
+      )}
 
       {unlock.isError && (
         <IonText color="danger">
