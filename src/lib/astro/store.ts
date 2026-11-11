@@ -58,6 +58,10 @@ export type AstroStore = {
   anchor: { x: number; y: number } | null;
   /** True between `pointerdown` and `pointerup` on his handle. */
   dragging: boolean;
+  /** True while the view stage is in fullscreen mode and Astro should disappear. */
+  hidden: boolean;
+  /** Centered initial hero slot above the greeting copy, or `null` once the user starts. */
+  heroSpot: { x: number; y: number } | null;
   /**
    * Is a conversation open (or opening)?
    *
@@ -78,6 +82,8 @@ export type AstroStore = {
   setLookOrigin(x: number, y: number, radius: number): void;
   setAnchor(anchor: { x: number; y: number } | null): void;
   setDragging(dragging: boolean): void;
+  setHidden(hidden: boolean): void;
+  setHeroSpot(heroSpot: { x: number; y: number } | null): void;
   setLive(live: boolean): void;
   setVoice(voice: { start(): void; stop(): void } | null): void;
   /**
@@ -110,6 +116,8 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
   lookRadius: 0,
   anchor: null,
   dragging: false,
+  hidden: false,
+  heroSpot: null,
   live: false,
   voice: null,
 
@@ -127,6 +135,14 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
 
   setDragging(dragging) {
     set({ dragging });
+  },
+
+  setHidden(hidden) {
+    set({ hidden });
+  },
+
+  setHeroSpot(heroSpot) {
+    set({ heroSpot });
   },
 
   setLive(live) {

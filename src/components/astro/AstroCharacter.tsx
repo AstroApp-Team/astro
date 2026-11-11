@@ -28,8 +28,8 @@
  */
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useRef } from "react";
-import { MathUtils, type Mesh, Vector3 } from "three";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { type Group, MathUtils, type Mesh, Vector3 } from "three";
 
 import {
   ASTRO_V2_BODY_RADIUS,
@@ -81,6 +81,7 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
    */
   const expression = useAstroStore((state) => state.expression);
 
+  const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Mesh>(null);
   const leftEyeRef = useRef<Mesh>(null);
   const rightEyeRef = useRef<Mesh>(null);
@@ -91,9 +92,38 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
   const look = useRef({ x: 0, y: 0 });
   /** The body's world position, reused per frame so the loop allocates nothing. */
   const world = useRef(new Vector3());
+  /** Target and spring state for fluid hero-to-corner glide transitions. */
+  const target = useRef({ x: 0, y: 1.6, z: 0 });
+  const spring = useRef({
+    x: 0,
+    y: 1.6,
+    z: 0,
+    vx: 0,
+    vy: 0,
+    seeded: false,
+  });
 
   /** The pose's constants, resolved in render so the loop does not recompute them per frame. */
   const pose = resolveEyePose(expression);
+
+  useLayoutEffect(() => {
+    target.current = { x: position[0], y: position[1], z: position[2] };
+    if (!spring.current.seeded) {
+      spring.current = {
+        x: position[0],
+        y: position[1],
+        z: position[2],
+        vx: 0,
+        vy: 0,
+        seeded: true,
+      };
+      if (groupRef.current) {
+        groupRef.current.position.set(position[0], position[1], position[2]);
+        groupRef.current.scale.setScalar(1);
+      }
+      bodyUniforms.uRadius.value = ASTRO_V2_BODY_RADIUS;
+    }
+  }, [position]);
 
   useEffect(() => {
     applyTunables(tunables);
@@ -102,6 +132,31 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
   useFrame((_, delta) => {
     /* Clamped: a restored tab hands in a multi-second delta, and a step that large lands mid-wave. */
     const dt = Math.min(delta, 1 / 20);
+    const store = useAstroStore.getState();
+
+    /* ── fluid position spring (scale stays constant at full size) ── */
+    const goal = target.current;
+    const motion = spring.current;
+    const posStiffness = store.dragging ? 1600 : 120;
+    const posDamping = store.dragging ? 80 : 22;
+
+    const substeps = 2;
+    const stepDt = dt / substeps;
+    for (let i = 0; i < substeps; i++) {
+      const ax = posStiffness * (goal.x - motion.x) - posDamping * motion.vx;
+      const ay = posStiffness * (goal.y - motion.y) - posDamping * motion.vy;
+      motion.vx += ax * stepDt;
+      motion.vy += ay * stepDt;
+      motion.x += motion.vx * stepDt;
+      motion.y += motion.vy * stepDt;
+    }
+
+    if (groupRef.current) {
+      groupRef.current.position.set(motion.x, motion.y, goal.z);
+      groupRef.current.scale.setScalar(1);
+      groupRef.current.updateMatrixWorld();
+    }
+    bodyUniforms.uRadius.value = ASTRO_V2_BODY_RADIUS;
 
     /* ── expression ── */
     /*
@@ -138,7 +193,6 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
     }
 
     /* ── where the eyes look ── */
-    const store = useAstroStore.getState();
     /*
      * `followPointer` is the pure rule: the expression's resting look plus the pointer's
      * contribution, radially clamped, and *not at all* for a reaction or a sleeping face —
@@ -223,7 +277,7 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
   });
 
   return (
-    <group position={position}>
+    <group ref={groupRef}>
       {/*
         The halo renders *after* the body (`renderOrder` 1) and additively, so its
         transparent middle adds nothing over the sphere and only the rim glows. Its
