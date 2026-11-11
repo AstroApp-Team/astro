@@ -1,12 +1,10 @@
 import { experimental_useRealtime, type Experimental_UseRealtimeOptions } from "@ai-sdk/react";
 import {
   IonBadge,
-  IonButton,
   IonButtons,
   IonContent,
   IonFooter,
   IonHeader,
-  IonIcon,
   IonModal,
   IonNote,
   IonSpinner,
@@ -14,14 +12,6 @@ import {
   IonToolbar,
 } from "@ionic/react";
 import { gateway } from "ai";
-import {
-  chatbubblesOutline,
-  folderOpenOutline,
-  micOffOutline,
-  micOutline,
-  stopCircleOutline,
-  terminalOutline,
-} from "ionicons/icons";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -37,7 +27,13 @@ import {
 } from "../../shared/realtime.ts";
 import { realtimeSetupUrl } from "../lib/api.ts";
 import { ASTRO_DEFAULT_EXPRESSION } from "../lib/astro/astro.ts";
-import { faceForSession } from "../lib/astro/interaction.ts";
+import { faceForSession, pixelsToViewport } from "../lib/astro/interaction.ts";
+import {
+  cloneAudioStream,
+  hasLiveAudioTrack,
+  setAudioTracksEnabled,
+  stopMediaStream,
+} from "../lib/media-stream.ts";
 import { sealViewHtml, VIEW_ALLOW, VIEW_SANDBOX } from "../lib/seal-view.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
@@ -46,6 +42,8 @@ import { useProjectAutoSave } from "../lib/use-projects.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
+import AudioWaveform from "./AudioWaveform.tsx";
+import LiquidGlassIcon from "./LiquidGlassIcon.tsx";
 import ProjectsSheet, { type LoadedProject } from "./ProjectsSheet.tsx";
 import UsageMeter from "./UsageMeter.tsx";
 
@@ -108,19 +106,81 @@ const DOCKED_TRANSCRIPT_QUERY = "(min-width: 900px)";
 /** How often the voice may *speak about* page events. See the effect below. */
 const EVENT_SPEECH_THROTTLE_MS = 5_000;
 
-export default function VoiceSession({ password }: { password: string }) {
+/** Rotating orange prompts shown under Astro on the initial welcome screen. */
+const HERO_PROMPTS = [
+  "Qual é a vibe de hoje?",
+  "O que vamos criar hoje?",
+  "Qual é a ideia do dia?",
+] as const;
+
+const HERO_PROMPT_INTERVAL_MS = 4_200;
+
+/** Brief silent tail before stopping capture so server-VAD closes the user's turn cleanly. */
+const MUTE_SILENCE_TAIL_MS = 350;
+
+/** Ignore leftover audio frames from an interrupted reply for this window (ms). */
+const INTERRUPT_SUPPRESS_MS = 1_500;
+
+/** Ignore startup iframe events/errors right after switching projects so Astro stays silent. */
+const PROJECT_SWITCH_SILENCE_MS = 1_500;
+
+function isResponseActive(events: ReadonlyArray<{ type: string }>): boolean {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const type = events[i]?.type;
+    if (type === "response-done" || type === "speech-started" || type === "session-closed") {
+      return false;
+    }
+    if (
+      type === "response-created" ||
+      type === "audio-delta" ||
+      type === "audio-chunk" ||
+      type === "audio-transcript-delta" ||
+      type === "text-delta"
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export default function VoiceSession({
+  password,
+  fullscreen = false,
+  onExitFullscreen,
+}: {
+  password: string;
+  fullscreen?: boolean;
+  onExitFullscreen?: () => void;
+}) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [promptIndex, setPromptIndex] = useState(0);
   /**
-   * Muted keeps the session open and stops the microphone.
+   * Muted keeps the session open and pauses the microphone.
    *
    * Deliberately not the same thing as hanging up: the socket bills by the second either
-   * way, so muting is the cheap gesture and ending is the expensive one. Leaving the tracks
-   * alive means unmuting does not re-prompt for permission.
+   * way, so muting is the cheap gesture and ending is the expensive one. Keeping the
+   * master tracks alive in `streamRef` (and handing a clone to `realtime`) means
+   * unmuting with "Falar" resumes cleanly without re-prompting for permission.
    */
   const [muted, setMuted] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const captureStreamRef = useRef<MediaStream | null>(null);
+  const muteStopTimerRef = useRef<number | null>(null);
+  const suppressIndexRef = useRef(0);
+  const suppressUntilRef = useRef(0);
+  const suppressProjectEventsUntilRef = useRef(0);
+  const mountedRef = useRef(true);
+  const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+
+  const clearMuteTimer = () => {
+    if (muteStopTimerRef.current != null) {
+      window.clearTimeout(muteStopTimerRef.current);
+      muteStopTimerRef.current = null;
+    }
+  };
 
   const viewBuilder = useViewBuilder({ password });
 
@@ -208,7 +268,41 @@ export default function VoiceSession({ password }: { password: string }) {
     onError: (sessionError) => setError(sessionError.message),
   });
 
-  const { status, messages, events, isCapturing, isPlaying, startAudioCapture } = realtime;
+  const { status, messages, events, isCapturing, isPlaying, startAudioCapture, stopPlayback } =
+    realtime;
+
+  const eventsRef = useRef(events);
+  const statusRef = useRef(status);
+  const cancelResponseRef = useRef(realtime.cancelResponse);
+  const stopPlaybackRef = useRef(stopPlayback);
+  useEffect(() => {
+    eventsRef.current = events;
+    statusRef.current = status;
+    cancelResponseRef.current = realtime.cancelResponse;
+    stopPlaybackRef.current = stopPlayback;
+  });
+
+  useEffect(() => {
+    if (suppressUntilRef.current <= Date.now()) return;
+
+    for (let i = suppressIndexRef.current; i < events.length; i++) {
+      const type = events[i]?.type;
+      if (
+        type === "response-done" ||
+        type === "response-created" ||
+        type === "input-transcription-completed" ||
+        type === "audio-committed" ||
+        type === "speech-started"
+      ) {
+        suppressUntilRef.current = 0;
+        return;
+      }
+    }
+
+    if (isPlaying) {
+      stopPlayback();
+    }
+  }, [events, isPlaying, stopPlayback]);
 
   /**
    * The app's side of the conversation: everything the model learns without a
@@ -217,6 +311,7 @@ export default function VoiceSession({ password }: { password: string }) {
    * instructions explain so the model does not read these aloud.
    */
   const reportToVoice = (report: string, { speak = true } = {}) => {
+    if (status !== "connected") return;
     realtime.sendEvent({
       type: "conversation-item-create",
       item: { type: "text-message", role: "user", text: `(app status) ${report}` },
@@ -255,6 +350,7 @@ export default function VoiceSession({ password }: { password: string }) {
 
   useEffect(() => {
     if (viewEvent == null) return;
+    if (Date.now() < suppressProjectEventsUntilRef.current) return;
 
     const speak = Date.now() - lastSpokenEventRef.current > EVENT_SPEECH_THROTTLE_MS;
     if (speak) lastSpokenEventRef.current = Date.now();
@@ -269,6 +365,7 @@ export default function VoiceSession({ password }: { password: string }) {
   const latestPageError = pageErrors.at(-1);
   useEffect(() => {
     if (latestPageError == null) return;
+    if (Date.now() < suppressProjectEventsUntilRef.current) return;
     reportRef.current(`The page threw an error: ${latestPageError.message}`, { speak: false });
   }, [latestPageError]);
 
@@ -301,60 +398,82 @@ export default function VoiceSession({ password }: { password: string }) {
   useEffect(() => {
     const face = faceForSession({
       status,
-      isCapturing,
+      isCapturing: isCapturing && !muted,
       isPlaying,
       hasError: error != null,
     });
-    useAstroStore.getState().syncSession(face.expression, face.sustained);
+    const store = useAstroStore.getState();
+    store.syncSession(face.expression, face.sustained);
 
     return () => {
       /* Unmounting (Clear, Forget password) must not leave a dead session's face up, and it
          must not leave him asleep either: `idle` is the state a visitor finds him in. */
       useAstroStore.getState().syncSession(ASTRO_DEFAULT_EXPRESSION, true);
     };
-  }, [status, isCapturing, isPlaying, error]);
+  }, [status, isCapturing, muted, isPlaying, error]);
+
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  });
 
   /**
    * Events sent before the socket opens are dropped, so capture waits for
    * `connected` (which the SDK sets on the session-created event) rather than
    * starting right after `connect()` resolves.
    *
-   * `muted` is a guard, not a note: without it this effect would restart capture the moment
-   * mute stopped it, and the mute button would blink and do nothing.
+   * `realtime.stopAudioCapture()` stops every track on the stream it receives when
+   * `api.token` is set, so we pass a clone while `streamRef` holds the live master
+   * stream for `AudioWaveform` and subsequent "Falar" resumes.
    */
   useEffect(() => {
     if (status !== "connected" || isCapturing || muted) return;
 
-    const stream = streamRef.current;
-    if (stream) startAudioCapture(stream);
-  }, [status, isCapturing, muted, startAudioCapture]);
+    const master = streamRef.current;
+    if (!master || !hasLiveAudioTrack(master)) return;
+
+    stopMediaStream(captureStreamRef.current);
+    const captureStream = cloneAudioStream(master);
+    setAudioTracksEnabled(captureStream, true);
+    captureStreamRef.current = captureStream;
+    startAudioCapture(captureStream);
+    if (isPlayingRef.current) {
+      setAudioTracksEnabled(captureStream, false);
+    }
+  }, [status, isCapturing, muted, micStream, startAudioCapture]);
 
   /**
-   * The model must never hear itself. Wired earphones on a laptop combo jack
-   * leak a faint copy of the playback into the headset mic, the browser's gain
-   * control lifts it, and the server's VAD takes it as the user barging in: the
-   * reply is cut a second in and its own words come back as the next user turn.
-   * Browser echo cancellation does not reliably cover Web Audio playback, so
-   * the track is muted while the model speaks — a disabled track sends silence.
-   * The cost is barge-in by voice; "End conversation" still interrupts.
+   * The model must never hear itself, and pausing with `[■]` must immediately
+   * send silence rather than room noise while closing out any active speech turn.
    */
   useEffect(() => {
-    for (const track of streamRef.current?.getAudioTracks() ?? []) track.enabled = !isPlaying;
-  }, [isPlaying]);
+    setAudioTracksEnabled(captureStreamRef.current, !isPlaying && !muted);
+  }, [isPlaying, muted]);
+
+  /* Clean up any cloned capture tracks when leaving the connected state. */
+  useEffect(() => {
+    if (status !== "connected") return;
+    return () => {
+      clearMuteTimer();
+      stopMediaStream(captureStreamRef.current);
+      captureStreamRef.current = null;
+    };
+  }, [status]);
 
   /* Release the microphone if the page navigates away mid-conversation. */
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      for (const track of streamRef.current?.getTracks() ?? []) track.stop();
+      mountedRef.current = false;
+      clearMuteTimer();
+      stopMediaStream(captureStreamRef.current);
+      captureStreamRef.current = null;
+      stopMediaStream(streamRef.current);
+      streamRef.current = null;
     };
   }, []);
 
-  const start = async () => {
-    setError(null);
-    setNotice(null);
-    /* Hanging up while muted must not leave the next session muted. */
-    setMuted(false);
-
+  const openMicrophone = async (): Promise<boolean> => {
     /*
      * `navigator.mediaDevices` is undefined outside a secure context, and reading
      * `.getUserMedia` off it throws the `TypeError` that used to surface here as
@@ -366,16 +485,28 @@ export default function VoiceSession({ password }: { password: string }) {
     if (navigator.mediaDevices?.getUserMedia === undefined) {
       setError(
         window.isSecureContext === false
-          ? "The microphone needs https or localhost — this page was opened over plain http."
-          : "This browser exposes no microphone API.",
+          ? "O microfone precisa de HTTPS ou localhost — esta página foi aberta via HTTP simples."
+          : "Este navegador não disponibiliza uma API de microfone.",
       );
-      return;
+      return false;
     }
 
     try {
+      stopMediaStream(captureStreamRef.current);
+      captureStreamRef.current = null;
+      stopMediaStream(streamRef.current);
+      streamRef.current = null;
+
       // Requested inside the click so the permission prompt lands in the
       // user's gesture, and so the AudioContext is allowed to make sound.
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!mountedRef.current) {
+        stopMediaStream(stream);
+        return false;
+      }
+      streamRef.current = stream;
+      setMicStream(stream);
+      return true;
     } catch (cause) {
       /**
        * The name matters: every failure here used to read as "denied", which
@@ -385,11 +516,23 @@ export default function VoiceSession({ password }: { password: string }) {
       const name = cause instanceof Error ? cause.name : "";
       setError(
         name === "NotAllowedError" || name === "SecurityError" || name === ""
-          ? "Microphone access was denied."
-          : `The microphone could not be opened (${name}).`,
+          ? "O acesso ao microfone foi negado."
+          : `Não foi possível abrir o microfone (${name}).`,
       );
-      return;
+      return false;
     }
+  };
+
+  const start = async () => {
+    clearMuteTimer();
+    suppressUntilRef.current = 0;
+    setHasStarted(true);
+    setError(null);
+    setNotice(null);
+    /* Hanging up while muted must not leave the next session muted. */
+    setMuted(false);
+
+    if (!(await openMicrophone())) return;
 
     /*
      * A second failure point, and a separate message: by here the microphone is open, so a
@@ -400,15 +543,21 @@ export default function VoiceSession({ password }: { password: string }) {
       await realtime.connect();
     } catch (cause) {
       const detail = cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause);
-      setError(`The conversation could not be opened (${detail}).`);
+      setError(`Não foi possível iniciar a conversa (${detail}).`);
       stopRef.current();
     }
   };
 
   const stop = () => {
+    clearMuteTimer();
+    suppressUntilRef.current = 0;
+    stopPlayback();
     realtime.stopAudioCapture();
-    for (const track of streamRef.current?.getTracks() ?? []) track.stop();
+    stopMediaStream(captureStreamRef.current);
+    captureStreamRef.current = null;
+    stopMediaStream(streamRef.current);
     streamRef.current = null;
+    setMicStream(null);
     realtime.disconnect();
   };
 
@@ -432,7 +581,7 @@ export default function VoiceSession({ password }: { password: string }) {
 
     const onVisibilityChange = () => {
       if (!document.hidden) return;
-      setNotice("Hung up when the tab went to the background.");
+      setNotice("Chamada encerrada quando a aba foi para segundo plano.");
       stopRef.current();
     };
 
@@ -453,7 +602,7 @@ export default function VoiceSession({ password }: { password: string }) {
     status === "connected",
     { messages, isPlaying, report: viewBuilder.report, viewEvent },
     () => {
-      setNotice("Hung up after two minutes of silence.");
+      setNotice("Chamada encerrada após dois minutos de silêncio.");
       stopRef.current();
     },
   );
@@ -489,14 +638,60 @@ export default function VoiceSession({ password }: { password: string }) {
     useAstroStore.getState().setLive(isLive);
   }, [isLive]);
 
+  const interruptAssistant = (): boolean => {
+    const active = isPlayingRef.current || isResponseActive(eventsRef.current);
+    stopPlaybackRef.current();
+    if (!active) return false;
+
+    suppressIndexRef.current = eventsRef.current.length;
+    suppressUntilRef.current = Date.now() + INTERRUPT_SUPPRESS_MS;
+    if (statusRef.current === "connected") {
+      try {
+        cancelResponseRef.current();
+      } catch {
+        /* Session closing between click and dispatch is harmless here. */
+      }
+    }
+    return true;
+  };
+
   const toggleMute = () => {
-    if (muted) {
+    if (!muted) {
+      const interrupted = interruptAssistant();
+      setMuted(true);
+      setAudioTracksEnabled(captureStreamRef.current, false);
+      clearMuteTimer();
+
+      if (interrupted) {
+        realtime.stopAudioCapture();
+        stopMediaStream(captureStreamRef.current);
+        captureStreamRef.current = null;
+        return;
+      }
+
+      muteStopTimerRef.current = window.setTimeout(() => {
+        muteStopTimerRef.current = null;
+        realtime.stopAudioCapture();
+        stopMediaStream(captureStreamRef.current);
+        captureStreamRef.current = null;
+      }, MUTE_SILENCE_TAIL_MS);
+      return;
+    }
+
+    interruptAssistant();
+    clearMuteTimer();
+    const existing = streamRef.current;
+    if (existing && hasLiveAudioTrack(existing)) {
+      setAudioTracksEnabled(captureStreamRef.current, !isPlayingRef.current);
       setMuted(false);
       return;
     }
 
-    realtime.stopAudioCapture();
-    setMuted(true);
+    void (async () => {
+      if (await openMicrophone()) {
+        setMuted(false);
+      }
+    })();
   };
 
   /**
@@ -526,6 +721,66 @@ export default function VoiceSession({ password }: { password: string }) {
    * and he would sit on top of the newest lines.
    */
   const docked = useMediaQuery(DOCKED_TRANSCRIPT_QUERY);
+  const heroSlotRef = useRef<HTMLDivElement>(null);
+  const isHero = !hasStarted && !isLive && viewBuilder.screen == null && !fullscreen;
+
+  useEffect(() => {
+    if (!isHero) return;
+    const timer = window.setInterval(() => {
+      setPromptIndex((current) => (current + 1) % HERO_PROMPTS.length);
+    }, HERO_PROMPT_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [isHero]);
+
+  useEffect(() => {
+    if (!isHero) {
+      useAstroStore.getState().setHeroSpot(null);
+      return;
+    }
+
+    const slot = heroSlotRef.current;
+    if (!slot) return;
+
+    const updateHeroSpot = () => {
+      const rect = slot.getBoundingClientRect();
+      if (
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        window.innerWidth <= 0 ||
+        window.innerHeight <= 0
+      ) {
+        return;
+      }
+      const center = pixelsToViewport(
+        { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+        window.innerWidth,
+        window.innerHeight,
+      );
+      const prev = useAstroStore.getState().heroSpot;
+      if (
+        prev != null &&
+        Math.abs(prev.x - center.x) < 0.001 &&
+        Math.abs(prev.y - center.y) < 0.001
+      ) {
+        return;
+      }
+      useAstroStore.getState().setHeroSpot(center);
+    };
+
+    updateHeroSpot();
+    const rafId = window.requestAnimationFrame(updateHeroSpot);
+    const observer = new ResizeObserver(updateHeroSpot);
+    observer.observe(slot);
+    observer.observe(document.documentElement);
+    window.addEventListener("resize", updateHeroSpot);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      observer.disconnect();
+      window.removeEventListener("resize", updateHeroSpot);
+      useAstroStore.getState().setHeroSpot(null);
+    };
+  }, [isHero, docked, transcriptOpen, projectsOpen]);
 
   const toggleTranscript = () => {
     if (transcriptOpen) {
@@ -546,15 +801,14 @@ export default function VoiceSession({ password }: { password: string }) {
   };
 
   const handleSelectProject = (project: LoadedProject) => {
+    suppressProjectEventsUntilRef.current = Date.now() + PROJECT_SWITCH_SILENCE_MS;
     setActiveProjectId(project.id);
     restoreState(project.state);
     viewBuilder.loadView({ title: project.title, html: project.html });
-    if (status === "connected") {
-      reportRef.current(`The user opened the saved project "${project.title}".`, { speak: false });
-    }
   };
 
   const handleNewProject = () => {
+    suppressProjectEventsUntilRef.current = Date.now() + PROJECT_SWITCH_SILENCE_MS;
     setActiveProjectId(null);
     restoreState(undefined);
     viewBuilder.loadView(null);
@@ -583,12 +837,18 @@ export default function VoiceSession({ password }: { password: string }) {
       )}
 
       {messages.length === 0 ? (
-        <IonNote className="voice-empty">Nothing said yet.</IonNote>
+        <IonNote className="voice-empty">Nada dito ainda.</IonNote>
       ) : (
         <div className="voice-transcript">
           {messages.map((message) => (
             <div key={message.id} className={`voice-turn voice-turn--${message.role}`}>
-              <span className="voice-turn__role">{message.role}</span>
+              <span className="voice-turn__role">
+                {message.role === "user"
+                  ? "Você"
+                  : message.role === "assistant"
+                    ? "Astro"
+                    : message.role}
+              </span>
               {/**
                * Rendered part by part rather than joined into one string: a
                * turn that only calls a tool has no text at all, and collapsing
@@ -601,7 +861,7 @@ export default function VoiceSession({ password }: { password: string }) {
                 if (part.type === "dynamic-tool") {
                   return (
                     <p key={part.toolCallId} className="voice-turn__tool">
-                      <IonIcon icon={terminalOutline} />
+                      <LiquidGlassIcon name="terminal" size={15} />
                       {part.toolName || "…"}
                       {part.state === "input-streaming" ? "" : `(${JSON.stringify(part.input)})`}
                       {part.state === "output-available" && " ✓"}
@@ -622,32 +882,36 @@ export default function VoiceSession({ password }: { password: string }) {
   const activity = !isLive
     ? null
     : muted
-      ? "muted"
+      ? "silenciado"
       : isPlaying
-        ? "speaking"
+        ? "falando"
         : isCapturing
-          ? "listening"
+          ? "ouvindo"
           : status === "connecting"
-            ? "connecting"
+            ? "conectando"
             : null;
 
   return (
     <>
       <IonContent scrollY={false}>
         <div className="voice-layout">
-          {docked && transcriptOpen && (
-            <aside className="voice-panel" aria-label="Transcript">
+          {docked && transcriptOpen && !fullscreen && (
+            <aside className="voice-panel" aria-label="Transcrição">
               <header className="voice-panel__header">
-                <h2>Transcript</h2>
-                <IonButton fill="clear" size="small" onClick={closeTranscript}>
-                  Close
-                </IonButton>
+                <h2>Transcrição</h2>
+                <button
+                  type="button"
+                  className="apple-liquid-glass-pill apple-liquid-glass-pill--dark apple-liquid-glass-pill--sm"
+                  onClick={closeTranscript}
+                >
+                  Fechar
+                </button>
               </header>
               <div className="voice-panel__body">{transcriptBody}</div>
             </aside>
           )}
           <ProjectsSheet
-            isOpen={projectsOpen}
+            isOpen={projectsOpen && !fullscreen}
             docked={docked}
             password={password}
             activeProjectId={activeProjectId}
@@ -656,15 +920,45 @@ export default function VoiceSession({ password }: { password: string }) {
             onNewProject={handleNewProject}
             onActiveProjectDeleted={handleActiveProjectDeleted}
           />
-          <div className="voice-stage">
+          <div className={`voice-stage${fullscreen ? " voice-stage--fullscreen" : ""}`}>
+            {fullscreen && onExitFullscreen != null && (
+              <button
+                type="button"
+                className="apple-liquid-glass-pill apple-liquid-glass-pill--dark apple-liquid-glass-pill--sm voice-stage__exit-fullscreen"
+                onClick={onExitFullscreen}
+                title="Voltar para a tela original"
+                aria-label="Voltar para a tela original"
+              >
+                <LiquidGlassIcon name="exit-fullscreen" size={16} />
+                Voltar
+              </button>
+            )}
             {viewBuilder.screen == null ? (
-              <div className="voice-stage__empty">
-                <p>Tap Astro and just talk.</p>
-                <IonNote>
-                  Ask for something (a game, a timer, a checklist) and it shows up here, full
-                  screen. {VOICE_MODEL_ID} answers out loud.
-                </IonNote>
-              </div>
+              isHero ? (
+                <div className="voice-stage__empty voice-stage__empty--hero">
+                  <div
+                    ref={heroSlotRef}
+                    className="voice-stage__astro-hero-slot"
+                    aria-hidden="true"
+                  />
+                  <p key={promptIndex} className="voice-stage__headline">
+                    {HERO_PROMPTS[promptIndex]}
+                  </p>
+                  <span className="voice-stage__subline">Toque no astro para começar</span>
+                </div>
+              ) : (
+                <div className="voice-stage__empty">
+                  <p className="voice-stage__headline">
+                    {isLive
+                      ? "Estou ouvindo. Pode pedir o que quiser."
+                      : "Toque em Iniciar ou no Astro."}
+                  </p>
+                  <IonNote>
+                    Peça algo (um jogo, um temporizador, uma lista) e aparece aqui em tela cheia.{" "}
+                    {VOICE_MODEL_ID} responde em voz alta.
+                  </IonNote>
+                </div>
+              )
             ) : (
               /**
                * `VIEW_SANDBOX` / `VIEW_ALLOW` open nearly everything — see
@@ -705,7 +999,7 @@ export default function VoiceSession({ password }: { password: string }) {
               )}
               {viewBuilder.failure != null && (
                 <div className="voice-banner voice-banner--error" role="alert">
-                  The page could not be built: {viewBuilder.failure}
+                  Não foi possível criar a página: {viewBuilder.failure}
                 </div>
               )}
               {error != null && (
@@ -715,63 +1009,6 @@ export default function VoiceSession({ password }: { password: string }) {
               )}
               {notice != null && <div className="voice-banner">{notice}</div>}
             </div>
-          </div>
-        </div>
-      </IonContent>
-
-      <IonFooter>
-        <IonToolbar>
-          {/**
-           * Astro is the start button — tapping him starts the conversation — so
-           * this bar is the *other* things: stop and mute once it is running, and
-           * a plain fallback when it is not. The fallback is not dead weight: a
-           * WebView without WebGL gets `CanvasBoundary`'s notice instead of a
-           * character, and then this is the only start control.
-           *
-           * Everything is packed to the left: the bottom-right is Astro's corner,
-           * and his tap target there would swallow a button under it.
-           */}
-          <div className="voice-bar">
-            {isLive ? (
-              <>
-                <IonButton
-                  fill="outline"
-                  color="tertiary"
-                  onClick={toggleMute}
-                  title={muted ? "Unmute" : "Mute microphone"}
-                >
-                  <IonIcon slot="icon-only" icon={muted ? micOffOutline : micOutline} />
-                </IonButton>
-                <IonButton color="danger" onClick={stop}>
-                  <IonIcon slot="start" icon={stopCircleOutline} />
-                  End
-                </IonButton>
-              </>
-            ) : (
-              <IonButton fill="outline" onClick={() => void start()}>
-                <IonIcon slot="start" icon={micOutline} />
-                Start
-              </IonButton>
-            )}
-
-            <IonButton
-              fill="clear"
-              className="voice-bar__transcript"
-              onClick={toggleTranscript}
-              title={transcriptOpen ? "Hide the transcript" : "Show the transcript"}
-            >
-              <IonIcon slot="icon-only" icon={chatbubblesOutline} />
-              {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
-            </IonButton>
-
-            <IonButton
-              fill="clear"
-              onClick={toggleProjects}
-              title={projectsOpen ? "Hide projects" : "Saved projects"}
-              aria-label={projectsOpen ? "Hide projects" : "Saved projects"}
-            >
-              <IonIcon slot="icon-only" icon={folderOpenOutline} />
-            </IonButton>
 
             {activity != null && (
               <IonNote className="voice-bar__activity">
@@ -780,25 +1017,120 @@ export default function VoiceSession({ password }: { password: string }) {
               </IonNote>
             )}
           </div>
-        </IonToolbar>
-      </IonFooter>
+        </div>
+      </IonContent>
+
+      {!fullscreen && (
+        <IonFooter className="astro-footer">
+          <IonToolbar className="astro-toolbar">
+            {/**
+             * Astro is the start button — tapping him starts the conversation — and the
+             * Start / live controls stay centered in the middle of the bar while utility
+             * buttons sit on the left, keeping the bottom-right corner clear for Astro 3D.
+             */}
+            <div className="voice-bar">
+              <div className="voice-bar__left">
+                <button
+                  type="button"
+                  className={`apple-liquid-glass-btn voice-bar__transcript${transcriptOpen ? " apple-liquid-glass-btn--active" : ""}`}
+                  onClick={toggleTranscript}
+                  title={transcriptOpen ? "Ocultar transcrição" : "Mostrar transcrição"}
+                  aria-label={transcriptOpen ? "Ocultar transcrição" : "Mostrar transcrição"}
+                >
+                  <LiquidGlassIcon
+                    name="chat"
+                    tone={transcriptOpen ? "active" : "default"}
+                    size={20}
+                  />
+                  {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
+                </button>
+
+                <button
+                  type="button"
+                  className={`apple-liquid-glass-btn${projectsOpen ? " apple-liquid-glass-btn--active" : ""}`}
+                  onClick={toggleProjects}
+                  title={projectsOpen ? "Ocultar projetos" : "Projetos salvos"}
+                  aria-label={projectsOpen ? "Ocultar projetos" : "Projetos salvos"}
+                >
+                  <LiquidGlassIcon
+                    name="folder"
+                    tone={projectsOpen ? "active" : "default"}
+                    size={20}
+                  />
+                </button>
+              </div>
+
+              <div className="voice-bar__center">
+                {isLive ? (
+                  muted ? (
+                    <button
+                      type="button"
+                      className="apple-liquid-glass-pill apple-liquid-glass-pill--primary"
+                      onClick={toggleMute}
+                      title="Falar"
+                      aria-label="Falar"
+                    >
+                      <LiquidGlassIcon name="mic" tone="cream" size={18} />
+                      Falar
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="apple-liquid-glass-square"
+                        onClick={toggleMute}
+                        title="Parar de falar"
+                        aria-label="Parar de falar"
+                      >
+                        <LiquidGlassIcon name="stop-square" tone="cream" size={18} />
+                      </button>
+                      <AudioWaveform
+                        stream={micStream}
+                        active={isLive && !muted && isCapturing && !isPlaying}
+                      />
+                    </>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className="apple-liquid-glass-pill apple-liquid-glass-pill--primary"
+                    onClick={() => void start()}
+                  >
+                    <LiquidGlassIcon name="mic" tone="cream" size={18} />
+                    Iniciar
+                  </button>
+                )}
+              </div>
+
+              <div className="voice-bar__right" />
+            </div>
+          </IonToolbar>
+        </IonFooter>
+      )}
 
       {/* Phones keep the sheet: there, dragging it is the native gesture. */}
       <IonModal
-        isOpen={transcriptOpen && !docked}
+        className="astro-modal"
+        isOpen={transcriptOpen && !docked && !fullscreen}
         onDidDismiss={closeTranscript}
         breakpoints={[0, 0.6, 1]}
         initialBreakpoint={0.6}
       >
-        <IonHeader>
-          <IonToolbar>
-            <IonTitle>Transcript</IonTitle>
+        <IonHeader className="astro-header">
+          <IonToolbar className="astro-toolbar">
+            <IonTitle>Transcrição</IonTitle>
             <IonButtons slot="end">
-              <IonButton onClick={closeTranscript}>Close</IonButton>
+              <button
+                type="button"
+                className="apple-liquid-glass-pill apple-liquid-glass-pill--dark apple-liquid-glass-pill--sm"
+                onClick={closeTranscript}
+              >
+                Fechar
+              </button>
             </IonButtons>
           </IonToolbar>
         </IonHeader>
-        <IonContent className="ion-padding">{transcriptBody}</IonContent>
+        <IonContent className="ion-padding astro-modal-content">{transcriptBody}</IonContent>
       </IonModal>
     </>
   );
