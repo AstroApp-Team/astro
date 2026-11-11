@@ -38,10 +38,10 @@ export class CanvasBoundary extends Component<Props, State> {
     if (error == null) return this.props.children;
     return (
       <div className="canvas-fallback" role="alert">
-        <p className="canvas-fallback__title">3D unavailable</p>
+        <p className="canvas-fallback__title">3D indisponível</p>
         <p className="canvas-fallback__body">
-          {this.props.what} cannot be drawn because this browser has no usable WebGL context. The
-          rest of the page still works.
+          {this.props.what} não pode ser desenhado porque este navegador não possui um contexto
+          WebGL utilizável. O restante da página continua funcionando.
         </p>
         <p className="canvas-fallback__detail mono">{error.message}</p>
       </div>

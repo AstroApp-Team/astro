@@ -1,7 +1,7 @@
-import { IonButton, IonIcon, IonNote } from "@ionic/react";
-import { refreshOutline } from "ionicons/icons";
+import { IonNote } from "@ionic/react";
 
 import { resetUsage, usageToUsd, useVoiceUsage } from "../lib/voice-usage.ts";
+import LiquidGlassIcon from "./LiquidGlassIcon.tsx";
 
 function formatDuration(seconds: number): string {
   const whole = Math.floor(seconds);
@@ -23,17 +23,23 @@ export default function UsageMeter() {
           <strong>${usageToUsd(usage).toFixed(4)}</strong>
           <IonNote>
             {" "}
-            spent · voice ${usage.voiceUsd.toFixed(4)} · pages ${usage.viewUsd.toFixed(4)}
+            gasto · voz ${usage.voiceUsd.toFixed(4)} · páginas ${usage.viewUsd.toFixed(4)}
           </IonNote>
         </div>
         <IonNote className="usage-meter__detail">
-          {usage.sessions} session{usage.sessions === 1 ? "" : "s"} ·{" "}
-          {formatDuration(usage.seconds)} connected
+          {usage.sessions} {usage.sessions === 1 ? "sessão" : "sessões"} ·{" "}
+          {formatDuration(usage.seconds)} conectado
         </IonNote>
       </div>
-      <IonButton fill="clear" size="small" onClick={resetUsage} title="Reset the running total">
-        <IonIcon slot="icon-only" icon={refreshOutline} />
-      </IonButton>
+      <button
+        type="button"
+        className="apple-liquid-glass-btn apple-liquid-glass-btn--sm"
+        onClick={resetUsage}
+        title="Zerar total acumulado"
+        aria-label="Zerar total acumulado"
+      >
+        <LiquidGlassIcon name="refresh" size={16} />
+      </button>
     </div>
   );
 }

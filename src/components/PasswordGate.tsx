@@ -1,4 +1,4 @@
-import { IonButton, IonInput, IonNote, IonText } from "@ionic/react";
+import { IonInput, IonNote, IonText } from "@ionic/react";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -16,7 +16,7 @@ export default function PasswordGate() {
   const unlock = useMutation({
     mutationFn: async (password: string) => {
       const res = await api.auth.$post({ json: { password } });
-      if (!res.ok) throw new Error("Wrong password");
+      if (!res.ok) throw new Error("Senha incorreta");
       setPassword(password);
     },
   });
@@ -42,16 +42,19 @@ export default function PasswordGate() {
         unlock.mutate(value);
       }}
     >
-      <IonNote>This app makes paid voice calls, so it is behind a shared password.</IonNote>
+      <IonNote className="password-gate__note">
+        Este aplicativo faz chamadas de voz pagas e é protegido por uma senha compartilhada.
+      </IonNote>
 
       <IonInput
+        className="password-gate__input"
         /* `fill="outline"` is what makes this look like a field. Ionic's modern input with no
            `fill` renders a floating label over a bare line — on a phone that reads as "there is
            no textbox here", which is exactly how the gate was reported. */
         fill="outline"
-        label="Password"
+        label="Senha"
         labelPlacement="stacked"
-        placeholder="Shared password"
+        placeholder="Senha compartilhada"
         type="password"
         value={value}
         autocomplete="current-password"
@@ -64,18 +67,22 @@ export default function PasswordGate() {
         }}
       />
 
-      <IonButton expand="block" type="submit" disabled={unlock.isPending}>
-        {unlock.isPending ? "Checking…" : "Unlock"}
-      </IonButton>
+      <button
+        className="apple-liquid-glass-pill apple-liquid-glass-pill--primary apple-liquid-glass-pill--block"
+        type="submit"
+        disabled={unlock.isPending}
+      >
+        {unlock.isPending ? "Verificando…" : "Desbloquear"}
+      </button>
 
       {emptySubmit && (
-        <IonText color="danger">
-          <p>Enter the shared password.</p>
+        <IonText color="danger" className="password-gate__error">
+          <p>Digite a senha compartilhada.</p>
         </IonText>
       )}
 
       {unlock.isError && (
-        <IonText color="danger">
+        <IonText color="danger" className="password-gate__error">
           <p>{unlock.error.message}</p>
         </IonText>
       )}

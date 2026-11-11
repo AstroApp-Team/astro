@@ -127,13 +127,15 @@ export function useViewBuilder({ password }: { password: string }) {
   const check = async (landed: View) => {
     const run = runRef.current;
     const id = run.id;
-    setStatus("Checking the page…");
+    setStatus("Verificando a página…");
     const problems = await runViewCheck(landed.html);
     if (runRef.current.id !== id) return;
 
     if (problems.length > 0 && run.fixes < MAX_AUTO_FIXES) {
       run.fixes += 1;
-      setStatus(`Fixing ${problems.length} problem${problems.length === 1 ? "" : "s"}…`);
+      setStatus(
+        `Corrigindo ${problems.length} ${problems.length === 1 ? "problema" : "problemas"}…`,
+      );
       send(
         "Running the page found these problems. Fix them without changing anything else:\n" +
           problems.map((problem) => `- ${problem}`).join("\n"),
@@ -195,7 +197,11 @@ export function useViewBuilder({ password }: { password: string }) {
       baseline: view?.html ?? null,
       landed: null,
     };
-    setStatus(mode === "rebuild" ? "Rebuilding the app — this takes a little while…" : "Starting…");
+    setStatus(
+      mode === "rebuild"
+        ? "Reconstruindo o aplicativo — isso leva alguns instantes…"
+        : "Iniciando…",
+    );
     setFailure(null);
     send(request, {
       mode,

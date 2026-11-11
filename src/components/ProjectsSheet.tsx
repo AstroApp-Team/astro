@@ -1,10 +1,8 @@
 import {
   IonBadge,
-  IonButton,
   IonButtons,
   IonContent,
   IonHeader,
-  IonIcon,
   IonModal,
   IonNote,
   IonSpinner,
@@ -12,7 +10,6 @@ import {
   IonToolbar,
 } from "@ionic/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addOutline, trashOutline } from "ionicons/icons";
 
 import {
   fetchProjectDetails,
@@ -20,6 +17,7 @@ import {
   useDeleteProject,
   useProjectsList,
 } from "../lib/use-projects.ts";
+import LiquidGlassIcon from "./LiquidGlassIcon.tsx";
 
 export type LoadedProject = {
   id: string;
@@ -47,7 +45,7 @@ function specCount(spec: string): number {
 function formatUpdatedAt(isoDate: string): string {
   const date = new Date(isoDate);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString("pt-BR", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
@@ -85,7 +83,7 @@ function ProjectsSheetBody({
       });
       const indexFile = details.files.find((file) => file.filePath === "index.html");
       if (!indexFile) {
-        throw new Error("This project does not have an index.html file yet.");
+        throw new Error("Este projeto ainda não possui um arquivo index.html.");
       }
       return {
         id: details.id,
@@ -115,42 +113,42 @@ function ProjectsSheetBody({
   return (
     <div className="projects-sheet">
       <div className="projects-sheet__actions">
-        <IonButton
-          expand="block"
-          fill="outline"
-          size="small"
+        <button
+          type="button"
+          className="apple-liquid-glass-pill apple-liquid-glass-pill--dark apple-liquid-glass-pill--block"
           onClick={() => {
             onNewProject();
             onClose();
           }}
         >
-          <IonIcon slot="start" icon={addOutline} />
-          New blank project
-        </IonButton>
+          <LiquidGlassIcon name="add" size={18} />
+          Novo projeto em branco
+        </button>
       </div>
 
       {actionError != null && (
         <IonNote color="danger" className="projects-sheet__status">
-          {actionError instanceof Error ? actionError.message : "Project action failed."}
+          {actionError instanceof Error ? actionError.message : "Falha na ação do projeto."}
         </IonNote>
       )}
 
       {isLoading && (
         <div className="projects-sheet__loading">
           <IonSpinner name="dots" />
-          <IonNote>Loading projects…</IonNote>
+          <IonNote>Carregando projetos…</IonNote>
         </div>
       )}
 
       {isError && (
         <IonNote color="danger" className="projects-sheet__status">
-          {error instanceof Error ? error.message : "Failed to load projects."}
+          {error instanceof Error ? error.message : "Falha ao carregar projetos."}
         </IonNote>
       )}
 
       {!isLoading && !isError && (projects == null || projects.length === 0) && (
         <IonNote className="voice-empty">
-          No saved projects yet. Ask Astro to build something and it saves here automatically.
+          Nenhum projeto salvo ainda. Peça ao Astro para criar algo e ele será salvo aqui
+          automaticamente.
         </IonNote>
       )}
 
@@ -174,30 +172,29 @@ function ProjectsSheetBody({
                 >
                   <div className="project-card__title-row">
                     <span className="project-card__title">{project.title}</span>
-                    {isActive && <IonBadge color="primary">Active</IonBadge>}
+                    {isActive && <IonBadge className="project-card__badge">Ativo</IonBadge>}
                     {isOpening && <IonSpinner name="dots" />}
                   </div>
                   <div className="project-card__meta">
                     <span>{formatUpdatedAt(project.updatedAt)}</span>
                     {features > 0 && (
                       <span>
-                        {features} feature{features === 1 ? "" : "s"}
+                        {features} {features === 1 ? "recurso" : "recursos"}
                       </span>
                     )}
                   </div>
                 </button>
 
-                <IonButton
-                  fill="clear"
-                  size="small"
-                  color="medium"
+                <button
+                  type="button"
+                  className="apple-liquid-glass-btn apple-liquid-glass-btn--sm apple-liquid-glass-btn--danger"
                   disabled={deleteProject.isPending}
                   onClick={() => handleDelete(project.id)}
-                  aria-label={`Delete ${project.title}`}
-                  title={`Delete ${project.title}`}
+                  aria-label={`Excluir ${project.title}`}
+                  title={`Excluir ${project.title}`}
                 >
-                  <IonIcon slot="icon-only" icon={trashOutline} />
-                </IonButton>
+                  <LiquidGlassIcon name="trash" tone="ember" size={16} />
+                </button>
               </li>
             );
           })}
@@ -221,12 +218,16 @@ export default function ProjectsSheet({
     if (!isOpen) return null;
 
     return (
-      <aside className="voice-panel" aria-label="Projects">
+      <aside className="voice-panel" aria-label="Projetos">
         <header className="voice-panel__header">
-          <h2>Projects</h2>
-          <IonButton fill="clear" size="small" onClick={onClose}>
-            Close
-          </IonButton>
+          <h2>Projetos</h2>
+          <button
+            type="button"
+            className="apple-liquid-glass-pill apple-liquid-glass-pill--dark apple-liquid-glass-pill--sm"
+            onClick={onClose}
+          >
+            Fechar
+          </button>
         </header>
         <div className="voice-panel__body">
           <ProjectsSheetBody
@@ -245,20 +246,27 @@ export default function ProjectsSheet({
 
   return (
     <IonModal
+      className="astro-modal"
       isOpen={isOpen}
       onDidDismiss={onClose}
       breakpoints={[0, 0.6, 1]}
       initialBreakpoint={0.6}
     >
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Projects</IonTitle>
+      <IonHeader className="astro-header">
+        <IonToolbar className="astro-toolbar">
+          <IonTitle>Projetos</IonTitle>
           <IonButtons slot="end">
-            <IonButton onClick={onClose}>Close</IonButton>
+            <button
+              type="button"
+              className="apple-liquid-glass-pill apple-liquid-glass-pill--dark apple-liquid-glass-pill--sm"
+              onClick={onClose}
+            >
+              Fechar
+            </button>
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent className="ion-padding">
+      <IonContent className="ion-padding astro-modal-content">
         <ProjectsSheetBody
           isOpen={isOpen}
           password={password}
