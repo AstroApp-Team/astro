@@ -77,6 +77,12 @@ export function useViewBuilder({ password }: { password: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [report, setReport] = useState<ViewReport | null>(null);
   /**
+   * Incremented once a generated page finishes `runViewCheck` with zero
+   * problems, so auto-save persists only verified builds rather than drafts
+   * or failing intermediate attempts.
+   */
+  const [lastCheckedView, setLastCheckedView] = useState<{ id: number; view: View } | null>(null);
+  /**
    * The last build failure, kept on screen until the next build starts.
    * Telling only the voice model was not enough: it paraphrases ("I ran into a
    * problem, let me try again") and retries, and the actual reason showed up
@@ -137,6 +143,9 @@ export function useViewBuilder({ password }: { password: string }) {
     }
 
     setStatus(null);
+    if (problems.length === 0) {
+      setLastCheckedView((previous) => ({ id: (previous?.id ?? 0) + 1, view: landed }));
+    }
     say(describeLanding(landed, run.baseline, problems));
   };
 
@@ -195,6 +204,23 @@ export function useViewBuilder({ password }: { password: string }) {
     });
   };
 
+  /**
+   * Injects a persisted project view (or `null` for a blank stage) without
+   * triggering the coding agent or emitting a voice report.
+   */
+  const loadView = (loaded: View | null) => {
+    runRef.current = {
+      id: runRef.current.id + 1,
+      fixes: 0,
+      baseline: loaded?.html ?? null,
+      landed: null,
+    };
+    setDraft(null);
+    setStatus(null);
+    setFailure(null);
+    setView(loaded);
+  };
+
   return {
     screen,
     /** The finished page, or null while a draft is on screen instead. */
@@ -203,7 +229,9 @@ export function useViewBuilder({ password }: { password: string }) {
     status,
     failure,
     report,
+    lastCheckedView,
     build,
+    loadView,
   };
 }
 

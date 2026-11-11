@@ -16,6 +16,7 @@ import {
 import { gateway } from "ai";
 import {
   chatbubblesOutline,
+  folderOpenOutline,
   micOffOutline,
   micOutline,
   stopCircleOutline,
@@ -41,9 +42,11 @@ import { sealViewHtml, VIEW_ALLOW, VIEW_SANDBOX } from "../lib/seal-view.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
 import { useMediaQuery } from "../lib/use-media-query.ts";
+import { useProjectAutoSave } from "../lib/use-projects.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
+import ProjectsSheet, { type LoadedProject } from "./ProjectsSheet.tsx";
 import UsageMeter from "./UsageMeter.tsx";
 
 /**
@@ -117,6 +120,7 @@ export default function VoiceSession({ password }: { password: string }) {
    */
   const [muted, setMuted] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const viewBuilder = useViewBuilder({ password });
 
@@ -129,8 +133,18 @@ export default function VoiceSession({ password }: { password: string }) {
     frameRef,
     event: viewEvent,
     pageErrors,
+    latestState,
     onFrameLoad,
+    restoreState,
   } = useViewEvents({ finishedHtml: viewBuilder.finishedHtml });
+
+  useProjectAutoSave({
+    password,
+    activeProjectId,
+    onProjectCreated: setActiveProjectId,
+    lastCheckedView: viewBuilder.lastCheckedView,
+    latestState,
+  });
 
   const realtime = experimental_useRealtime({
     model: voiceModel,
@@ -491,6 +505,7 @@ export default function VoiceSession({ password }: { password: string }) {
    * the app's scroll pushed the app off screen with every line.
    */
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const [seenTurns, setSeenTurns] = useState(0);
   const unread = transcriptOpen ? 0 : Math.max(0, messages.length - seenTurns);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -513,8 +528,40 @@ export default function VoiceSession({ password }: { password: string }) {
   const docked = useMediaQuery(DOCKED_TRANSCRIPT_QUERY);
 
   const toggleTranscript = () => {
-    if (transcriptOpen) closeTranscript();
-    else setTranscriptOpen(true);
+    if (transcriptOpen) {
+      closeTranscript();
+    } else {
+      setProjectsOpen(false);
+      setTranscriptOpen(true);
+    }
+  };
+
+  const toggleProjects = () => {
+    if (projectsOpen) {
+      setProjectsOpen(false);
+    } else {
+      closeTranscript();
+      setProjectsOpen(true);
+    }
+  };
+
+  const handleSelectProject = (project: LoadedProject) => {
+    setActiveProjectId(project.id);
+    restoreState(project.state);
+    viewBuilder.loadView({ title: project.title, html: project.html });
+    if (status === "connected") {
+      reportRef.current(`The user opened the saved project "${project.title}".`, { speak: false });
+    }
+  };
+
+  const handleNewProject = () => {
+    setActiveProjectId(null);
+    restoreState(undefined);
+    viewBuilder.loadView(null);
+  };
+
+  const handleActiveProjectDeleted = () => {
+    setActiveProjectId(null);
   };
 
   const transcriptBody = (
@@ -599,6 +646,16 @@ export default function VoiceSession({ password }: { password: string }) {
               <div className="voice-panel__body">{transcriptBody}</div>
             </aside>
           )}
+          <ProjectsSheet
+            isOpen={projectsOpen}
+            docked={docked}
+            password={password}
+            activeProjectId={activeProjectId}
+            onClose={() => setProjectsOpen(false)}
+            onSelectProject={handleSelectProject}
+            onNewProject={handleNewProject}
+            onActiveProjectDeleted={handleActiveProjectDeleted}
+          />
           <div className="voice-stage">
             {viewBuilder.screen == null ? (
               <div className="voice-stage__empty">
@@ -705,6 +762,15 @@ export default function VoiceSession({ password }: { password: string }) {
             >
               <IonIcon slot="icon-only" icon={chatbubblesOutline} />
               {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
+            </IonButton>
+
+            <IonButton
+              fill="clear"
+              onClick={toggleProjects}
+              title={projectsOpen ? "Hide projects" : "Saved projects"}
+              aria-label={projectsOpen ? "Hide projects" : "Saved projects"}
+            >
+              <IonIcon slot="icon-only" icon={folderOpenOutline} />
             </IonButton>
 
             {activity != null && (

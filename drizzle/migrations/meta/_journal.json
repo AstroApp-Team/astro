@@ -8,6 +8,13 @@
       "when": 1787417447957,
       "tag": "0000_mushy_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794422423714,
+      "tag": "0001_cold_cassandra_nova",
+      "breakpoints": true
     }
   ]
 }
