@@ -1165,7 +1165,7 @@ export default function VoiceSession({
                 if (part.type === "dynamic-tool") {
                   return (
                     <p key={part.toolCallId} className="voice-turn__tool">
-                      <LiquidGlassIcon name="terminal" size={15} />
+                      <LiquidGlassIcon name="terminal" size={19} />
                       {part.toolName || "…"}
                       {part.state === "input-streaming" ? "" : `(${JSON.stringify(part.input)})`}
                       {part.state === "output-available" && " ✓"}
@@ -1231,7 +1231,7 @@ export default function VoiceSession({
                 title="Voltar para a tela original"
                 aria-label="Voltar para a tela original"
               >
-                <LiquidGlassIcon name="exit-fullscreen" size={18} />
+                <LiquidGlassIcon name="exit-fullscreen" size={22} />
                 Voltar
               </button>
             )}
@@ -1351,8 +1351,10 @@ export default function VoiceSession({
         </div>
       </IonContent>
 
+      {/* The capsule widens only once the socket is open — the same moment the push-to-talk button
+          mounts — so it never opens up around an empty middle while "connecting". */}
       {!fullscreen && (
-        <IonFooter className="astro-footer">
+        <IonFooter className={`astro-footer${status === "connected" ? " astro-footer--live" : ""}`}>
           <IonToolbar className="astro-toolbar">
             {/**
              * Astro is the start button — tapping him starts the conversation — and the
@@ -1371,7 +1373,7 @@ export default function VoiceSession({
                   <LiquidGlassIcon
                     name="chat"
                     tone={transcriptOpen ? "active" : "default"}
-                    size={26}
+                    size={34}
                   />
                   {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
                 </button>
@@ -1388,18 +1390,6 @@ export default function VoiceSession({
                     waveformActive={isLive && talking && isCapturing && !isPlaying}
                   />
                 )}
-                {isAssistantSpeaking && !talking && (
-                  <button
-                    type="button"
-                    className="apple-liquid-glass-pill apple-liquid-glass-pill--dark voice-bar__interrupt"
-                    onClick={() => void interruptAssistant()}
-                    title="Interromper Astro"
-                    aria-label="Interromper Astro"
-                  >
-                    <LiquidGlassIcon name="stop" tone="ember" size={22} />
-                    <span className="voice-bar__interrupt-label">Interromper</span>
-                  </button>
-                )}
               </div>
 
               <div className="voice-bar__right">
@@ -1415,7 +1405,7 @@ export default function VoiceSession({
                   <LiquidGlassIcon
                     name="astro-ask"
                     tone={askerMode ? "active" : "default"}
-                    size={26}
+                    size={34}
                   />
                 </button>
               </div>

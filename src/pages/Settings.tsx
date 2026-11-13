@@ -65,7 +65,7 @@ export default function Settings() {
               title="Voltar"
               aria-label="Voltar"
             >
-              <LiquidGlassIcon name="arrow-back" size={24} />
+              <LiquidGlassIcon name="arrow-back" size={28} />
             </button>
           </IonButtons>
           <IonTitle className="astro-header__title">Configurações</IonTitle>
@@ -109,7 +109,7 @@ export default function Settings() {
                     <LiquidGlassIcon
                       name={option.icon}
                       tone={selected ? "active" : "default"}
-                      size={22}
+                      size={26}
                     />
                     {option.label}
                   </button>
@@ -147,7 +147,7 @@ export default function Settings() {
               disabled={password === ""}
               onClick={handleForgetPassword}
             >
-              <LiquidGlassIcon name="lock-open" tone="cream" size={20} />
+              <LiquidGlassIcon name="lock-open" tone="cream" size={24} />
               Esquecer senha
             </button>
           </section>

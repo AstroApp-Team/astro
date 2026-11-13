@@ -245,13 +245,8 @@ describe("VoiceSession hero Astro lifecycle", () => {
     expect(useAstroStore.getState().speaking).toBe(true);
     expect(screen.getByRole("button", { name: "Segurar para falar" })).toBeTruthy();
 
-    /* Clicking Interromper stops Astro without capturing or committing user speech. */
-    fireEvent.click(screen.getByRole("button", { name: "Interromper Astro" }));
-    expect(realtimeState.stopPlayback).toHaveBeenCalledTimes(1);
-    expect(realtimeState.cancelResponse).toHaveBeenCalledTimes(1);
-    expect(realtimeState.startAudioCapture).not.toHaveBeenCalled();
-    expect(realtimeState.commitAudio).not.toHaveBeenCalled();
-    expect(realtimeState.requestResponse).not.toHaveBeenCalled();
+    /* There is no Interromper button any more: the footer never offers it while Astro speaks. */
+    expect(screen.queryByRole("button", { name: "Interromper Astro" })).toBeNull();
     expect(screen.getByRole("button", { name: "Segurar para falar" })).toBeTruthy();
 
     /* Tapping Astro 3D (through the store bridge) also interrupts without starting PTT. */

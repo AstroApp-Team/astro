@@ -62,7 +62,7 @@ export default function Voice() {
                   title="Configurações"
                   aria-label="Configurações"
                 >
-                  <LiquidGlassIcon name="settings" size={24} />
+                  <LiquidGlassIcon name="settings" size={28} />
                 </button>
                 <button
                   type="button"
@@ -74,7 +74,7 @@ export default function Voice() {
                   <LiquidGlassIcon
                     name="folder"
                     tone={projectsOpen ? "active" : "default"}
-                    size={24}
+                    size={28}
                   />
                 </button>
                 <button
@@ -88,7 +88,7 @@ export default function Voice() {
                   title="Tela cheia"
                   aria-label="Tela cheia"
                 >
-                  <LiquidGlassIcon name="fullscreen" size={24} />
+                  <LiquidGlassIcon name="fullscreen" size={28} />
                 </button>
                 <button
                   type="button"
@@ -100,7 +100,7 @@ export default function Voice() {
                   title="Limpar conversa"
                   aria-label="Limpar conversa"
                 >
-                  <LiquidGlassIcon name="trash" size={24} />
+                  <LiquidGlassIcon name="trash" size={28} />
                 </button>
               </IonButtons>
             )}

@@ -36,7 +36,7 @@ export default function UsageMeter() {
         title="Zerar total acumulado"
         aria-label="Zerar total acumulado"
       >
-        <LiquidGlassIcon name="refresh" size={19} />
+        <LiquidGlassIcon name="refresh" size={23} />
       </button>
     </div>
   );

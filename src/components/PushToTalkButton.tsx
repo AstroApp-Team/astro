@@ -145,7 +145,7 @@ export default function PushToTalkButton({
           <>
             <span className="ptt__pulse" aria-hidden="true" />
             <RecordingTimer />
-            <LiquidGlassIcon name="stop" tone="cream" size={22} />
+            <LiquidGlassIcon name="stop" tone="cream" size={26} />
             <span>Enviar</span>
           </>
         ) : state.phase === "pressing" ? (
@@ -155,7 +155,7 @@ export default function PushToTalkButton({
           </>
         ) : (
           <>
-            <LiquidGlassIcon name="mic" tone="cream" size={24} />
+            <LiquidGlassIcon name="mic" tone="cream" size={28} />
             <span>Segurar para falar</span>
           </>
         )}
