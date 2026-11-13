@@ -299,9 +299,15 @@ describe("VoiceSession hero Astro lifecycle", () => {
     });
     expect(realtimeState.stopAudioCapture).not.toHaveBeenCalled();
 
+    /* The old fixed 600 ms cutoff is gone: until the server closes the turn, silence keeps flowing. */
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(600);
+      await vi.advanceTimersByTimeAsync(2000);
     });
+    expect(realtimeState.stopAudioCapture).not.toHaveBeenCalled();
+
+    /* The server took the turn, so capture stops. */
+    realtimeState.events = [{ type: "response-created" }];
+    rerender(<VoiceSession password="pw" />);
     expect(realtimeState.stopAudioCapture).toHaveBeenCalledTimes(1);
     expect(realtimeState.commitAudio).not.toHaveBeenCalled();
     expect(realtimeState.requestResponse).not.toHaveBeenCalled();
@@ -406,7 +412,7 @@ describe("VoiceSession hero Astro lifecycle", () => {
       });
       expect(screen.getByRole("button", { name: "Segurar para falar" })).toBeTruthy();
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(7000);
       });
       expect(realtimeState.stopAudioCapture).toHaveBeenCalledTimes(1);
     });
@@ -422,7 +428,7 @@ describe("VoiceSession hero Astro lifecycle", () => {
 
       expect(screen.getByRole("button", { name: "Segurar para falar" })).toBeTruthy();
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(7000);
       });
       expect(realtimeState.stopAudioCapture).toHaveBeenCalledTimes(1);
     });
@@ -437,7 +443,7 @@ describe("VoiceSession hero Astro lifecycle", () => {
 
       expect(screen.getByRole("button", { name: "Segurar para falar" })).toBeTruthy();
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2000);
+        await vi.advanceTimersByTimeAsync(7000);
       });
       expect(realtimeState.stopAudioCapture).toHaveBeenCalledTimes(1);
     });

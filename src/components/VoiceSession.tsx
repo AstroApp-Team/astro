@@ -12,7 +12,7 @@ import {
   IonToolbar,
 } from "@ionic/react";
 import { experimental_decodeRealtimeAudio as decodeRealtimeAudio, gateway } from "ai";
-import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { type Ref, useEffect, useEffectEvent, useImperativeHandle, useRef, useState } from "react";
 
 import {
   AUDIO_FORMAT_TYPE,
@@ -161,8 +161,23 @@ const HERO_PROMPT_INTERVAL_MS = 4_200;
 /** Brief capture tail on release so final syllable audio frames finish flushing. */
 const PTT_RELEASE_TAIL_MS = 180;
 
-/** Silent audio window fed after the release tail so server-vad closes the turn promptly. */
-const PTT_VAD_SILENCE_MS = 600;
+/**
+ * The most silence fed while waiting for the server to close the turn. Server-vad only decides
+ * the user stopped by *hearing* silence, so cutting the audio stream off early leaves the turn
+ * open and the speech unanswered until the next press restarts the stream. Capture therefore
+ * stays open, muted, until the server shows it took the turn (see `TURN_CLOSED_EVENTS`); this
+ * is only the ceiling for when it never does.
+ */
+const PTT_TURN_CLOSE_MAX_MS = 6_000;
+
+/** Server events that prove the turn the user just spoke was closed and taken. */
+const TURN_CLOSED_EVENTS: ReadonlySet<string> = new Set([
+  "audio-committed",
+  "input-transcription-completed",
+  "response-created",
+  "audio-delta",
+  "response-done",
+]);
 
 /** The close button every floating banner carries. */
 function BannerClose({ onClick }: { onClick: () => void }) {
@@ -252,6 +267,11 @@ export default function VoiceSession({
   const streamRef = useRef<MediaStream | null>(null);
   const captureStreamRef = useRef<MediaStream | null>(null);
   const releaseTimerRef = useRef<number | null>(null);
+  /**
+   * Set from release until the server closes the turn: the index into `events` where this
+   * release began, so only events after it count. `null` when no turn is waiting to close.
+   */
+  const awaitingTurnCloseRef = useRef<number | null>(null);
   const holdStartRef = useRef<number | null>(null);
   /**
    * Resets the push-to-talk gesture (idle/pressing/locked). It lives in `usePushToTalk`, declared
@@ -267,6 +287,7 @@ export default function VoiceSession({
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const clearReleaseTimer = () => {
+    awaitingTurnCloseRef.current = null;
     if (releaseTimerRef.current != null) {
       window.clearTimeout(releaseTimerRef.current);
       releaseTimerRef.current = null;
@@ -923,14 +944,37 @@ export default function VoiceSession({
       return;
     }
 
+    /*
+     * Tail, then silence — and the silence keeps flowing until the server acknowledges the turn.
+     * Stopping after a fixed window left the turn open whenever the VAD wanted more silence than
+     * that: nothing happened until the next press restarted the audio stream and let it finish.
+     */
+    awaitingTurnCloseRef.current = eventsRef.current.length;
     releaseTimerRef.current = window.setTimeout(() => {
       setAudioTracksEnabled(captureStreamRef.current, false);
       releaseTimerRef.current = window.setTimeout(() => {
-        releaseTimerRef.current = null;
+        clearReleaseTimer();
         stopCaptureAndStreams();
-      }, PTT_VAD_SILENCE_MS);
+      }, PTT_TURN_CLOSE_MAX_MS);
     }, PTT_RELEASE_TAIL_MS);
   };
+
+  /* The server took the turn: the silence has done its job, so stop capturing. */
+  const finishRelease = useEffectEvent(() => {
+    clearReleaseTimer();
+    stopCaptureAndStreams();
+  });
+  useEffect(() => {
+    const from = awaitingTurnCloseRef.current;
+    if (from == null) return;
+    for (let i = from; i < events.length; i++) {
+      const type = events[i]?.type;
+      if (type !== undefined && TURN_CLOSED_EVENTS.has(type)) {
+        finishRelease();
+        return;
+      }
+    }
+  }, [events]);
 
   /**
    * The push-to-talk gesture. It decides when a press becomes a recording (`onStart`), when the
