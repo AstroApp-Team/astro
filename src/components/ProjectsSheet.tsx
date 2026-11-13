@@ -121,7 +121,7 @@ function ProjectsSheetBody({
             onClose();
           }}
         >
-          <LiquidGlassIcon name="add" size={18} />
+          <LiquidGlassIcon name="add" size={20} />
           Novo projeto em branco
         </button>
       </div>
@@ -193,7 +193,7 @@ function ProjectsSheetBody({
                   aria-label={`Excluir ${project.title}`}
                   title={`Excluir ${project.title}`}
                 >
-                  <LiquidGlassIcon name="trash" tone="ember" size={16} />
+                  <LiquidGlassIcon name="trash" tone="ember" size={19} />
                 </button>
               </li>
             );

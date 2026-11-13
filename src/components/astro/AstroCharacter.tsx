@@ -70,9 +70,11 @@ function damp(current: number, target: number, lambda: number, delta: number): n
 export type AstroCharacterProps = {
   /** Where the character sits, in the overlay's camera space. */
   position?: [number, number, number];
+  /** Uniform scale multiplier relative to the standard corner size. */
+  scale?: number;
 };
 
-export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) {
+export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroCharacterProps) {
   const tunables = useAstroV2Store((state) => state.tunables);
   /*
    * Subscribed normally: the expression changes on a press or a session event, not
@@ -92,14 +94,16 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
   const look = useRef({ x: 0, y: 0 });
   /** The body's world position, reused per frame so the loop allocates nothing. */
   const world = useRef(new Vector3());
-  /** Target and spring state for fluid hero-to-corner glide transitions. */
-  const target = useRef({ x: 0, y: 1.6, z: 0 });
+  /** Target and spring state for fluid hero-to-corner glide and scale transitions. */
+  const target = useRef({ x: 0, y: 1.6, z: 0, scale: 1 });
   const spring = useRef({
     x: 0,
     y: 1.6,
     z: 0,
+    scale: 1,
     vx: 0,
     vy: 0,
+    vScale: 0,
     seeded: false,
   });
 
@@ -107,23 +111,25 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
   const pose = resolveEyePose(expression);
 
   useLayoutEffect(() => {
-    target.current = { x: position[0], y: position[1], z: position[2] };
+    target.current = { x: position[0], y: position[1], z: position[2], scale };
     if (!spring.current.seeded) {
       spring.current = {
         x: position[0],
         y: position[1],
         z: position[2],
+        scale,
         vx: 0,
         vy: 0,
+        vScale: 0,
         seeded: true,
       };
       if (groupRef.current) {
         groupRef.current.position.set(position[0], position[1], position[2]);
-        groupRef.current.scale.setScalar(1);
+        groupRef.current.scale.setScalar(scale);
       }
-      bodyUniforms.uRadius.value = ASTRO_V2_BODY_RADIUS;
+      bodyUniforms.uRadius.value = ASTRO_V2_BODY_RADIUS * scale;
     }
-  }, [position]);
+  }, [position, scale]);
 
   useEffect(() => {
     applyTunables(tunables);
@@ -134,29 +140,34 @@ export function AstroCharacter({ position = [0, 1.6, 0] }: AstroCharacterProps) 
     const dt = Math.min(delta, 1 / 20);
     const store = useAstroStore.getState();
 
-    /* ── fluid position spring (scale stays constant at full size) ── */
+    /* ── fluid position and scale spring ── */
     const goal = target.current;
     const motion = spring.current;
     const posStiffness = store.dragging ? 1600 : 120;
     const posDamping = store.dragging ? 80 : 22;
+    const scaleStiffness = 120;
+    const scaleDamping = 22;
 
     const substeps = 2;
     const stepDt = dt / substeps;
     for (let i = 0; i < substeps; i++) {
       const ax = posStiffness * (goal.x - motion.x) - posDamping * motion.vx;
       const ay = posStiffness * (goal.y - motion.y) - posDamping * motion.vy;
+      const aScale = scaleStiffness * (goal.scale - motion.scale) - scaleDamping * motion.vScale;
       motion.vx += ax * stepDt;
       motion.vy += ay * stepDt;
+      motion.vScale += aScale * stepDt;
       motion.x += motion.vx * stepDt;
       motion.y += motion.vy * stepDt;
+      motion.scale = Math.max(0.1, motion.scale + motion.vScale * stepDt);
     }
 
     if (groupRef.current) {
       groupRef.current.position.set(motion.x, motion.y, goal.z);
-      groupRef.current.scale.setScalar(1);
+      groupRef.current.scale.setScalar(motion.scale);
       groupRef.current.updateMatrixWorld();
     }
-    bodyUniforms.uRadius.value = ASTRO_V2_BODY_RADIUS;
+    bodyUniforms.uRadius.value = ASTRO_V2_BODY_RADIUS * motion.scale;
 
     /* ── expression ── */
     /*

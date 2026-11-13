@@ -225,12 +225,22 @@ describe("a press on the character", () => {
     expect(tapIntent(false)).toBe("start");
   });
 
-  it("only greets once one is open, because hanging up is the button's job", () => {
+  it("greets while a session is open and Astro is silent", () => {
     expect(tapIntent(true)).toBe("greet");
+    expect(tapIntent(true, false)).toBe("greet");
+  });
+
+  it("interrupts when a session is open and Astro is speaking", () => {
+    expect(tapIntent(true, true)).toBe("interrupt");
   });
 });
 
 describe("the drag and voice fields", () => {
+  afterEach(() => {
+    useAstroStore.getState().setSpeaking(false);
+    useAstroStore.getState().setVoice(null);
+  });
+
   it("publishes a drag anchor and clears it back to the corner", () => {
     useAstroStore.getState().setAnchor({ x: 0.2, y: -0.3 });
     expect(useAstroStore.getState().anchor).toEqual({ x: 0.2, y: -0.3 });
@@ -239,10 +249,13 @@ describe("the drag and voice fields", () => {
     expect(useAstroStore.getState().anchor).toBeNull();
   });
 
-  it("publishes the session's start/stop while the session is mounted", () => {
-    const voice = { start: () => {}, stop: () => {} };
+  it("publishes the session's start/stop/interrupt and speaking state while mounted", () => {
+    const voice = { start: () => {}, stop: () => {}, interrupt: () => {} };
     useAstroStore.getState().setVoice(voice);
     expect(useAstroStore.getState().voice).toBe(voice);
+
+    useAstroStore.getState().setSpeaking(true);
+    expect(useAstroStore.getState().speaking).toBe(true);
 
     /* The gate replaces the session, so the handle must go with it: a press with no key
        behind it would ask for the microphone and then fail to connect. */

@@ -44,6 +44,7 @@ import { ASTRO_REACTION_MS } from "../../lib/astro/expression.ts";
 import {
   ASTRO_CORNER_HALO_WORLD,
   anchoredPosition,
+  characterScale,
   clampAnchor,
   cornerPosition,
   orthographicHalfExtent,
@@ -174,6 +175,7 @@ function CornerCharacter() {
      `zoom`, so a world unit occupies `zoom` pixels. Only `zoom` is ours. */
   const zoom = orthographicZoom(size.width, size.height, HALO_COVERAGE);
   const extent = orthographicHalfExtent(size.width, size.height, zoom);
+  const scale = characterScale(heroSpot != null, anchor != null);
 
   let position: [number, number, number];
   if (anchor != null) {
@@ -209,12 +211,12 @@ function CornerCharacter() {
   const originY = position[1] / extent.halfHeight;
   /* `zoom` is pixels per world unit, so this is the glow's radius on screen — the one
      quantity the press handler needs and the canvas is the only place that knows. */
-  const haloRadiusPx = ASTRO_CORNER_HALO_WORLD * zoom;
+  const haloRadiusPx = ASTRO_CORNER_HALO_WORLD * zoom * scale;
   useLayoutEffect(() => {
     useAstroStore.getState().setLookOrigin(originX, originY, haloRadiusPx);
   }, [originX, originY, haloRadiusPx]);
 
-  return <AstroCharacter position={position} />;
+  return <AstroCharacter position={position} scale={scale} />;
 }
 
 /**
@@ -237,6 +239,7 @@ function DragHandle() {
   const lookOrigin = useAstroStore((state) => state.lookOrigin);
   const lookRadius = useAstroStore((state) => state.lookRadius);
   const live = useAstroStore((state) => state.live);
+  const speaking = useAstroStore((state) => state.speaking);
   const [dragging, setDragging] = useState(false);
 
   const settleTimer = useRef<number | undefined>(undefined);
@@ -317,20 +320,26 @@ function DragHandle() {
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => store.settle(), ASTRO_REACTION_MS.max);
 
-    if (tapIntent(store.live) !== "start") return;
+    const intent = tapIntent(store.live, store.speaking);
+    if (intent === "start") {
+      /*
+       * He is the start button, but a locked page has no session to start — `voice` is `null`
+       * while the gate is up. A tap there still has to *answer*, or a first-time visitor taps
+       * the character and concludes nothing works: it puts the cursor in the password field,
+       * which is the one thing standing between them and a conversation.
+       */
+      if (store.voice) {
+        store.voice.start();
+        return;
+      }
 
-    /*
-     * He is the start button, but a locked page has no session to start — `voice` is `null`
-     * while the gate is up. A tap there still has to *answer*, or a first-time visitor taps
-     * the character and concludes nothing works: it puts the cursor in the password field,
-     * which is the one thing standing between them and a conversation.
-     */
-    if (store.voice) {
-      store.voice.start();
+      document.querySelector<HTMLInputElement>("ion-input input")?.focus();
       return;
     }
 
-    document.querySelector<HTMLInputElement>("ion-input input")?.focus();
+    if (intent === "interrupt") {
+      store.voice?.interrupt?.();
+    }
   };
 
   const onPointerCancel = () => {
@@ -353,7 +362,11 @@ function DragHandle() {
         visibility: radius > 0 ? "visible" : "hidden",
       }}
       aria-label={
-        live ? "Astro está ouvindo — toque para cumprimentá-lo" : "Começar a conversar com o Astro"
+        !live
+          ? "Começar a conversar com o Astro"
+          : speaking
+            ? "Astro está falando — toque para interrompê-lo"
+            : "Astro está ouvindo — toque para cumprimentá-lo"
       }
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

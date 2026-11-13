@@ -9,9 +9,7 @@ function formatDuration(seconds: number): string {
 }
 
 /**
- * The running bill, itemized. The header shows only the total; this is the
- * breakdown and the reset, kept in the transcript sheet so the bottom-right of
- * the screen stays Astro's.
+ * The running bill, itemized on the Settings screen.
  */
 export default function UsageMeter() {
   const usage = useVoiceUsage();
@@ -19,13 +17,13 @@ export default function UsageMeter() {
   return (
     <div className="usage-meter">
       <div className="usage-meter__text">
-        <div>
-          <strong>${usageToUsd(usage).toFixed(4)}</strong>
-          <IonNote>
-            {" "}
-            gasto · voz ${usage.voiceUsd.toFixed(4)} · páginas ${usage.viewUsd.toFixed(4)}
-          </IonNote>
+        <div className="usage-meter__headline">
+          <strong className="usage-meter__total">${usageToUsd(usage).toFixed(4)}</strong>
+          <IonNote>gasto acumulado</IonNote>
         </div>
+        <IonNote className="usage-meter__detail">
+          voz ${usage.voiceUsd.toFixed(4)} · páginas ${usage.viewUsd.toFixed(4)}
+        </IonNote>
         <IonNote className="usage-meter__detail">
           {usage.sessions} {usage.sessions === 1 ? "sessão" : "sessões"} ·{" "}
           {formatDuration(usage.seconds)} conectado
@@ -38,7 +36,7 @@ export default function UsageMeter() {
         title="Zerar total acumulado"
         aria-label="Zerar total acumulado"
       >
-        <LiquidGlassIcon name="refresh" size={16} />
+        <LiquidGlassIcon name="refresh" size={19} />
       </button>
     </div>
   );

@@ -13,7 +13,9 @@ export type LiquidGlassIconName =
   | "refresh"
   | "terminal"
   | "fullscreen"
-  | "exit-fullscreen";
+  | "exit-fullscreen"
+  | "settings"
+  | "arrow-back";
 
 export type LiquidGlassIconTone = "default" | "active" | "ember" | "cream";
 
@@ -402,6 +404,44 @@ function renderGlyph(name: LiquidGlassIconName, strokeId: string, maskId: string
             d="M14.25 9.75H19M14.25 9.75V5M19 5l-4.75 4.75M9.75 14.25H5M9.75 14.25V19M5 19l4.75-4.75"
             stroke={stroke}
             strokeWidth="1.65"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      );
+
+    case "settings":
+      return (
+        <>
+          <defs>
+            <mask id={maskId}>
+              <rect width="24" height="24" fill="#fff" />
+              <circle cx="12" cy="12" r="3" fill="#000" />
+            </mask>
+          </defs>
+          <path
+            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+            fill={spec.glassFill}
+            mask={`url(#${maskId})`}
+          />
+          <path
+            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+            stroke={stroke}
+            strokeWidth="1.55"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="12" r="3" stroke={stroke} strokeWidth="1.6" />
+        </>
+      );
+
+    case "arrow-back":
+      return (
+        <>
+          <circle cx="12" cy="12" r="8.5" fill={spec.glassSecondary} opacity="0.45" />
+          <path
+            d="M14.25 6.5 8.75 12l5.5 5.5"
+            stroke={stroke}
+            strokeWidth="1.85"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
