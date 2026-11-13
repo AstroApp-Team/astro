@@ -965,6 +965,26 @@
     radial-gradient(90% 80% at 15% 85%, rgba(254, 52, 2, 0.12) 0%, rgba(26, 21, 44, 0) 60%), #1a152c;
 }
 
+/* Dark / light: two glass pills side by side; the chosen one takes the orange tint. */
+.theme-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.theme-switch__option {
+  width: 100%;
+}
+
+.theme-switch__option[aria-pressed="true"] {
+  --lg-tint: rgba(255, 139, 0, 0.24);
+  --lg-rim: rgba(255, 214, 160, 0.6);
+}
+
 .settings-layout {
   max-width: 34rem;
   margin: 0.5rem auto 0;

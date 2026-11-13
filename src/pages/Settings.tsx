@@ -15,6 +15,12 @@ import LiquidGlassIcon from "../components/LiquidGlassIcon.tsx";
 import UsageMeter from "../components/UsageMeter.tsx";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { setPassword, usePassword } from "../lib/password.ts";
+import { setTheme, type Theme, useTheme } from "../lib/theme.ts";
+
+const THEMES: { value: Theme; label: string; icon: "moon" | "sun" }[] = [
+  { value: "dark", label: "Escuro", icon: "moon" },
+  { value: "light", label: "Claro", icon: "sun" },
+];
 
 /**
  * Dedicated Settings screen holding accumulated spend controls and device
@@ -23,6 +29,7 @@ import { setPassword, usePassword } from "../lib/password.ts";
 export default function Settings() {
   const router = useIonRouter();
   const password = usePassword();
+  const theme = useTheme();
 
   useEffect(() => {
     useAstroStore.getState().setHidden(true);
@@ -76,6 +83,38 @@ export default function Settings() {
               </IonNote>
             </div>
             <UsageMeter />
+          </section>
+
+          <section className="settings-card" aria-labelledby="settings-theme-title">
+            <div className="settings-card__header">
+              <h2 id="settings-theme-title" className="settings-card__title">
+                Aparência
+              </h2>
+              <IonNote className="settings-card__subtitle">
+                Escolha o tema do app neste dispositivo.
+              </IonNote>
+            </div>
+            <fieldset className="theme-switch" aria-label="Tema">
+              {THEMES.map((option) => {
+                const selected = theme === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`apple-liquid-glass-pill apple-liquid-glass-pill--dark theme-switch__option${selected ? " apple-liquid-glass-btn--active" : ""}`}
+                    aria-pressed={selected}
+                    onClick={() => setTheme(option.value)}
+                  >
+                    <LiquidGlassIcon
+                      name={option.icon}
+                      tone={selected ? "active" : "default"}
+                      size={22}
+                    />
+                    {option.label}
+                  </button>
+                );
+              })}
+            </fieldset>
           </section>
 
           <section className="settings-card" aria-labelledby="settings-security-title">

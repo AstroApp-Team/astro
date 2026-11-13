@@ -1,0 +1,282 @@
+/*
+ * Light theme. Every rule here is scoped to `:root[data-theme="light"]` (set by
+ * `src/lib/theme.ts`), so the dark theme — the default, defined in variables.css and
+ * voice.css — is never touched by this file.
+ *
+ * Built only from the design-system palette:
+ *   #FEFBF5 cream     page and surfaces
+ *   #EDCA99 sand      soft warm accents, borders, badges
+ *   #1A152C ink       text and glyphs (lighter text is ink at lower opacity)
+ *   #FF8B00 / #FA6B2F / #FE3402   the orange accents, unchanged
+ */
+
+/* ── Ionic tokens ──────────────────────────────────────────────────────────── */
+
+:root[data-theme="light"],
+:root.ios[data-theme="light"],
+:root.md[data-theme="light"] {
+  --ion-background-color: #fefbf5;
+  --ion-background-color-rgb: 254, 251, 245;
+  --ion-text-color: #1a152c;
+  --ion-text-color-rgb: 26, 21, 44;
+  --ion-item-background: #fefbf5;
+  --ion-toolbar-background: #fefbf5;
+  --ion-color-step-50: #f6efe3;
+  --ion-color-step-100: #f0e4d0;
+  --ion-color-step-150: #ecdbc1;
+  --ion-color-step-200: #edca99;
+  --ion-background-color-step-50: #f9f4ea;
+  --ion-background-color-step-100: #f5ecdc;
+  --ion-background-color-step-150: #f1e3cd;
+  --ion-background-color-step-200: #edca99;
+}
+
+:root[data-theme="light"] body {
+  background: #fefbf5;
+  color: #1a152c;
+}
+
+/* ── Glass: light, milky glass with ink glyphs ─────────────────────────────── */
+
+:root[data-theme="light"] .apple-liquid-glass-btn,
+:root[data-theme="light"] .apple-liquid-glass-pill--dark,
+:root[data-theme="light"] .voice-waveform {
+  --lg-tint: rgba(254, 251, 245, 0.62);
+  --lg-rim: rgba(255, 255, 255, 1);
+  --lg-rim-dim: rgba(237, 202, 153, 0.35);
+  --lg-press: rgba(237, 202, 153, 0.45);
+  color: #1a152c;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(237, 202, 153, 0.55),
+    0 1px 2px rgba(26, 21, 44, 0.08),
+    0 6px 16px rgba(26, 21, 44, 0.1);
+}
+
+:root[data-theme="light"] .apple-liquid-glass-btn--active,
+:root[data-theme="light"] .theme-switch__option[aria-pressed="true"] {
+  --lg-tint: rgba(255, 139, 0, 0.18);
+  --lg-rim: rgba(255, 255, 255, 1);
+}
+
+:root[data-theme="light"] .apple-liquid-glass-btn--danger,
+:root[data-theme="light"] .voice-bar__interrupt {
+  --lg-tint: rgba(254, 52, 2, 0.1);
+}
+
+:root[data-theme="light"] .liquid-glass-icon--default {
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .liquid-glass-icon--active {
+  color: #fa6b2f;
+}
+
+:root[data-theme="light"] .liquid-glass-icon--ember {
+  color: #fe3402;
+}
+
+/* `cream` sits on the orange pills, which stay orange: it stays cream. */
+
+:root[data-theme="light"] .liquid-glass-icon {
+  filter: none;
+}
+
+/* ── Bars ──────────────────────────────────────────────────────────────────── */
+
+:root[data-theme="light"] .astro-toolbar {
+  --background: rgba(254, 251, 245, 0.78);
+  --color: #1a152c;
+  --border-color: rgba(237, 202, 153, 0.6);
+}
+
+:root[data-theme="light"] .astro-header .astro-toolbar {
+  --background: transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.1) 60%),
+    rgba(254, 251, 245, 0.7);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(237, 202, 153, 0.6),
+    0 1px 3px rgba(26, 21, 44, 0.08),
+    0 8px 24px rgba(26, 21, 44, 0.12);
+}
+
+:root[data-theme="light"] .astro-header .astro-toolbar::before {
+  background: conic-gradient(
+    from var(--lg-angle, 135deg),
+    rgba(255, 255, 255, 1) 0deg,
+    rgba(237, 202, 153, 0.3) 50deg,
+    rgba(237, 202, 153, 0.3) 130deg,
+    rgba(255, 255, 255, 0.7) 180deg,
+    rgba(237, 202, 153, 0.3) 230deg,
+    rgba(237, 202, 153, 0.3) 310deg,
+    rgba(255, 255, 255, 1) 360deg
+  );
+}
+
+:root[data-theme="light"] .astro-header__title,
+:root[data-theme="light"] .voice-panel__header h2,
+:root[data-theme="light"] .settings-card__title,
+:root[data-theme="light"] .usage-meter__total,
+:root[data-theme="light"] .project-card__title,
+:root[data-theme="light"] .project-card__select {
+  color: #1a152c;
+}
+
+/* ── Stage, panels, sheets ─────────────────────────────────────────────────── */
+
+:root[data-theme="light"] .voice-layout,
+:root[data-theme="light"] .voice-stage,
+:root[data-theme="light"] .voice-view {
+  background: #fefbf5;
+}
+
+:root[data-theme="light"] .voice-stage__subline {
+  color: rgba(26, 21, 44, 0.7);
+}
+
+:root[data-theme="light"] .voice-stage__empty ion-note,
+:root[data-theme="light"] .voice-empty,
+:root[data-theme="light"] .voice-events,
+:root[data-theme="light"] .settings-card__subtitle,
+:root[data-theme="light"] .usage-meter__text ion-note,
+:root[data-theme="light"] .project-card__meta,
+:root[data-theme="light"] .projects-sheet__loading,
+:root[data-theme="light"] .voice-turn__role {
+  color: rgba(26, 21, 44, 0.62);
+}
+
+:root[data-theme="light"] .voice-panel {
+  border-right-color: rgba(237, 202, 153, 0.6);
+  background: rgba(254, 251, 245, 0.9);
+  box-shadow: none;
+}
+
+:root[data-theme="light"] .voice-panel__header {
+  border-bottom-color: rgba(237, 202, 153, 0.6);
+}
+
+:root[data-theme="light"] .astro-modal {
+  --background: rgba(254, 251, 245, 0.94);
+}
+
+:root[data-theme="light"] .astro-modal::part(content) {
+  background: rgba(254, 251, 245, 0.94);
+  border-top-color: rgba(237, 202, 153, 0.7);
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .astro-modal::part(handle) {
+  background: rgba(26, 21, 44, 0.25);
+}
+
+/* ── Floating status: banners, activity pill, lock badge ───────────────────── */
+
+:root[data-theme="light"] .voice-banner,
+:root[data-theme="light"] .voice-bar__activity,
+:root[data-theme="light"] .ptt__lock-label {
+  border-color: rgba(237, 202, 153, 0.7);
+  background: rgba(254, 251, 245, 0.92);
+  box-shadow: 0 6px 18px rgba(26, 21, 44, 0.12);
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .voice-banner__close {
+  background: rgba(26, 21, 44, 0.08);
+}
+
+:root[data-theme="light"] .voice-banner__close:hover {
+  background: rgba(26, 21, 44, 0.16);
+}
+
+:root[data-theme="light"] .voice-banner--error {
+  border-color: rgba(254, 52, 2, 0.45);
+  background: #fefbf5;
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .ptt__lock {
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .ptt__lock-badge {
+  background:
+    radial-gradient(circle at center, rgba(254, 251, 245, 0.96) 58%, transparent 60%),
+    conic-gradient(
+      var(--astro-orange, #ff8b00) calc(var(--ptt-progress, 0) * 360deg),
+      rgba(26, 21, 44, 0.14) 0
+    );
+  box-shadow: 0 6px 18px rgba(26, 21, 44, 0.14);
+  color: color-mix(in srgb, #1a152c calc((1 - var(--ptt-progress, 0)) * 100%), #ff8b00);
+}
+
+:root[data-theme="light"] .ptt__lock--locked .ptt__lock-badge {
+  background: var(--astro-orange, #ff8b00);
+  color: #fefbf5;
+}
+
+/* ── Transcript ────────────────────────────────────────────────────────────── */
+
+:root[data-theme="light"] .voice-turn {
+  border-color: rgba(237, 202, 153, 0.7);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 8px rgba(26, 21, 44, 0.06);
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .voice-turn--user {
+  border-color: rgba(255, 139, 0, 0.45);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 139, 0, 0.16) 0%,
+    rgba(250, 107, 47, 0.12) 55%,
+    rgba(254, 52, 2, 0.1) 100%
+  );
+}
+
+:root[data-theme="light"] .voice-turn__tool {
+  border-color: rgba(237, 202, 153, 0.7);
+  background: rgba(237, 202, 153, 0.22);
+  color: rgba(26, 21, 44, 0.75);
+}
+
+/* ── Cards: settings, usage, projects, password gate ───────────────────────── */
+
+:root[data-theme="light"] .settings-content {
+  --background:
+    radial-gradient(120% 90% at 80% 10%, rgba(255, 139, 0, 0.12) 0%, rgba(254, 251, 245, 0) 58%),
+    radial-gradient(90% 80% at 15% 85%, rgba(254, 52, 2, 0.08) 0%, rgba(254, 251, 245, 0) 60%),
+    #fefbf5;
+}
+
+:root[data-theme="light"] .settings-card,
+:root[data-theme="light"] .password-gate,
+:root[data-theme="light"] .usage-meter,
+:root[data-theme="light"] .project-card,
+:root[data-theme="light"] .canvas-fallback {
+  border-color: rgba(237, 202, 153, 0.75);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, rgba(254, 251, 245, 0.92) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 8px 24px rgba(26, 21, 44, 0.08);
+  color: #1a152c;
+}
+
+:root[data-theme="light"] .project-card:hover {
+  border-color: rgba(250, 107, 47, 0.5);
+}
+
+:root[data-theme="light"] .project-card--active {
+  border-color: rgba(255, 139, 0, 0.55);
+  background: linear-gradient(180deg, rgba(255, 139, 0, 0.1) 0%, rgba(254, 251, 245, 0.94) 100%);
+}
+
+:root[data-theme="light"] .password-gate__note {
+  color: rgba(26, 21, 44, 0.75);
+}
+
+:root[data-theme="light"] .password-gate__input {
+  --background: #ffffff;
+  --color: #1a152c;
+  --border-color: rgba(237, 202, 153, 0.9);
+  --placeholder-color: rgba(26, 21, 44, 0.45);
+}

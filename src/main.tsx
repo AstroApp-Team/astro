@@ -15,8 +15,12 @@ import "./theme/voice.css";
 /* Astro's overlay. The character paints over the page, so the file has no Ionic theme
    variables in it — the only sheet colours in the app are here and in the shaders. */
 import "./theme/astro.css";
+/* Light theme overrides, scoped to `<html data-theme="light">`; dark needs nothing. */
+import "./theme/theme-light.css";
 
 import App from "./App.tsx";
+/* Sets `<html data-theme>` on import, before anything paints. */
+import "./lib/theme.ts";
 import { queryClient } from "./lib/query.ts";
 
 /* Must run before any Ionic component renders. */

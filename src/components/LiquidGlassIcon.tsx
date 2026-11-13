@@ -16,7 +16,9 @@ export type LiquidGlassIconName =
   | "exit-fullscreen"
   | "settings"
   | "astro-ask"
-  | "arrow-back";
+  | "arrow-back"
+  | "sun"
+  | "moon";
 
 export type LiquidGlassIconTone = "default" | "active" | "ember" | "cream";
 
@@ -467,6 +469,23 @@ function renderGlyph(name: LiquidGlassIconName, strokeId: string, maskId: string
           />
           <circle cx="12" cy="8.4" r="0.85" fill={spec.strokeStart} />
         </>
+      );
+
+    case "sun":
+      return (
+        <>
+          <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+          <path d="M12 2.75v1.9M12 19.35v1.9M21.25 12h-1.9M4.65 12h-1.9M18.54 5.46l-1.34 1.34M6.8 17.2l-1.34 1.34M18.54 18.54 17.2 17.2M6.8 6.8 5.46 5.46" />
+        </>
+      );
+
+    case "moon":
+      return (
+        <path
+          d="M20 14.6A8.25 8.25 0 0 1 9.4 4a8.25 8.25 0 1 0 10.6 10.6Z"
+          fill="currentColor"
+          stroke="none"
+        />
       );
 
     case "arrow-back":
