@@ -1261,7 +1261,7 @@ export default function VoiceSession({
                           : isPlaying
                             ? "Toque no Astro para interromper ou segure para falar"
                             : "Segure o botão abaixo para falar"
-                      : "Toque no astro para começar"}
+                      : "Clique para acordar o Astro"}
                   </span>
                 </div>
               ) : (

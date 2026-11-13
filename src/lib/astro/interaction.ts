@@ -7,7 +7,7 @@
  * corner overlay needs because its canvas cannot receive events.
  */
 
-import { ASTRO_DEFAULT_EXPRESSION, type AstroExpression } from "./astro.ts";
+import type { AstroExpression } from "./astro.ts";
 
 /** A point in CSS pixels, y **down** — the space pointer events are written in. */
 export type ScreenPoint = { x: number; y: number };
@@ -127,18 +127,15 @@ export type VoiceFaceInput = {
  * until the next status change, which for `speaking` means the character looks
  * attentive after the model has stopped talking.
  *
- * `disconnected` → `idle`, not `doze`. A dozing character was supposed to read as "a quiet
- * room", and it does — but a *page* is not a room: he is the only thing on it, sitting in the
- * corner of a form the visitor has not filled in yet, and a sleeping mascot next to an empty
- * password field reads as "nothing here is awake", not as calm. `idle` keeps him looking
- * around instead, and `followsPointer("idle")` is true, so his eyes track the cursor while
- * the visitor decides.
+ * `disconnected` → `sleep`. With no conversation open he is asleep, `zs-2` glyph and all, and
+ * the hero copy says a tap wakes him — which is also what starts the session. This only
+ * applies while `VoiceSession` is mounted: the password gate unmounts it, and its cleanup
+ * puts him back to `idle`, so a visitor at an empty password field still finds him awake.
  */
 export function faceForSession({ status, isCapturing, isPlaying, hasError }: VoiceFaceInput) {
   if (hasError) return { expression: "alert" as AstroExpression, sustained: false };
   if (status === "connecting") return { expression: "wonder" as AstroExpression, sustained: false };
-  if (status !== "connected")
-    return { expression: ASTRO_DEFAULT_EXPRESSION as AstroExpression, sustained: true };
+  if (status !== "connected") return { expression: "sleep" as AstroExpression, sustained: true };
   if (isPlaying) return { expression: "happy" as AstroExpression, sustained: false };
   if (isCapturing) return { expression: "look-right" as AstroExpression, sustained: true };
   return { expression: "idle" as AstroExpression, sustained: true };

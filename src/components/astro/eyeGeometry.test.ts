@@ -85,31 +85,31 @@ describe("the eye geometry", () => {
     expect(open.height / open.width).toBeCloseTo(111 / 58, 1);
   });
 
-  it("flattens to the sheet's sliver when asleep, scaled for legibility", () => {
+  it("closes into a wide, shallow bowl when asleep", () => {
     const asleep = bounds(ASLEEP);
     const open = bounds(OPEN);
 
-    /* Same shape as the drawing, `1.8×` its height — see SLEEP_EYE_LEGIBILITY. */
-    expect(asleep.height / asleep.width).toBeCloseTo((28.7 / 90) * 1.8, 1);
-    /* Around a third of the open eye's height: a closed lid, not a hairline. */
-    expect(asleep.height / open.height).toBeCloseTo(0.31, 1);
+    /* ~115 × 30 on the drawing: about 3.8 times as wide as it is deep. */
+    expect(asleep.width / asleep.height).toBeGreaterThan(3.3);
+    expect(asleep.width / asleep.height).toBeLessThan(4.4);
+    /* Around a fifth of the open eye's height: a closed lid, not a hairline. */
+    expect(asleep.height / open.height).toBeCloseTo(0.22, 1);
   });
 
-  it("hangs its lowest point from the middle, which is the downward curve", () => {
-    /* The shape of the sheet's closed eyelid: the bottom of the sliver is at the centre, well
-       below where the ends sit — the opposite of the happy arch. */
-    const middle = extreme(ASLEEP, "min", MIDDLE);
-    const tips = extreme(ASLEEP, "min", TIPS);
+  it("keeps the lid flat and hangs its belly from the middle, an open U", () => {
+    const lidMiddle = extreme(ASLEEP, "max", MIDDLE);
+    const lidTips = extreme(ASLEEP, "max", [0.9, 1.4]);
+    const bellyMiddle = extreme(ASLEEP, "min", MIDDLE);
+    const bellyTips = extreme(ASLEEP, "min", [0.9, 1.4]);
 
-    expect(tips).toBeLessThan(0);
-    /* In world units the eye is ~19 px tall on a phone: the centre dips five times as far. */
-    expect(Math.abs(middle)).toBeGreaterThan(Math.abs(tips) * 4);
+    /* The top edge is one straight line; the bottom is deepest at the centre. */
+    expect(lidTips).toBeCloseTo(lidMiddle, 3);
+    expect(bellyMiddle).toBeLessThan(bellyTips - 0.005);
   });
 
-  it("curves its spine upward toward the ends, so the ends turn up like a closed lid", () => {
-    /* Both edges converge at the points, so the asymmetry lives in the spine: a sliver whose
-       ends sit *higher* than its middle is an eyelid; a bar's spine is flat. */
-    expect(spine(ASLEEP, TIPS)).toBeGreaterThan(spine(ASLEEP, MIDDLE));
+  it("is a bowl, not an arch: the middle sits lower than the tips", () => {
+    /* The opposite of the happy `∩`: the spine of the closed eye dips in the middle. */
+    expect(spine(ASLEEP, MIDDLE)).toBeLessThan(spine(ASLEEP, TIPS));
   });
 
   it("arches the opposite way when happy", () => {

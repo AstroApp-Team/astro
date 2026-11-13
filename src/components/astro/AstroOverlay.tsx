@@ -40,6 +40,8 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
+import { ASTRO_DEFAULT_EXPRESSION, ASTRO_EXPRESSIONS } from "../../lib/astro/astro.ts";
+import { ASTRO_V2_BODY_RADIUS, ASTRO_V2_HALO_RADIUS } from "../../lib/astro/astroV2.ts";
 import { ASTRO_REACTION_MS } from "../../lib/astro/expression.ts";
 import {
   ASTRO_CORNER_HALO_WORLD,
@@ -316,11 +318,21 @@ function DragHandle() {
     store.setDragging(false);
     if (current == null || current.pointerId !== event.pointerId || current.moved) return;
 
+    const intent = tapIntent(store.live, store.speaking);
+    /*
+     * Waking him *is* the start, so he wakes all the way. Without this, `resting` stays
+     * `sleep` (the disconnected face), and the reaction's settle timer below would put him
+     * back to sleep in the middle of connecting, since `connecting` is a momentary face that
+     * never becomes the return target.
+     */
+    if (intent === "start" && store.voice) {
+      store.syncSession(ASTRO_DEFAULT_EXPRESSION, true);
+    }
+
     store.react();
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => store.settle(), ASTRO_REACTION_MS.max);
 
-    const intent = tapIntent(store.live, store.speaking);
     if (intent === "start") {
       /*
        * He is the start button, but a locked page has no session to start — `voice` is `null`
@@ -363,7 +375,7 @@ function DragHandle() {
       }}
       aria-label={
         !live
-          ? "Começar a conversar com o Astro"
+          ? "Acordar o Astro e começar a conversar"
           : speaking
             ? "Astro está falando — toque para interrompê-lo"
             : "Astro está ouvindo — toque para cumprimentá-lo"
@@ -373,6 +385,50 @@ function DragHandle() {
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     />
+  );
+}
+
+/** How many Zs each sleep glyph draws. */
+const Z_COUNT = { "zs-2": 2, "zs-3": 3 } as const;
+
+/**
+ * The "Zz" over his head while he sleeps: the `zs-*` glyph the expression sheet declares.
+ *
+ * HTML rather than geometry, for the same reason as `DragHandle`: it is positioned from the
+ * `[-1, 1]` origin the canvas already publishes, so it follows him through the hero-to-corner
+ * glide and a drag without a font, a texture or a mesh. It sits up and to the right of the
+ * body, over the halo, where the reference drawing puts it.
+ */
+function SleepZs() {
+  const expression = useAstroStore((state) => state.expression);
+  const anchor = useAstroStore((state) => state.anchor);
+  const lookOrigin = useAstroStore((state) => state.lookOrigin);
+  const lookRadius = useAstroStore((state) => state.lookRadius);
+
+  const glyph = ASTRO_EXPRESSIONS[expression].glyph;
+  if (glyph !== "zs-2" && glyph !== "zs-3") return null;
+  if (lookRadius <= 0) return null;
+
+  const centre = anchor ?? lookOrigin;
+  /* `lookRadius` is the glow's radius on screen; the body is a fixed fraction of it. */
+  const body = lookRadius * (ASTRO_V2_BODY_RADIUS / ASTRO_V2_HALO_RADIUS);
+
+  return (
+    <span
+      className="astro-zs"
+      aria-hidden="true"
+      style={{
+        left: `calc(${50 + centre.x * 50}% + ${body * 0.62}px)`,
+        top: `calc(${50 - centre.y * 50}% - ${body * 0.92}px)`,
+        fontSize: Math.max(body * 0.2, 14),
+      }}
+    >
+      {Array.from({ length: Z_COUNT[glyph] }, (_, index) => (
+        <span key={index} className="astro-zs__z" style={{ animationDelay: `${index * 0.9}s` }}>
+          Z
+        </span>
+      ))}
+    </span>
   );
 }
 
@@ -476,6 +532,7 @@ export default function AstroOverlay() {
       {/* Outside the boundary on purpose: a WebView with no WebGL loses the character, and
           with him the page's only start button would go too — the notice inside
           `CanvasBoundary` is then the thing to press, which is why it is a real button. */}
+      {!hidden && <SleepZs />}
       {!hidden && <DragHandle />}
     </div>
   );

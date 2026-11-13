@@ -13,8 +13,8 @@
  * `ASTRO_V2_EYE.height / 2` and the depth — so **one geometry unit is not the same
  * number of pixels in x and y**, and a shape's on-screen aspect is not its aspect here.
  * With the shipped numbers (`0.0498` and `0.0953` world units per geometry unit) the y
- * axis is `1.9×` denser than x, which is why the dash below is a third of a unit tall
- * and still reads as the sheet's sliver rather than as a hairline.
+ * axis is `1.9×` denser than x, which is why the sleeping bowl below is a third of a unit
+ * deep and still reads as a wide, shallow `U` rather than as a round eye.
  *
  * ## The shapes are the sheet's, not a moodboard's
  *
@@ -22,54 +22,38 @@
  * of one:
  *
  *   - **happy** is an arch: `∩`, drawn up at the middle, ~2:1 wide.
- *   - **asleep** is a **lens**: `90 × 28.7` with the ends tapering to points, a nearly
- *     flat top edge, and a bottom edge that sags *downward* in the middle. Drawn as a
- *     flat bar it reads as a dash; that is the bug this file fixes, and the sag is what
- *     makes it read as a closed eyelid.
+ *   - **asleep** is a **bowl**: a flat top edge and a rounded belly, an open `U` like a
+ *     contented closed eye — `115 × 30` on the sheet's drawing of him sleeping, ~3.8 : 1.
+ *     It is not a lens with two pointed ends and not a bar: the flat lid on top is what
+ *     says "closed", and the soft curve under it is what says "relaxed".
  */
 
 /**
- * How far the closed eye is scaled up beyond the sheet's ratio so its curve survives at
- * phone size.
+ * The bowl's depth at its middle, in geometry units.
  *
- * The sheet draws the sleeping sliver at `28.7 / 833` of the body, and on a 111 px phone
- * body that is `3.8 px` — the sag lands under a pixel and the shape reads as a dash, which
- * is precisely what "make his sleep expression look like the sheet" was asking to fix. So
- * the sliver is `1.8×` the sheet's height. Faithful in *shape* (taper, sag, lens points),
- * deliberately thicker in *scale*: `6.0 px` tall with a `1.7 px` sag is the smallest that
- * still reads as a curved lid. It stays well under the open eye's `19.3 px`.
+ * The mesh scales y by `ASTRO_V2_EYE.height / 2` (~0.084 world units per unit), so `0.36`
+ * is ~0.030 world units: `30 / 1090` of the body, the proportion of the drawing. With the
+ * wider `DASH_WIDEN` below it makes the ~3.8 : 1 shape the drawing has.
  */
-export const SLEEP_EYE_LEGIBILITY = 1.8;
+const BOWL_DEPTH = 0.36;
 
 /**
- * Half the sliver's thickness at its middle, in geometry units.
- *
- * Derived from the sheet, and the arithmetic is worth keeping because the two axes are not
- * the same size. The dash's on-screen bbox is `2.04` units wide and
- * `2 · DASH_HALF + DASH_DROOP = 0.62` units tall, and the mesh scales those by `0.0498` and
- * `0.0953` world units — `0.0591 / 0.1016 = 0.58`, i.e. the sheet's `28.7 / 90 = 0.319`
- * times `SLEEP_EYE_LEGIBILITY`.
- *
- * (It used to be `0.14 · y`: the right height, the wrong shape — a rectangle, which reads
- * as a dash rather than as a closed eye.)
+ * The bowl's depth at its tips — small but not zero, so the ends are rounded off instead of
+ * being needle points. In geometry units; ~0.008 world units, about a pixel on a phone.
  */
-const DASH_HALF = 0.12 * SLEEP_EYE_LEGIBILITY;
+const BOWL_TIP = 0.1;
 
 /**
- * How far the **lower** edge sags in the middle, in geometry units.
+ * How much wider the closed eye is than the open one.
  *
- * Applied to the lower rim only (`(1 - y) / 2`): a bar whose two edges bow together reads
- * as a dash that slid down, while the sheet's eyelid has a top edge that stays put. `0.18`
- * is `29%` of the sliver's full thickness and `1.7 px` of sag at phone size — the smallest
- * amount that still reads as a curve rather than a straight edge.
+ * The open eye is a narrow vertical oval (`58 / 833`); the sleeping bowl is `115 / 1090`
+ * of the body, a little wider than the open eye is tall. `1.32` takes the unit circle's
+ * half-width of 1 to the ~0.058 world units that is.
  */
-const DASH_DROOP = 0.18;
+const DASH_WIDEN = 1.32;
 
-/** How much thinner the ends are than the middle, as a fraction of `DASH_HALF`. */
-const DASH_TAPER = 0.4;
-
-/** The pair's dash is `180 / 148` wider than the open pair, so the shape widens with it. */
-const DASH_WIDEN = 1.02;
+/** Where the flat lid sits, so the bowl hangs symmetrically about the eye line. */
+const BOWL_TOP = BOWL_DEPTH / 2;
 
 /**
  * The crescent target: an up-curved arch, `∩`.
@@ -83,21 +67,23 @@ export function happyTarget(x: number, y: number): [number, number] {
 }
 
 /**
- * The dash target: the sheet's asleep eye, a lens with a sagging lower edge.
+ * The sleeping target: a bowl, `U`-shaped and open at the top, flat lid above and a smooth
+ * belly below.
  *
- * Three terms, in the order they matter:
+ * `x, y` are a point on the unit circle (or the cap's centre). The shape keeps every point's
+ * *fraction* of the way down its own vertical chord, `v`, so the top rim (`v = 1`) lands on
+ * one straight line and the bottom rim (`v = 0`) lands on the belly curve below it:
  *
- * 1. `DASH_HALF · y` is the sliver's thickness.
- * 2. `(1 - DASH_TAPER · x²)` tapers it: full thickness at the middle, `0.6` of it at the
- *    tips, which is what makes the ends read as points instead of as a cut-off bar.
- * 3. `-DASH_DROOP · (1 - x²) · (1 - y) / 2` is the sag — zero at the top rim and at both
- *    tips, strongest at the middle of the bottom rim.
+ *   - the belly is `BOWL_TIP + (BOWL_DEPTH - BOWL_TIP) · √(1 - x²)`, a half-ellipse,
+ *     deepest in the middle and rounding off at the ends;
+ *   - the lid is flat at `BOWL_TOP`, so the top edge never moves with the curve.
  *
- * `y` is the *rest* position, so the weights are independent of each other and the shader
- * can blend `happy` and `sleepy` at once without the shapes fighting.
+ * Symmetric in `x`, which is what lets one geometry serve both eyes unmirrored.
  */
 export function sleepyTarget(x: number, y: number): [number, number] {
-  const thickness = DASH_HALF * y * (1 - DASH_TAPER * x * x);
-  const sag = -DASH_DROOP * (1 - x * x) * ((1 - y) / 2);
-  return [x * DASH_WIDEN, thickness + sag];
+  const chord = Math.sqrt(Math.max(1 - x * x, 0));
+  /* At the tips the chord has no length and `y / chord` is noise: the tip sits mid-depth. */
+  const v = chord < 1e-3 ? 0.5 : (y / chord + 1) / 2;
+  const depth = BOWL_TIP + (BOWL_DEPTH - BOWL_TIP) * chord;
+  return [x * DASH_WIDEN, BOWL_TOP - depth * (1 - v)];
 }

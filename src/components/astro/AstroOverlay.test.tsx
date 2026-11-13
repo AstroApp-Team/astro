@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 vi.mock("@react-three/fiber", () => ({
@@ -73,5 +73,50 @@ describe("AstroOverlay tap interruption", () => {
     expect(interrupt).not.toHaveBeenCalled();
     expect(start).not.toHaveBeenCalled();
     expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe("AstroOverlay asleep", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useAstroStore.getState().setAnchor(null);
+    useAstroStore.getState().setLookOrigin(0, 0, 60);
+    useAstroStore.getState().setLive(false);
+    useAstroStore.getState().setSpeaking(false);
+    useAstroStore.getState().syncSession("sleep", true);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    useAstroStore.getState().setVoice(null);
+    useAstroStore.getState().syncSession("idle", true);
+  });
+
+  const zs = (container: HTMLElement) => container.querySelectorAll(".astro-zs__z").length;
+
+  it("draws the Zz while he sleeps, and not once he is awake", () => {
+    const { container } = render(<AstroOverlay />);
+    expect(zs(container)).toBe(2);
+
+    act(() => useAstroStore.getState().syncSession("idle", true));
+    expect(zs(container)).toBe(0);
+  });
+
+  it("wakes all the way on the tap that starts a conversation", () => {
+    const start = vi.fn();
+    useAstroStore.getState().setVoice({ start, stop: vi.fn() });
+
+    render(<AstroOverlay />);
+    const handle = screen.getByRole("button", { name: "Acordar o Astro e começar a conversar" });
+    handle.setPointerCapture = vi.fn();
+
+    fireEvent.pointerDown(handle, { pointerId: 3, clientX: 200, clientY: 400 });
+    fireEvent.pointerUp(handle, { pointerId: 3, clientX: 200, clientY: 400 });
+    expect(start).toHaveBeenCalledTimes(1);
+
+    /* The reaction's settle must not drop him back to sleep while the socket connects. */
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(useAstroStore.getState().expression).toBe("idle");
   });
 });

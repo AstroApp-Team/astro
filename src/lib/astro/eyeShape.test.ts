@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import { ASTRO_V2_EYE } from "./astroV2.ts";
-import { happyTarget, SLEEP_EYE_LEGIBILITY, sleepyTarget } from "./eyeShape.ts";
+import { happyTarget, sleepyTarget } from "./eyeShape.ts";
 
 /**
  * The eye shapes, asserted in the space they are built in.
@@ -13,9 +13,10 @@ import { happyTarget, SLEEP_EYE_LEGIBILITY, sleepyTarget } from "./eyeShape.ts";
  */
 
 /** The upper edge of the sliver at `x`, in geometry units. */
-const top = (x: number) => sleepyTarget(x, 1)[1];
+const rim = (x: number) => Math.sqrt(Math.max(1 - x * x, 0));
+const top = (x: number) => sleepyTarget(x, rim(x))[1];
 /** The lower edge at `x`. */
-const bottom = (x: number) => sleepyTarget(x, -1)[1];
+const bottom = (x: number) => sleepyTarget(x, -rim(x))[1];
 
 /** The shape's height/width as it lands on screen, given the mesh's non-uniform scale. */
 function screenAspect(widthUnits: number, heightUnits: number): number {
@@ -25,54 +26,40 @@ function screenAspect(widthUnits: number, heightUnits: number): number {
 }
 
 describe("the asleep eye", () => {
-  it("sags in the middle of its lower edge instead of being a bar", () => {
-    /* The sheet's eyelid droops: the middle of the lower edge is well below the tips. */
-    expect(bottom(0)).toBeLessThan(bottom(0.9));
-    expect(bottom(0.9) - bottom(0)).toBeGreaterThan(0.1);
+  it("has a flat lid: the upper edge is a straight line across the whole eye", () => {
+    for (const x of [0, 0.3, 0.6, 0.9]) {
+      expect(top(x)).toBeCloseTo(top(0), 6);
+    }
   });
 
-  it("keeps the upper edge far straighter than the lower one", () => {
-    /*
-     * The asymmetry is the shape. A bar whose *both* edges bow together reads as a dash that
-     * slid down the face; an eyelid is a lid, i.e. one edge stays and the other closes past
-     * it. So the top edge must move less than half as much as the bottom over the same span.
-     */
-    const topSag = top(0) - top(0.9);
-    const bottomSag = bottom(0.9) - bottom(0);
-
-    expect(topSag).toBeGreaterThan(0);
-    expect(topSag).toBeLessThan(bottomSag / 2);
+  it("is a bowl: the lower edge is deepest in the middle and rises toward the ends", () => {
+    expect(bottom(0)).toBeLessThan(bottom(0.6));
+    expect(bottom(0.6)).toBeLessThan(bottom(0.95));
+    /* Never below its own lid, and never inverted into a lens. */
+    for (const x of [0, 0.4, 0.8, 0.95]) {
+      expect(bottom(x)).toBeLessThan(top(x));
+    }
   });
 
-  it("tapers to points at the ends", () => {
+  it("rounds off the ends instead of ending in needle points", () => {
     const thickness = (x: number) => top(x) - bottom(x);
-
-    expect(thickness(0.5)).toBeLessThan(thickness(0));
-    expect(thickness(0.96)).toBeLessThan(thickness(0.5));
-    expect(thickness(0.96)).toBeLessThan(thickness(0) * 0.5);
+    expect(thickness(0.99)).toBeGreaterThan(0);
+    expect(thickness(0.99)).toBeLessThan(thickness(0) * 0.4);
   });
 
-  it("lands on the sheet's 28.7 : 90 aspect on screen, times the legibility scale", () => {
-    /* Both axes of the mesh are scaled differently, so this is the only assertion that ties
-       the geometry back to the drawing. The shape is the sheet's; only the scale is raised,
-       because `28.7 / 833` of a 111 px body is 3.8 px, where the sag is unreadable. */
+  it("lands on the drawing's ~3.8 : 1 aspect on screen", () => {
+    /* Both axes of the mesh are scaled differently, so this is the assertion that ties the
+       geometry back to the drawing: ~115 px wide, ~30 px deep. */
     const halfWidth = sleepyTarget(1, 0)[0];
     const aspect = screenAspect(2 * halfWidth, top(0) - bottom(0));
 
-    expect(aspect).toBeCloseTo((28.7 / 90) * SLEEP_EYE_LEGIBILITY, 1);
-  });
-
-  it("keeps the sheet's shape: taper, sag and lens points are unchanged by the scale-up", () => {
-    /* The scale multiplies thickness only; widths and taper ratios stay the sheet's, so the
-       sliver is a thicker copy of the drawing rather than a different eyelid. */
-    /* The sheet's `2 · 0.12 + 0.10 = 0.34`, times the scale: the ratios are untouched. */
-    expect(top(0) - bottom(0)).toBeCloseTo(0.34 * SLEEP_EYE_LEGIBILITY, 6);
-    expect(top(0.96) - bottom(0.96)).toBeLessThan((top(0) - bottom(0)) * 0.5);
+    expect(1 / aspect).toBeGreaterThan(3.3);
+    expect(1 / aspect).toBeLessThan(4.4);
   });
 
   it("is symmetric in x, so one geometry can serve both eyes", () => {
-    expect(sleepyTarget(-0.6, -1)[1]).toBeCloseTo(sleepyTarget(0.6, -1)[1], 10);
-    expect(sleepyTarget(-0.6, 1)[1]).toBeCloseTo(sleepyTarget(0.6, 1)[1], 10);
+    expect(sleepyTarget(-0.6, -0.8)[1]).toBeCloseTo(sleepyTarget(0.6, -0.8)[1], 10);
+    expect(sleepyTarget(-0.6, 0.8)[1]).toBeCloseTo(sleepyTarget(0.6, 0.8)[1], 10);
   });
 });
 

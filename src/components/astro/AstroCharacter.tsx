@@ -36,6 +36,7 @@ import {
   ASTRO_V2_EYE,
   ASTRO_V2_LOOK_RANGE,
 } from "../../lib/astro/astroV2.ts";
+import { BLINK_DURATION_S, blinkWeight, nextBlinkDelay } from "../../lib/astro/blink.ts";
 import { followPointer, followsPointer, resolveEyePose } from "../../lib/astro/pose.ts";
 import { useAstroStore, useAstroV2Store } from "../../lib/astro/store.ts";
 import { astroVoiceLevel, voiceClock } from "../../lib/astro/voice-level.ts";
@@ -91,6 +92,8 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
 
   /** Smoothed morph weights, so a pose change is an expression and not a jump cut. */
   const morph = useRef({ happy: 0, sleepy: 0, stretch: 1 });
+  /** The blink in progress: when it began (`-1` for none) and when the next one is due, on `uTime`. */
+  const blink = useRef({ start: -1, next: 2.5 });
   /** Smoothed attention, in sheet-normalised `[-1, 1]`. */
   const look = useRef({ x: 0, y: 0 });
   /** Smoothed voice level for the halo: quick to rise with a syllable, slower to settle. */
@@ -183,10 +186,6 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
     morph.current.sleepy = damp(morph.current.sleepy, pose.sleepy, 10, dt);
     morph.current.stretch = damp(morph.current.stretch, pose.stretch, 12, dt);
 
-    eyeUniforms.uHappy.value = morph.current.happy;
-    eyeUniforms.uSleepy.value = morph.current.sleepy;
-    eyeUniforms.uStretch.value = morph.current.stretch;
-
     /* ── the wave ── */
     /*
      * `uTime` accumulates frame deltas instead of reading the clock, so a paused tab
@@ -194,6 +193,40 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
      * multiplier is applied in the shader; applying it here too would square it.
      */
     bodyUniforms.uTime.value += dt;
+
+    /* ── the blink ── */
+    /*
+     * The blink is the asleep eye shown for a moment (`lib/astro/blink.ts`), so it rides the
+     * same `uSleepy` weight rather than adding a lid. It is a weight computed straight from
+     * the clock, not damped: a blink is ~300 ms, and a smoothing filter would round it away.
+     *
+     * Only an open-eyed face blinks. A sleeping face is already shut, and the happy crescent
+     * is a closed eye by choice — blinking through it would flicker between two shapes. While
+     * he cannot blink the next one is pushed out, so he does not blink the instant he wakes.
+     */
+    const clock = bodyUniforms.uTime.value;
+    const blinking = blink.current;
+    if (pose.sleepy >= 0.5 || pose.happy >= 0.5) {
+      blinking.start = -1;
+      blinking.next = clock + 1.5;
+    } else if (blinking.start < 0 && clock >= blinking.next) {
+      blinking.start = clock;
+    }
+    let blinkWeightNow = 0;
+    if (blinking.start >= 0) {
+      const elapsed = clock - blinking.start;
+      blinkWeightNow = blinkWeight(elapsed);
+      if (elapsed >= BLINK_DURATION_S) {
+        blinking.start = -1;
+        blinking.next = clock + nextBlinkDelay(Math.random(), Math.random());
+      }
+    }
+
+    /* The bowl is drawn at the eye's own height, not the alert face's taller one. */
+    const stretch = MathUtils.lerp(morph.current.stretch, 1, Math.min(blinkWeightNow, 1));
+    eyeUniforms.uHappy.value = morph.current.happy;
+    eyeUniforms.uSleepy.value = Math.max(morph.current.sleepy, blinkWeightNow);
+    eyeUniforms.uStretch.value = stretch;
 
     /*
      * The gradient's anchor is the body's **world** position. The hero can move the
@@ -274,7 +307,7 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
        * also where the expression's `open` compression lands, which is why it is not
        * baked into the morph.
        */
-      eye.scale.set(width / 2, (height / 2) * morph.current.stretch, depth);
+      eye.scale.set(width / 2, (height / 2) * stretch, depth);
     }
 
     /* ── the halo ── */

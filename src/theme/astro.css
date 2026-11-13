@@ -90,6 +90,69 @@
 }
 
 /*
+ * The "Zz" over him while he sleeps (`SleepZs` in `AstroOverlay.tsx`). A `span`, not a
+ * `div`: `.astro-overlay > div` stretches every div child to the full layer.
+ *
+ * Each Z rises up and to the right from the top of his head, growing and fading as it goes,
+ * and the next one follows partway through, so there is always one on the way. `left`/`top`
+ * glide with the same curve as `.astro-handle`, so the Zs stay with him as he moves.
+ */
+.astro-zs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  color: var(--astro-paper, #fefbf5);
+  font-family: var(--ion-font-family);
+  font-weight: 300;
+  line-height: 1;
+  transition:
+    left 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.astro-zs__z {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  opacity: 0;
+  animation: astro-z-drift 2.7s ease-out infinite;
+}
+
+@keyframes astro-z-drift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(1.4em, -2.2em) scale(1.25);
+  }
+}
+
+/* No drift: two still Zs, staggered like the drawing. */
+@media (prefers-reduced-motion: reduce) {
+  .astro-zs__z {
+    animation: none;
+    opacity: 1;
+  }
+
+  .astro-zs__z:nth-child(2) {
+    transform: translate(0.7em, -1.1em) scale(1.2);
+  }
+
+  .astro-zs__z:nth-child(3) {
+    transform: translate(1.4em, -2.2em) scale(1.4);
+  }
+}
+
+/*
  * The no-GL-context notice, in the same corner as the character it replaces. `CanvasBoundary`
  * renders this markup, so the selectors are its own (`__title` / `__body` / `__detail`), and
  * `.mono` is the class it puts on the detail line.
