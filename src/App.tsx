@@ -3,6 +3,7 @@ import { IonReactRouter } from "@ionic/react-router";
 import { Navigate, Route } from "react-router-dom";
 
 import AstroOverlay from "./components/astro/AstroOverlay.tsx";
+import Settings from "./pages/Settings.tsx";
 import Voice from "./pages/Voice.tsx";
 
 /**
@@ -18,6 +19,7 @@ export default function App() {
       <IonReactRouter>
         <IonRouterOutlet>
           <Route path="/voice" element={<Voice />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/" element={<Navigate to="/voice" replace />} />
         </IonRouterOutlet>
       </IonReactRouter>
