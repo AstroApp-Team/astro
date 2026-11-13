@@ -18,6 +18,18 @@ import { ASTRO_V2_BODY_RADIUS, ASTRO_V2_HALO_RADIUS } from "./astroV2.ts";
 /** The halo's radius in world units — the quantity the inset is measured against. */
 export const ASTRO_CORNER_HALO_WORLD = ASTRO_V2_HALO_RADIUS;
 
+/** Uniform scale while Astro waits centered on the initial / new-project screen. */
+export const ASTRO_HERO_SCALE = 1.65;
+
+/**
+ * Resolves Astro's uniform scale: enlarged on the hero "Vamos começar" stage
+ * until development starts (or the user drags him to a custom anchor), when he
+ * returns to his standard size (`1`).
+ */
+export function characterScale(hero: boolean, anchored: boolean): number {
+  return hero && !anchored ? ASTRO_HERO_SCALE : 1;
+}
+
 /**
  * How far in from the corner the body's centre sits, as a fraction of the halo's world
  * radius. Flush to the corner would put half the halo off-screen and he would read as a

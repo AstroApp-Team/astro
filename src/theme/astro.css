@@ -30,6 +30,14 @@
      100) so the rigging overlay on a dev desktop is never covered by the glow. */
   z-index: 1;
   pointer-events: none;
+  transition:
+    opacity 0.22s ease,
+    visibility 0.22s ease;
+}
+
+.astro-overlay--hidden {
+  opacity: 0;
+  visibility: hidden;
 }
 
 /* R3F sizes its container to this box. Without `inset: 0` above, the box would be 0×0
@@ -64,10 +72,16 @@
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
   pointer-events: auto;
+  transition:
+    left 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .astro-handle--dragging {
   cursor: grabbing;
+  transition: none;
 }
 
 .astro-handle:focus-visible {
@@ -85,14 +99,19 @@
   right: 12px;
   bottom: 12px;
   max-width: 340px;
-  padding: 8px 10px;
-  border: 1px solid rgb(var(--ion-color-primary-rgb) / 20%);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--astro-ink) 82%, transparent);
+  padding: 10px 12px;
+  border: 1px solid rgba(254, 251, 245, 0.16);
+  border-radius: 16px;
+  background: rgba(26, 21, 44, 0.74);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    inset 0 1px 1.5px rgba(254, 251, 245, 0.28),
+    0 10px 28px rgba(0, 0, 0, 0.7);
   color: var(--astro-paper);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--ion-font-family);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   /* Same rule as the layer above: a notice that cannot be drawn must not eat a press. */
   pointer-events: none;
 }

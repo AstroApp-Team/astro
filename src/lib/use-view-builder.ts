@@ -77,6 +77,12 @@ export function useViewBuilder({ password }: { password: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [report, setReport] = useState<ViewReport | null>(null);
   /**
+   * Incremented once a generated page finishes `runViewCheck` with zero
+   * problems, so auto-save persists only verified builds rather than drafts
+   * or failing intermediate attempts.
+   */
+  const [lastCheckedView, setLastCheckedView] = useState<{ id: number; view: View } | null>(null);
+  /**
    * The last build failure, kept on screen until the next build starts.
    * Telling only the voice model was not enough: it paraphrases ("I ran into a
    * problem, let me try again") and retries, and the actual reason showed up
@@ -121,13 +127,15 @@ export function useViewBuilder({ password }: { password: string }) {
   const check = async (landed: View) => {
     const run = runRef.current;
     const id = run.id;
-    setStatus("Checking the page…");
+    setStatus("Verificando a página…");
     const problems = await runViewCheck(landed.html);
     if (runRef.current.id !== id) return;
 
     if (problems.length > 0 && run.fixes < MAX_AUTO_FIXES) {
       run.fixes += 1;
-      setStatus(`Fixing ${problems.length} problem${problems.length === 1 ? "" : "s"}…`);
+      setStatus(
+        `Corrigindo ${problems.length} ${problems.length === 1 ? "problema" : "problemas"}…`,
+      );
       send(
         "Running the page found these problems. Fix them without changing anything else:\n" +
           problems.map((problem) => `- ${problem}`).join("\n"),
@@ -137,6 +145,9 @@ export function useViewBuilder({ password }: { password: string }) {
     }
 
     setStatus(null);
+    if (problems.length === 0) {
+      setLastCheckedView((previous) => ({ id: (previous?.id ?? 0) + 1, view: landed }));
+    }
     say(describeLanding(landed, run.baseline, problems));
   };
 
@@ -186,13 +197,34 @@ export function useViewBuilder({ password }: { password: string }) {
       baseline: view?.html ?? null,
       landed: null,
     };
-    setStatus(mode === "rebuild" ? "Rebuilding the app — this takes a little while…" : "Starting…");
+    setStatus(
+      mode === "rebuild"
+        ? "Reconstruindo o aplicativo — isso leva alguns instantes…"
+        : "Iniciando…",
+    );
     setFailure(null);
     send(request, {
       mode,
       currentHtml: view?.html ?? null,
       ...(pageErrors != null && { pageErrors }),
     });
+  };
+
+  /**
+   * Injects a persisted project view (or `null` for a blank stage) without
+   * triggering the coding agent or emitting a voice report.
+   */
+  const loadView = (loaded: View | null) => {
+    runRef.current = {
+      id: runRef.current.id + 1,
+      fixes: 0,
+      baseline: loaded?.html ?? null,
+      landed: null,
+    };
+    setDraft(null);
+    setStatus(null);
+    setFailure(null);
+    setView(loaded);
   };
 
   return {
@@ -203,7 +235,9 @@ export function useViewBuilder({ password }: { password: string }) {
     status,
     failure,
     report,
+    lastCheckedView,
     build,
+    loadView,
   };
 }
 
@@ -215,12 +249,12 @@ export function describeLanding(landed: View, baseline: string | null, problems:
   if (removed.length > 0) {
     text +=
       ` It no longer lists these features: ${removed.join("; ")}. If the user did not ask ` +
-      "for that, have them put back.";
+      "for that, mention it and ask whether they want them back. Do not change the page yourself.";
   }
   if (problems.length > 0) {
     text +=
-      ` A check still finds problems: ${problems.join("; ")}. If the page keeps misbehaving, ` +
-      "rebuild_view rewrites it cleanly.";
+      ` A check still finds problems: ${problems.join("; ")}. Mention it briefly and ask ` +
+      "whether they want it fixed. Do not change the page yourself.";
   }
   return text;
 }

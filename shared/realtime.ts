@@ -151,7 +151,8 @@ export const REALTIME_TOOLS: Experimental_RealtimeToolDefinition[] = [
       "Have a stronger, slower coding model rewrite the page on screen from scratch, from the " +
       "list of features the user has asked for. Use it when the page has outgrown quick edits: " +
       "the user says things are broken, inconsistent or missing, a change made something else " +
-      "stop working, edits keep failing, or the app reports errors from the page. It takes " +
+      "stop working, or edits keep failing. Only when the user asks — never on your own, " +
+      "and never because of an (app status) message or a page error. It takes " +
       "ten seconds or more; the current page stays usable meanwhile and the user's data " +
       "carries over. Not for new pages or small changes — use render_view for those.",
     parameters: {

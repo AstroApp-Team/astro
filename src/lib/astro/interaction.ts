@@ -84,19 +84,22 @@ export function gazeDirection(
 /**
  * What a press on the character means.
  *
- * The character is the page's start button, and a press is the whole interaction: it starts a
- * conversation when there is none, and once one is open it is only a greeting. Hanging up is
- * deliberately *not* something a press can do — he is draggable, so a press is also how a drag
- * begins, and a control that ended a call every time it was poked would hang up by accident.
+ * The character is the page's start button, and a press adapts cleanly to the session: it
+ * starts a conversation when there is none, interrupts Astro's reply when he is speaking
+ * (leaving the user's microphone open), and greets once open while he is silent. Hanging
+ * up is deliberately *not* something a press can do — he is draggable, so a press is also
+ * how a drag begins, and a control that ended a call every time it was poked would hang up
+ * by accident.
  *
  * Split out of the component because this is the product rule, not an implementation detail:
- * `"start"` and `"greet"` are the two answers, and the test can hold the rule still while the
- * event plumbing changes around it.
+ * `"start"`, `"interrupt"`, and `"greet"` are the three answers, and the test can hold the
+ * rule still while the event plumbing changes around it.
  */
-export type TapIntent = "start" | "greet";
+export type TapIntent = "start" | "interrupt" | "greet";
 
-export function tapIntent(live: boolean): TapIntent {
-  return live ? "greet" : "start";
+export function tapIntent(live: boolean, speaking = false): TapIntent {
+  if (!live) return "start";
+  return speaking ? "interrupt" : "greet";
 }
 
 /**

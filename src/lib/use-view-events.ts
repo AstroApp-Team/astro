@@ -52,6 +52,8 @@ export function useViewEvents({ finishedHtml }: { finishedHtml: string | null })
    * when the next version of the page loads.
    */
   const savedStateRef = useRef<unknown>(undefined);
+  /** Reactive counter + payload for silent auto-save to D1. */
+  const [latestState, setLatestState] = useState<{ id: number; data: unknown } | null>(null);
 
   useEffect(() => {
     const onMessage = (message: MessageEvent) => {
@@ -60,6 +62,7 @@ export function useViewEvents({ finishedHtml }: { finishedHtml: string | null })
       const state = parseViewState(message.data);
       if (state != null) {
         savedStateRef.current = state.state;
+        setLatestState((previous) => ({ id: (previous?.id ?? 0) + 1, data: state.state }));
         return;
       }
 
@@ -97,9 +100,23 @@ export function useViewEvents({ finishedHtml }: { finishedHtml: string | null })
     target.postMessage({ type: VIEW_STATE_TYPE, state: savedStateRef.current }, "*");
   };
 
+  /**
+   * Seeds `savedStateRef` when switching to a saved project (or `undefined` when
+   * starting a blank one) without triggering an immediate redundant auto-save.
+   */
+  const restoreState = (state: unknown) => {
+    savedStateRef.current = state;
+    setLatestState(null);
+
+    const target = frameRef.current?.contentWindow;
+    if (target != null && state !== undefined) {
+      target.postMessage({ type: VIEW_STATE_TYPE, state }, "*");
+    }
+  };
+
   const pageErrors = errors.html === finishedHtml ? errors.list : [];
 
-  return { frameRef, event, pageErrors, onFrameLoad };
+  return { frameRef, event, pageErrors, latestState, onFrameLoad, restoreState };
 }
 
 /** The parent-side check for `astro:error`: a short string, nothing else. */

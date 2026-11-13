@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { MAX_VIEW_HTML_BYTES } from "./view.ts";
+import { PASSWORD_QUERY_PARAM } from "./realtime.ts";
+import { MAX_VIEW_HTML_BYTES, MAX_VIEW_STATE_BYTES } from "./view.ts";
 
 /**
  * Zod lives here rather than in realtime.ts so the SPA can import the shared
@@ -10,6 +11,32 @@ import { MAX_VIEW_HTML_BYTES } from "./view.ts";
 
 export const PasswordSchema = z.object({
   password: z.string().min(1).max(200),
+});
+
+export const AuthQuerySchema = z.object({
+  [PASSWORD_QUERY_PARAM]: z.string().max(200).optional(),
+});
+
+export const ProjectIdParamSchema = z.object({
+  id: z.string().min(1).max(100),
+});
+
+export const CreateProjectSchema = PasswordSchema.extend({
+  title: z.string().min(1).max(120),
+  spec: z.string().max(4000).default(""),
+  html: z.string().min(1).max(MAX_VIEW_HTML_BYTES),
+  stateData: z.string().max(MAX_VIEW_STATE_BYTES).optional(),
+});
+
+export const SaveProjectFileSchema = PasswordSchema.extend({
+  filePath: z.string().min(1).max(255).default("index.html"),
+  content: z.string().min(1).max(MAX_VIEW_HTML_BYTES),
+  title: z.string().min(1).max(120).optional(),
+  spec: z.string().max(4000).optional(),
+});
+
+export const UpdateProjectStateSchema = PasswordSchema.extend({
+  stateData: z.string().min(1).max(MAX_VIEW_STATE_BYTES),
 });
 
 /**

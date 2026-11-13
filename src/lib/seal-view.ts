@@ -43,13 +43,13 @@ export const VIEW_CHECK_SANDBOX = "allow-scripts allow-same-origin allow-forms";
  * it what is here — keep the two in step.
  */
 export const VIEW_BASE_CSS =
-  ":root{color-scheme:dark;font:18px/1.4 system-ui,sans-serif}" +
+  ":root{color-scheme:dark;font:18px/1.4 'Urbanist',system-ui,sans-serif}" +
   "*{box-sizing:border-box}" +
   "html,body{margin:0;min-height:100%}" +
-  "body{padding:16px;background:#1a152c;color:#f3effa}" +
+  "body{padding:16px;background:#1a152c;color:#fefbf5}" +
   "button,input,select,textarea{font:inherit;color:inherit;padding:.5em .8em;" +
-  "border:1px solid #4a4266;border-radius:10px;background:#2a2344}" +
-  "button{cursor:pointer}button:active{background:#3a3159}" +
+  "border:1px solid rgba(254,251,245,0.18);border-radius:12px;background:#252036}" +
+  "button{cursor:pointer}button:active{background:#302a48}" +
   "canvas,svg{max-width:100%}";
 
 /** `</script` inside the injected source would end the tag early. */
