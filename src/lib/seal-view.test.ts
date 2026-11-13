@@ -83,6 +83,23 @@ describe("the Astro runtime", () => {
     expect(document.querySelector("#n")?.textContent).toBe("7");
   });
 
+  it("keeps a field an edit just added to a list's items, and still resumes the user's data", async () => {
+    const page = `<title>Shop</title>
+<!-- spec
+- Lists products with a picture
+-->
+<script>Astro.state({ n: 0, items: [{ id: 1, img: "https://x.test/a.jpg" }], cart: [], prefs: { dark: false, size: 2 } })</script>
+<script>Astro.view((s) => html\`<img src=\${s.items[0].img} /><i id="c">\${s.cart.length}</i><i id="p">\${s.prefs.size}</i>\`)</script>`;
+    // Saved by the previous version: items had no `img`, and prefs had no `size`.
+    const { document } = await load(page, {
+      saved: { n: 3, items: [{ id: 1 }], cart: [{ id: 1 }], prefs: { dark: true } },
+    });
+    await tick();
+    expect(document.querySelector("img")?.getAttribute("src")).toBe("https://x.test/a.jpg");
+    expect(document.querySelector("#c")?.textContent).toBe("1");
+    expect(document.querySelector("#p")?.textContent).toBe("2");
+  });
+
   it("passes the check for a working page", async () => {
     const { posted } = await load(COUNTER, { check: true });
     expect(posted.find((m) => m.type === "astro:check")).toEqual({

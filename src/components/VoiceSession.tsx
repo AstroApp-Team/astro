@@ -1267,7 +1267,9 @@ export default function VoiceSession({
               )}
             </div>
 
-            {activity != null && (
+            {/* Not while a press is down: the lock badge, the button and the headline already
+                say Astro is listening, and the badge rises through this spot. */}
+            {activity != null && ptt.state.phase === "idle" && (
               <IonNote className="voice-bar__activity">
                 {status === "connecting" && <IonSpinner name="dots" />}
                 {activity}
@@ -1282,8 +1284,8 @@ export default function VoiceSession({
           <IonToolbar className="astro-toolbar">
             {/**
              * Astro is the start button — tapping him starts the conversation — and the
-             * Start / live controls stay centered in the middle of the bar while utility
-             * buttons sit on the left, keeping the bottom-right corner clear for Astro 3D.
+             * Start / live controls stay centered in the middle of the bar, the transcript
+             * button sits on the left and the asker-mode toggle mirrors it on the right.
              */}
             <div className="voice-bar">
               <div className="voice-bar__left">
@@ -1297,7 +1299,7 @@ export default function VoiceSession({
                   <LiquidGlassIcon
                     name="chat"
                     tone={transcriptOpen ? "active" : "default"}
-                    size={23}
+                    size={26}
                   />
                   {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
                 </button>
@@ -1322,13 +1324,29 @@ export default function VoiceSession({
                     title="Interromper Astro"
                     aria-label="Interromper Astro"
                   >
-                    <LiquidGlassIcon name="stop" tone="ember" size={20} />
+                    <LiquidGlassIcon name="stop" tone="ember" size={22} />
                     <span className="voice-bar__interrupt-label">Interromper</span>
                   </button>
                 )}
               </div>
 
-              <div className="voice-bar__right" />
+              <div className="voice-bar__right">
+                {/* Asker mode, mirroring the transcript button in the opposite corner. */}
+                <button
+                  type="button"
+                  className={`apple-liquid-glass-btn${askerMode ? " apple-liquid-glass-btn--active" : ""}`}
+                  onClick={() => changeMode(!askerMode)}
+                  aria-pressed={askerMode}
+                  title={askerMode ? "Desativar modo perguntador" : "Ativar modo perguntador"}
+                  aria-label="Modo perguntador"
+                >
+                  <LiquidGlassIcon
+                    name="astro-ask"
+                    tone={askerMode ? "active" : "default"}
+                    size={26}
+                  />
+                </button>
+              </div>
             </div>
           </IonToolbar>
         </IonFooter>

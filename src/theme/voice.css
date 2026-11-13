@@ -2,8 +2,127 @@
 
 /* ── Apple Liquid Glass Primitives ─────────────────────────────────────────── */
 
-.apple-liquid-glass-btn {
+/*
+ * Modelled on iOS 26 Liquid Glass rather than on frosted panels:
+ *
+ *  - The body is mostly clear. A light blur, a saturation and brightness lift, and a
+ *    faint tint let whatever sits behind show through and set the colour of the control.
+ *  - The edge is a specular rim: a thin ring that is bright where the light hits and
+ *    nearly gone elsewhere (::before). Its angle is `--lg-angle`, which
+ *    `useGlassLight` moves as the phone tilts, so the glass catches the light.
+ *  - A soft sheen sits inside the top of the glass (::after), and when pressed it
+ *    becomes a glow under the finger (`--lg-px`/`--lg-py`) while the control swells
+ *    a little on a spring, the way Apple's controls react to touch.
+ *  - Glyphs are flat, single-colour symbols (LiquidGlassIcon); the glass does the depth.
+ */
+
+.apple-liquid-glass-btn,
+.apple-liquid-glass-square,
+.apple-liquid-glass-pill,
+.voice-waveform {
+  --lg-tint: rgba(56, 48, 92, 0.22);
+  --lg-rim: rgba(255, 255, 255, 0.55);
+  --lg-rim-dim: rgba(255, 255, 255, 0.08);
+  --lg-press: rgba(255, 255, 255, 0.14);
   position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 55%),
+    var(--lg-tint);
+  backdrop-filter: blur(12px) saturate(190%) brightness(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(190%) brightness(1.08);
+  border: none;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1),
+    0 1px 2px rgba(6, 4, 14, 0.25),
+    0 6px 16px rgba(6, 4, 14, 0.26);
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    background 0.25s ease,
+    opacity 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The specular rim: a hairline ring, brighter toward the light and across from it. */
+.apple-liquid-glass-btn::before,
+.apple-liquid-glass-square::before,
+.apple-liquid-glass-pill::before,
+.voice-waveform::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--lg-angle, 135deg),
+    var(--lg-rim) 0deg,
+    var(--lg-rim-dim) 62deg,
+    var(--lg-rim-dim) 118deg,
+    rgba(255, 255, 255, 0.2) 180deg,
+    var(--lg-rim-dim) 242deg,
+    var(--lg-rim-dim) 298deg,
+    var(--lg-rim) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+/* Pressed: a soft lightening of the glass under the finger. Behind the glyph. */
+.apple-liquid-glass-btn::after,
+.apple-liquid-glass-square::after,
+.apple-liquid-glass-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    90% 90% at var(--lg-px, 50%) var(--lg-py, 50%),
+    var(--lg-press) 0%,
+    transparent 75%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.apple-liquid-glass-btn:active:not(:disabled)::after,
+.apple-liquid-glass-square:active:not(:disabled)::after,
+.apple-liquid-glass-pill:active:not(:disabled)::after {
+  opacity: 1;
+  transition-duration: 0.1s;
+}
+
+.apple-liquid-glass-btn:active:not(:disabled),
+.apple-liquid-glass-square:active:not(:disabled),
+.apple-liquid-glass-pill:active:not(:disabled) {
+  transform: scale(1.06);
+  transition-duration: 0.18s;
+}
+
+.apple-liquid-glass-btn:focus-visible,
+.apple-liquid-glass-square:focus-visible,
+.apple-liquid-glass-pill:focus-visible {
+  outline: 2px solid var(--astro-orange);
+  outline-offset: 3px;
+}
+
+.apple-liquid-glass-btn:disabled,
+.apple-liquid-glass-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Round icon button. */
+.apple-liquid-glass-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -11,156 +130,53 @@
   height: 50px;
   padding: 0;
   border-radius: 9999px;
-  background: radial-gradient(
-    130% 130% at 24% 16%,
-    rgba(254, 251, 245, 0.2) 0%,
-    rgba(37, 32, 60, 0.56) 52%,
-    rgba(18, 14, 34, 0.78) 100%
-  );
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(254, 251, 245, 0.24);
-  box-shadow:
-    inset 0 1px 1.5px rgba(254, 251, 245, 0.52),
-    inset 0 -1px 2px rgba(254, 251, 245, 0.14),
-    inset 0 -4px 8px rgba(10, 7, 22, 0.55),
-    0 8px 22px rgba(8, 5, 18, 0.45);
-  color: rgba(254, 251, 245, 0.92);
+  color: rgba(254, 251, 245, 0.95);
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
-  -webkit-tap-highlight-color: transparent;
 }
 
 .apple-liquid-glass-btn--sm {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
 }
 
-.apple-liquid-glass-btn:hover:not(:disabled) {
-  border-color: rgba(254, 251, 245, 0.42);
-  box-shadow:
-    inset 0 1.5px 3px rgba(254, 251, 245, 0.68),
-    inset 0 -1.5px 4px rgba(255, 139, 0, 0.22),
-    0 10px 26px rgba(8, 5, 18, 0.62);
-  color: #fefbf5;
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .apple-liquid-glass-btn:hover:not(:disabled),
+  .apple-liquid-glass-square:hover:not(:disabled),
+  .apple-liquid-glass-pill:hover:not(:disabled) {
+    --lg-rim: rgba(255, 255, 255, 0.75);
+  }
 }
 
-.apple-liquid-glass-btn:active:not(:disabled) {
-  transform: translateY(0) scale(0.96);
-}
-
-.apple-liquid-glass-btn:focus-visible {
-  outline: 2px solid var(--astro-orange);
-  outline-offset: 2px;
-}
-
-.apple-liquid-glass-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
+/* Selected: the glass takes an orange tint and the rim warms. */
 .apple-liquid-glass-btn--active {
-  border-color: rgba(255, 139, 0, 0.62);
-  box-shadow:
-    inset 0 1px 2px rgba(254, 251, 245, 0.58),
-    inset 0 -2px 6px rgba(255, 139, 0, 0.28),
-    inset 0 -4px 8px rgba(12, 8, 24, 0.55),
-    0 6px 20px rgba(255, 139, 0, 0.24);
+  --lg-tint: rgba(255, 139, 0, 0.24);
+  --lg-rim: rgba(255, 214, 160, 0.6);
 }
 
 .apple-liquid-glass-btn--danger {
-  border-color: rgba(254, 52, 2, 0.56);
-  box-shadow:
-    inset 0 1px 2px rgba(254, 251, 245, 0.48),
-    inset 0 -2px 6px rgba(254, 52, 2, 0.34),
-    inset 0 -4px 8px rgba(18, 8, 16, 0.6),
-    0 6px 20px rgba(254, 52, 2, 0.24);
+  --lg-tint: rgba(254, 52, 2, 0.22);
+  --lg-rim: rgba(255, 180, 160, 0.6);
 }
 
+/* Rounded-square button, tinted ember. */
 .apple-liquid-glass-square {
-  position: relative;
+  --lg-tint: rgba(254, 70, 10, 0.42);
+  --lg-rim: rgba(255, 225, 200, 0.6);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 50px;
   height: 50px;
   padding: 0;
-  border-radius: 15px;
-  border: 1px solid rgba(254, 251, 245, 0.32);
-  background: radial-gradient(
-    130% 130% at 24% 16%,
-    rgba(254, 251, 245, 0.24) 0%,
-    rgba(254, 52, 2, 0.46) 48%,
-    rgba(32, 16, 36, 0.84) 100%
-  );
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  box-shadow:
-    inset 0 1px 1.5px rgba(254, 251, 245, 0.58),
-    inset 0 -1.5px 3px rgba(254, 52, 2, 0.3),
-    inset 0 -4px 8px rgba(14, 7, 22, 0.55),
-    0 8px 22px rgba(254, 52, 2, 0.26);
+  border-radius: 16px;
   color: #fefbf5;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
-  -webkit-tap-highlight-color: transparent;
 }
 
-.apple-liquid-glass-square:hover:not(:disabled) {
-  border-color: rgba(254, 251, 245, 0.48);
-  box-shadow:
-    inset 0 1.5px 3px rgba(254, 251, 245, 0.72),
-    inset 0 -2px 6px rgba(254, 52, 2, 0.42),
-    0 10px 26px rgba(254, 52, 2, 0.38);
-  transform: translateY(-1px);
-}
-
-.apple-liquid-glass-square:active:not(:disabled) {
-  transform: translateY(0) scale(0.95);
-}
-
-.apple-liquid-glass-square:focus-visible {
-  outline: 2px solid var(--astro-orange);
-  outline-offset: 2px;
-}
-
-.voice-waveform {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 50px;
-  padding: 0 0.9rem;
-  border-radius: 999px;
-  border: 1px solid rgba(254, 251, 245, 0.2);
-  background: radial-gradient(
-    130% 130% at 24% 16%,
-    rgba(254, 251, 245, 0.16) 0%,
-    rgba(37, 32, 60, 0.56) 54%,
-    rgba(18, 14, 34, 0.76) 100%
-  );
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  box-shadow:
-    inset 0 1px 1.5px rgba(254, 251, 245, 0.4),
-    inset 0 -2px 5px rgba(10, 7, 22, 0.5),
-    0 8px 20px rgba(8, 5, 18, 0.42);
-}
-
-.voice-waveform__bar {
-  width: 3.5px;
-  height: 24px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #fefbf5 0%, #ff8b00 68%, #fa6b2f 100%);
-  transform-origin: center;
-  transition: transform 0.08s linear;
-}
-
+/* Capsule with a label. */
 .apple-liquid-glass-pill {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -172,10 +188,9 @@
   font-size: 1.02rem;
   font-weight: 600;
   letter-spacing: 0.01em;
+  color: #fefbf5;
   cursor: pointer;
   flex-shrink: 0;
-  transition: all 0.22s cubic-bezier(0.25, 0.8, 0.25, 1);
-  -webkit-tap-highlight-color: transparent;
 }
 
 .apple-liquid-glass-pill--sm {
@@ -190,94 +205,78 @@
   font-size: 1.04rem;
 }
 
+/* Tinted glass in Astro's orange: still translucent, so the page shows through it. */
 .apple-liquid-glass-pill--primary {
-  border: 1px solid rgba(254, 251, 245, 0.38);
-  background: var(--astro-gradient-brand);
-  box-shadow:
-    inset 0 1.5px 2px rgba(254, 251, 245, 0.66),
-    inset 0 -3px 6px rgba(153, 25, 0, 0.38),
-    0 8px 24px rgba(254, 52, 2, 0.32);
-  color: #fefbf5;
-}
-
-.apple-liquid-glass-pill--primary:hover:not(:disabled) {
-  box-shadow:
-    inset 0 2px 3px rgba(254, 251, 245, 0.82),
-    inset 0 -3px 6px rgba(153, 25, 0, 0.45),
-    0 12px 28px rgba(254, 52, 2, 0.44);
-  transform: translateY(-1px);
+  --lg-tint: linear-gradient(
+    135deg,
+    rgba(255, 139, 0, 0.78) 0%,
+    rgba(250, 107, 47, 0.74) 50%,
+    rgba(254, 52, 2, 0.74) 100%
+  );
+  --lg-rim: rgba(255, 236, 214, 0.65);
+  --lg-rim-dim: rgba(255, 220, 190, 0.12);
+  text-shadow: 0 1px 2px rgba(120, 20, 0, 0.3);
 }
 
 .apple-liquid-glass-pill--ember {
-  border: 1px solid rgba(254, 251, 245, 0.34);
-  background: var(--astro-gradient-card-2);
-  box-shadow:
-    inset 0 1.5px 2px rgba(254, 251, 245, 0.64),
-    inset 0 -3px 6px rgba(130, 14, 0, 0.44),
-    0 8px 24px rgba(254, 52, 2, 0.35);
-  color: #fefbf5;
+  --lg-tint: linear-gradient(
+    135deg,
+    rgba(254, 52, 2, 0.8) 0%,
+    rgba(255, 139, 0, 0.74) 60%,
+    rgba(250, 107, 47, 0.76) 100%
+  );
+  --lg-rim: rgba(255, 236, 214, 0.65);
+  --lg-rim-dim: rgba(255, 220, 190, 0.12);
+  text-shadow: 0 1px 2px rgba(120, 20, 0, 0.3);
 }
 
-.apple-liquid-glass-pill--ember:hover:not(:disabled) {
-  box-shadow:
-    inset 0 2px 3px rgba(254, 251, 245, 0.78),
-    inset 0 -3px 6px rgba(130, 14, 0, 0.48),
-    0 12px 28px rgba(254, 52, 2, 0.48);
-  transform: translateY(-1px);
-}
-
+/* Clear glass with a label. */
 .apple-liquid-glass-pill--dark {
-  border: 1px solid rgba(254, 251, 245, 0.2);
-  background: rgba(36, 30, 60, 0.74);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow:
-    inset 0 1px 1.5px rgba(254, 251, 245, 0.34),
-    inset 0 -3px 6px rgba(12, 9, 24, 0.55),
-    0 6px 18px rgba(8, 5, 18, 0.45);
-  color: #fefbf5;
+  --lg-tint: rgba(46, 39, 80, 0.38);
 }
 
-.apple-liquid-glass-pill--dark:hover:not(:disabled) {
-  border-color: rgba(254, 251, 245, 0.36);
-  background: rgba(46, 39, 76, 0.84);
-  transform: translateY(-1px);
+/* The level meter shares the glass. */
+.voice-waveform {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 50px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
 }
 
-.apple-liquid-glass-pill:active:not(:disabled) {
-  transform: translateY(0) scale(0.97);
+.voice-waveform__bar {
+  width: 3.5px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fefbf5 0%, #ff8b00 68%, #fa6b2f 100%);
+  transform-origin: center;
+  transition: transform 0.08s linear;
 }
 
-.apple-liquid-glass-pill:focus-visible {
-  outline: 2px solid var(--astro-orange);
-  outline-offset: 2px;
-}
-
-.apple-liquid-glass-pill:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-/* Modern crystalline icon refraction */
+/* Glyphs: one flat colour per tone, like SF Symbols on glass. A hairline shadow keeps
+   them legible over bright content showing through. */
 .liquid-glass-icon {
   display: block;
   flex-shrink: 0;
+  filter: drop-shadow(0 0.5px 1px rgba(6, 4, 14, 0.28));
 }
 
 .liquid-glass-icon--default {
-  filter: drop-shadow(0 1px 4px rgba(254, 251, 245, 0.16));
+  color: rgba(254, 251, 245, 0.95);
 }
 
 .liquid-glass-icon--active {
-  filter: drop-shadow(0 2px 7px rgba(255, 139, 0, 0.34));
+  color: #ffa640;
 }
 
 .liquid-glass-icon--ember {
-  filter: drop-shadow(0 2px 7px rgba(254, 52, 2, 0.38));
+  color: #ff6b47;
 }
 
 .liquid-glass-icon--cream {
-  filter: drop-shadow(0 1px 3px rgba(26, 21, 44, 0.28));
+  color: #fefbf5;
 }
 
 /* ── Header, Footer & Modal Glass Chrome ───────────────────────────────────── */
@@ -302,6 +301,89 @@
   --padding-bottom: 0.35rem;
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
+  /* Ionic paint-contains the toolbar and its inner container (`contain: content` plus
+     `overflow: hidden`), which clips anything drawn above the bar. The push-to-talk lock
+     badge and arrow rise out of the bar, so lift the clipping at each level. */
+  overflow: visible;
+  contain: none;
+}
+
+.astro-toolbar::part(container),
+.astro-toolbar::part(content) {
+  overflow: visible;
+  contain: none;
+}
+
+/* The top bar floats: a rounded glass capsule inset from the screen edges, like the App
+   Store's tab bar. The safe-area inset moves from inside the toolbar (Ionic's default) to
+   the header around it, so a notch pushes the capsule down instead of making it taller. */
+/* `ion-header.` outranks Ionic's `.header-md`, whose drop shadow drew a square band
+   under the whole header, behind the capsule. */
+ion-header.astro-header {
+  box-shadow: none;
+}
+
+.astro-header {
+  box-sizing: border-box;
+  padding: calc(var(--ion-safe-area-top, 0px) + 0.5rem) 0.75rem 0.4rem;
+}
+
+.astro-header .astro-toolbar {
+  --background: transparent;
+  --border-width: 0;
+  --min-height: 58px;
+  --padding-start: 0.45rem;
+  --padding-end: 0.45rem;
+  --padding-top: 0.3rem;
+  --padding-bottom: 0.3rem;
+  position: relative;
+  padding-top: 0;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 60%),
+    rgba(30, 25, 52, 0.55);
+  backdrop-filter: blur(22px) saturate(190%) brightness(1.06);
+  -webkit-backdrop-filter: blur(22px) saturate(190%) brightness(1.06);
+  box-shadow:
+    inset 0 0 0 0.5px rgba(255, 255, 255, 0.1),
+    0 1px 3px rgba(6, 4, 14, 0.25),
+    0 8px 24px rgba(6, 4, 14, 0.32);
+}
+
+/* The voice screen's bar holds only its buttons, all in one row: the capsule hugs them and
+   sits centred, instead of stretching across the screen with a gap in the middle. */
+.astro-header--compact .astro-toolbar {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* The same moving specular rim as the glass buttons. */
+.astro-header .astro-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--lg-angle, 135deg),
+    rgba(255, 255, 255, 0.5) 0deg,
+    rgba(255, 255, 255, 0.07) 50deg,
+    rgba(255, 255, 255, 0.07) 130deg,
+    rgba(255, 255, 255, 0.2) 180deg,
+    rgba(255, 255, 255, 0.07) 230deg,
+    rgba(255, 255, 255, 0.07) 310deg,
+    rgba(255, 255, 255, 0.5) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
 }
 
 .astro-header__title {
@@ -326,8 +408,8 @@
   }
 
   .apple-liquid-glass-btn--sm {
-    width: 38px;
-    height: 38px;
+    width: 42px;
+    height: 42px;
   }
 }
 
@@ -568,8 +650,8 @@
   color: #fefbf5;
 }
 
-/* The footer bar: utility icons sit on the left, Start / live controls stay centered in
-   the middle, and the bottom-right corner remains clear for Astro 3D. */
+/* The footer bar: the transcript button on the left, Start / live controls centered in the
+   middle, and the asker-mode toggle on the right. */
 .voice-bar {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -663,6 +745,32 @@
   bottom: calc(100% + 0.5rem);
 }
 
+/* The arrow head above the lock badge while a press is down: a rounded orange glass shape that
+   bobs upward and fades as the slide nears the lock. */
+.ptt__arrow {
+  display: block;
+  line-height: 0;
+  filter: drop-shadow(0 3px 8px rgba(254, 52, 2, 0.5));
+  opacity: calc(1 - var(--ptt-progress, 0) * 0.85);
+  animation: ptt-arrow-bob 1.2s ease-in-out infinite;
+}
+
+@keyframes ptt-arrow-bob {
+  0%,
+  100% {
+    transform: translateY(2px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ptt__arrow {
+    animation: none;
+  }
+}
+
 /* The locked button: a pulsing dot, the clock, a stop icon. */
 .ptt__pulse {
   width: 10px;
@@ -697,12 +805,8 @@
 }
 
 .voice-bar__ptt--active {
-  box-shadow:
-    inset 0 2px 3px rgba(254, 251, 245, 0.72),
-    inset 0 -3px 6px rgba(130, 14, 0, 0.44),
-    0 0 0 4px rgba(255, 139, 0, 0.24),
-    0 12px 30px rgba(254, 52, 2, 0.48);
-  transform: scale(1.02);
+  --lg-rim: rgba(255, 240, 225, 0.8);
+  transform: scale(1.04);
 }
 
 .voice-bar__ptt .voice-waveform {
@@ -716,6 +820,12 @@
   box-shadow: none;
 }
 
+/* Inside the button the meter is bare bars: no glass of its own. */
+.voice-bar__ptt .voice-waveform::before,
+.voice-bar__ptt .voice-waveform::after {
+  display: none;
+}
+
 .voice-bar__ptt .voice-waveform__bar {
   width: 3px;
   height: 20px;
@@ -724,19 +834,8 @@
 }
 
 .voice-bar__interrupt {
-  border-color: rgba(254, 52, 2, 0.44);
-  box-shadow:
-    inset 0 1px 1.5px rgba(254, 251, 245, 0.36),
-    inset 0 -3px 6px rgba(12, 9, 24, 0.55),
-    0 6px 18px rgba(254, 52, 2, 0.22);
-}
-
-.voice-bar__interrupt:hover:not(:disabled) {
-  border-color: rgba(255, 139, 0, 0.68);
-  box-shadow:
-    inset 0 1.5px 2px rgba(254, 251, 245, 0.48),
-    inset 0 -3px 6px rgba(12, 9, 24, 0.55),
-    0 8px 22px rgba(254, 52, 2, 0.34);
+  --lg-tint: rgba(254, 52, 2, 0.16);
+  --lg-rim: rgba(255, 190, 170, 0.6);
 }
 
 .voice-bar__right {

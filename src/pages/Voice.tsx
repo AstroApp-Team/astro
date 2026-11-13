@@ -1,19 +1,10 @@
-import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  useIonRouter,
-} from "@ionic/react";
+import { IonButtons, IonContent, IonHeader, IonPage, IonToolbar, useIonRouter } from "@ionic/react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import LiquidGlassIcon from "../components/LiquidGlassIcon.tsx";
 import PasswordGate from "../components/PasswordGate.tsx";
 import VoiceSession, { type VoiceSessionHandle } from "../components/VoiceSession.tsx";
-import { useAskerMode } from "../lib/asker-mode.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { usePassword } from "../lib/password.ts";
 import { useFullscreen } from "../lib/use-fullscreen.ts";
@@ -30,7 +21,6 @@ export default function Voice() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const sessionRef = useRef<VoiceSessionHandle>(null);
   const password = usePassword();
-  const askerMode = useAskerMode();
   const router = useIonRouter();
   const { pathname } = useLocation();
   const {
@@ -61,7 +51,7 @@ export default function Voice() {
   return (
     <IonPage>
       {!fullscreen && (
-        <IonHeader className="astro-header">
+        <IonHeader className="astro-header astro-header--compact">
           <IonToolbar className="astro-toolbar">
             {password !== "" && (
               <IonButtons slot="start" className="astro-header__start">
@@ -72,7 +62,7 @@ export default function Voice() {
                   title="Configurações"
                   aria-label="Configurações"
                 >
-                  <LiquidGlassIcon name="settings" size={20} />
+                  <LiquidGlassIcon name="settings" size={24} />
                 </button>
                 <button
                   type="button"
@@ -84,26 +74,7 @@ export default function Voice() {
                   <LiquidGlassIcon
                     name="folder"
                     tone={projectsOpen ? "active" : "default"}
-                    size={20}
-                  />
-                </button>
-              </IonButtons>
-            )}
-            <IonTitle className="astro-header__title">Astro</IonTitle>
-            {password !== "" && (
-              <IonButtons slot="end" className="astro-header__actions">
-                <button
-                  type="button"
-                  className={`apple-liquid-glass-btn apple-liquid-glass-btn--sm${askerMode ? " apple-liquid-glass-btn--active" : ""}`}
-                  onClick={() => sessionRef.current?.changeMode(!askerMode)}
-                  aria-pressed={askerMode}
-                  title={askerMode ? "Desativar modo perguntador" : "Ativar modo perguntador"}
-                  aria-label="Modo perguntador"
-                >
-                  <LiquidGlassIcon
-                    name="astro-ask"
-                    tone={askerMode ? "active" : "default"}
-                    size={20}
+                    size={24}
                   />
                 </button>
                 <button
@@ -117,7 +88,7 @@ export default function Voice() {
                   title="Tela cheia"
                   aria-label="Tela cheia"
                 >
-                  <LiquidGlassIcon name="fullscreen" size={20} />
+                  <LiquidGlassIcon name="fullscreen" size={24} />
                 </button>
                 <button
                   type="button"
@@ -129,7 +100,7 @@ export default function Voice() {
                   title="Limpar conversa"
                   aria-label="Limpar conversa"
                 >
-                  <LiquidGlassIcon name="trash" size={20} />
+                  <LiquidGlassIcon name="trash" size={24} />
                 </button>
               </IonButtons>
             )}

@@ -54,6 +54,29 @@ function LockIcon() {
   );
 }
 
+/** A soft, rounded arrow head in orange glass: gradient body, bright rim, a sheen on top. */
+function ArrowHead() {
+  const body =
+    "M16 2.5C17.9 2.5 19.2 3.5 20.3 5.2L28.4 16.4C29.7 18.2 28.5 20 26.3 20H5.7C3.5 20 2.3 18.2 3.6 16.4L11.7 5.2C12.8 3.5 14.1 2.5 16 2.5Z";
+  return (
+    <svg viewBox="0 0 32 22" width="34" height="24">
+      <defs>
+        <linearGradient id="ptt-arrow-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffb347" />
+          <stop offset="1" stopColor="#fe3402" />
+        </linearGradient>
+        <linearGradient id="ptt-arrow-sheen" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fefbf5" stopOpacity="0.75" />
+          <stop offset="1" stopColor="#fefbf5" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={body} fill="url(#ptt-arrow-fill)" />
+      <path d={body} fill="url(#ptt-arrow-sheen)" />
+      <path d={body} fill="none" stroke="#fefbf5" strokeOpacity="0.5" strokeWidth="0.8" />
+    </svg>
+  );
+}
+
 /**
  * The push-to-talk button, drawn from the gesture state. It decides nothing: which phase it is
  * in, and what a press means, belong to `usePushToTalk` and `pttTransition`.
@@ -85,6 +108,12 @@ export default function PushToTalkButton({
           style={{ "--ptt-progress": progress } as React.CSSProperties}
           aria-live="polite"
         >
+          {/* Just the head of an arrow, only while the finger is down: it can still slide up to lock. */}
+          {state.phase === "pressing" && (
+            <span className="ptt__arrow" aria-hidden="true">
+              <ArrowHead />
+            </span>
+          )}
           <span className="ptt__lock-badge">
             <LockIcon />
           </span>
@@ -116,7 +145,7 @@ export default function PushToTalkButton({
           <>
             <span className="ptt__pulse" aria-hidden="true" />
             <RecordingTimer />
-            <LiquidGlassIcon name="stop" tone="cream" size={20} />
+            <LiquidGlassIcon name="stop" tone="cream" size={22} />
             <span>Enviar</span>
           </>
         ) : state.phase === "pressing" ? (
@@ -126,7 +155,7 @@ export default function PushToTalkButton({
           </>
         ) : (
           <>
-            <LiquidGlassIcon name="mic" tone="cream" size={22} />
+            <LiquidGlassIcon name="mic" tone="cream" size={24} />
             <span>Segurar para falar</span>
           </>
         )}

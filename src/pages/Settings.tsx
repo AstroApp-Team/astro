@@ -64,14 +64,14 @@ export default function Settings() {
               title="Voltar"
               aria-label="Voltar"
             >
-              <LiquidGlassIcon name="arrow-back" size={20} />
+              <LiquidGlassIcon name="arrow-back" size={24} />
             </button>
           </IonButtons>
           <IonTitle className="astro-header__title">Configurações</IonTitle>
         </IonToolbar>
       </IonHeader>
 
-      <IonContent className="ion-padding settings-content">
+      <IonContent fullscreen className="ion-padding settings-content">
         <div className="settings-layout">
           <section className="settings-card" aria-labelledby="settings-usage-title">
             <div className="settings-card__header">
