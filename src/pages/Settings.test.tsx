@@ -44,6 +44,7 @@ vi.mock("@ionic/react", () => {
 
 import { useAstroStore } from "../lib/astro/store.ts";
 import { getPassword, setPassword } from "../lib/password.ts";
+import { getTheme, setTheme } from "../lib/theme.ts";
 import { addViewCost, addVoiceCost, getUsage, resetUsage, usageToUsd } from "../lib/voice-usage.ts";
 import Settings from "./Settings.tsx";
 
@@ -96,5 +97,24 @@ describe("Settings", () => {
 
     expect(routerMock.goBack).not.toHaveBeenCalled();
     expect(routerMock.push).toHaveBeenCalledWith("/voice", "back", "replace");
+  });
+
+  it("switches between the dark and light themes, and remembers the choice", () => {
+    setTheme("dark");
+    render(<Settings />);
+
+    const dark = screen.getByRole("button", { name: "Escuro" });
+    const light = screen.getByRole("button", { name: "Claro" });
+    expect(dark.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(light);
+    expect(getTheme()).toBe("light");
+    expect(document.documentElement.dataset["theme"]).toBe("light");
+    expect(localStorage.getItem("astro.theme.v1")).toBe("light");
+    expect(light.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(dark);
+    expect(document.documentElement.dataset["theme"]).toBe("dark");
+    expect(localStorage.getItem("astro.theme.v1")).toBeNull();
   });
 });
