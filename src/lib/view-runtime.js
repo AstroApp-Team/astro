@@ -94,12 +94,33 @@
    * Saved state may come from an older version of this page or from a
    * different page entirely. Keep the starting shape, and take a saved value
    * only where its key exists and its kind matches.
+   *
+   * Kind alone is not enough: when an edit adds a field to the items of a list
+   * (an `img` URL on every product, say), the old saved list has the right kind
+   * and none of the new field, and taking it wholesale blanks what the edit just
+   * added. So a saved array is taken only while its objects still carry every
+   * field the page now starts with, and a saved object gets any new field
+   * filled in from the start.
    */
+  function takeSaved(start, saved) {
+    if (kind(start) === "array") {
+      const sample = start.find((item) => kind(item) === "object");
+      if (sample === undefined) return saved;
+      const fields = Object.keys(sample);
+      const fits = saved.every((item) => kind(item) !== "object" || fields.every((k) => k in item));
+      return fits ? saved : start;
+    }
+    if (kind(start) === "object") return { ...start, ...saved };
+    return saved;
+  }
+
   function merge(start, saved) {
     if (kind(saved) !== "object") return start;
     const next = { ...start };
     for (const key of Object.keys(start)) {
-      if (key in saved && kind(saved[key]) === kind(start[key])) next[key] = saved[key];
+      if (key in saved && kind(saved[key]) === kind(start[key])) {
+        next[key] = takeSaved(start[key], saved[key]);
+      }
     }
     return next;
   }
