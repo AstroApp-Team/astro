@@ -2,84 +2,118 @@ import {
   IonButtons,
   IonContent,
   IonHeader,
-  IonNote,
   IonPage,
   IonTitle,
   IonToolbar,
+  useIonRouter,
 } from "@ionic/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import LiquidGlassIcon from "../components/LiquidGlassIcon.tsx";
 import PasswordGate from "../components/PasswordGate.tsx";
-import VoiceSession from "../components/VoiceSession.tsx";
+import VoiceSession, { type VoiceSessionHandle } from "../components/VoiceSession.tsx";
 import { useAstroStore } from "../lib/astro/store.ts";
-import { setPassword, usePassword } from "../lib/password.ts";
+import { usePassword } from "../lib/password.ts";
 import { useFullscreen } from "../lib/use-fullscreen.ts";
-import { usageToUsd, useVoiceUsage } from "../lib/voice-usage.ts";
 
 export default function Voice() {
   /**
    * The realtime hook has no "clear messages" call — its state lives in a ref
    * inside the component. Bumping the key remounts the session, which disposes
    * the old store (closing the socket and the audio contexts) and builds an
-   * empty one. The running cost total lives out here, so clearing the
+   * empty one. The running cost total lives in localStorage, so clearing the
    * conversation does not clear the bill.
    */
   const [sessionKey, setSessionKey] = useState(0);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const sessionRef = useRef<VoiceSessionHandle>(null);
   const password = usePassword();
-  const usd = usageToUsd(useVoiceUsage());
+  const router = useIonRouter();
+  const { pathname } = useLocation();
   const {
     fullscreen,
     enter: enterFullscreen,
     exit: exitFullscreen,
   } = useFullscreen(password !== "");
 
+  const onVoiceRoute = pathname === "/voice" || pathname === "/";
+
   useEffect(() => {
-    useAstroStore.getState().setHidden(fullscreen);
-    return () => useAstroStore.getState().setHidden(false);
-  }, [fullscreen]);
+    useAstroStore.getState().setHidden(fullscreen || !onVoiceRoute);
+  }, [fullscreen, onVoiceRoute]);
+
+  useEffect(() => () => useAstroStore.getState().setHidden(false), []);
+
+  const toggleProjects = () => {
+    if (!projectsOpen) sessionRef.current?.closeTranscript();
+    setProjectsOpen((open) => !open);
+  };
+
+  const openSettings = () => {
+    sessionRef.current?.closeTranscript();
+    setProjectsOpen(false);
+    router.push("/settings", "forward", "push");
+  };
 
   return (
     <IonPage>
       {!fullscreen && (
         <IonHeader className="astro-header">
           <IonToolbar className="astro-toolbar">
-            <IonTitle className="astro-header__title">Astro</IonTitle>
             {password !== "" && (
-              <IonButtons slot="end" className="astro-header__actions">
-                {/* The total only; the breakdown and the reset are in the transcript sheet. */}
-                <IonNote className="voice-cost" title="Gasto até agora">
-                  ${usd.toFixed(4)}
-                </IonNote>
+              <IonButtons slot="start" className="astro-header__start">
                 <button
                   type="button"
                   className="apple-liquid-glass-btn apple-liquid-glass-btn--sm"
-                  onClick={enterFullscreen}
-                  title="Tela cheia"
-                  aria-label="Tela cheia"
+                  onClick={openSettings}
+                  title="Configurações"
+                  aria-label="Configurações"
                 >
-                  <LiquidGlassIcon name="fullscreen" size={17} />
+                  <LiquidGlassIcon name="settings" size={20} />
                 </button>
                 <button
                   type="button"
-                  className="apple-liquid-glass-btn apple-liquid-glass-btn--sm"
-                  onClick={() => setSessionKey((key) => key + 1)}
-                  title="Limpar conversa"
-                  aria-label="Limpar conversa"
+                  className={`apple-liquid-glass-btn apple-liquid-glass-btn--sm${projectsOpen ? " apple-liquid-glass-btn--active" : ""}`}
+                  onClick={toggleProjects}
+                  title={projectsOpen ? "Ocultar projetos" : "Projetos salvos"}
+                  aria-label={projectsOpen ? "Ocultar projetos" : "Projetos salvos"}
                 >
-                  <LiquidGlassIcon name="trash" size={17} />
+                  <LiquidGlassIcon
+                    name="folder"
+                    tone={projectsOpen ? "active" : "default"}
+                    size={20}
+                  />
+                </button>
+              </IonButtons>
+            )}
+            <IonTitle className="astro-header__title">Astro</IonTitle>
+            {password !== "" && (
+              <IonButtons slot="end" className="astro-header__actions">
+                <button
+                  type="button"
+                  className="apple-liquid-glass-btn apple-liquid-glass-btn--sm"
+                  onClick={() => {
+                    sessionRef.current?.closeTranscript();
+                    setProjectsOpen(false);
+                    enterFullscreen();
+                  }}
+                  title="Tela cheia"
+                  aria-label="Tela cheia"
+                >
+                  <LiquidGlassIcon name="fullscreen" size={20} />
                 </button>
                 <button
                   type="button"
                   className="apple-liquid-glass-btn apple-liquid-glass-btn--sm"
                   onClick={() => {
-                    exitFullscreen();
-                    setPassword("");
+                    setProjectsOpen(false);
+                    setSessionKey((key) => key + 1);
                   }}
-                  title="Esquecer senha"
-                  aria-label="Esquecer senha"
+                  title="Limpar conversa"
+                  aria-label="Limpar conversa"
                 >
-                  <LiquidGlassIcon name="lock-open" size={17} />
+                  <LiquidGlassIcon name="trash" size={20} />
                 </button>
               </IonButtons>
             )}
@@ -98,7 +132,11 @@ export default function Voice() {
           key={sessionKey}
           password={password}
           fullscreen={fullscreen}
+          projectsOpen={projectsOpen}
+          onOpenTranscript={() => setProjectsOpen(false)}
+          onCloseProjects={() => setProjectsOpen(false)}
           onExitFullscreen={exitFullscreen}
+          sessionRef={sessionRef}
         />
       )}
     </IonPage>

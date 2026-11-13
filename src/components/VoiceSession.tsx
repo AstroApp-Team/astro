@@ -12,7 +12,7 @@ import {
   IonToolbar,
 } from "@ionic/react";
 import { gateway } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import {
   AUDIO_FORMAT_TYPE,
@@ -45,7 +45,6 @@ import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-
 import AudioWaveform from "./AudioWaveform.tsx";
 import LiquidGlassIcon from "./LiquidGlassIcon.tsx";
 import ProjectsSheet, { type LoadedProject } from "./ProjectsSheet.tsx";
-import UsageMeter from "./UsageMeter.tsx";
 
 /**
  * Both of these are compared by identity inside the hook: a fresh object on
@@ -90,8 +89,9 @@ const sessionConfig = {
   // without them the audio still works and the page just looks empty.
   inputAudioTranscription: {},
   outputAudioTranscription: {},
-  // Server-side VAD: the model decides when a turn ends, so there is no
-  // push-to-talk button.
+  // Gemini 3.8 Live requires server-side VAD (sending `disabled` or manual
+  // commit/clear frames closes the WebSocket with code 1008). Push-to-talk
+  // gates local microphone capture to the hold window instead.
   turnDetection: { type: "server-vad" },
 } satisfies NonNullable<Experimental_UseRealtimeOptions["sessionConfig"]>;
 
@@ -115,8 +115,14 @@ const HERO_PROMPTS = [
 
 const HERO_PROMPT_INTERVAL_MS = 4_200;
 
-/** Brief silent tail before stopping capture so server-VAD closes the user's turn cleanly. */
-const MUTE_SILENCE_TAIL_MS = 350;
+/** Brief capture tail on release so final syllable audio frames finish flushing. */
+const PTT_RELEASE_TAIL_MS = 180;
+
+/** Silent audio window fed after the release tail so server-vad closes the turn promptly. */
+const PTT_VAD_SILENCE_MS = 600;
+
+/** Minimum connected hold time (ms) before a release commits audio as a turn. */
+const PTT_MIN_HOLD_MS = 120;
 
 /** Ignore leftover audio frames from an interrupted reply for this window (ms). */
 const INTERRUPT_SUPPRESS_MS = 1_500;
@@ -143,31 +149,42 @@ function isResponseActive(events: ReadonlyArray<{ type: string }>): boolean {
   return false;
 }
 
+export type VoiceSessionHandle = {
+  closeTranscript(): void;
+};
+
 export default function VoiceSession({
   password,
   fullscreen = false,
+  projectsOpen = false,
+  onOpenTranscript,
+  onCloseProjects,
   onExitFullscreen,
+  sessionRef,
 }: {
   password: string;
   fullscreen?: boolean;
+  projectsOpen?: boolean;
+  onOpenTranscript?: () => void;
+  onCloseProjects?: () => void;
   onExitFullscreen?: () => void;
+  sessionRef?: Ref<VoiceSessionHandle>;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [hasStarted, setHasStarted] = useState(false);
   const [promptIndex, setPromptIndex] = useState(0);
   /**
-   * Muted keeps the session open and pauses the microphone.
-   *
-   * Deliberately not the same thing as hanging up: the socket bills by the second either
-   * way, so muting is the cheap gesture and ending is the expensive one. Keeping the
-   * master tracks alive in `streamRef` (and handing a clone to `realtime`) means
-   * unmuting with "Falar" resumes cleanly without re-prompting for permission.
+   * Push-to-talk keeps the microphone silent by default while connected and only streams
+   * audio while the user actively holds the talk button. Keeping the master tracks alive
+   * in `streamRef` (and handing a clone to `realtime`) lets every press resume cleanly
+   * without re-prompting for permission.
    */
-  const [muted, setMuted] = useState(false);
+  const [talking, setTalking] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const captureStreamRef = useRef<MediaStream | null>(null);
-  const muteStopTimerRef = useRef<number | null>(null);
+  const releaseTimerRef = useRef<number | null>(null);
+  const holdStartRef = useRef<number | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
   const suppressIndexRef = useRef(0);
   const suppressUntilRef = useRef(0);
   const suppressProjectEventsUntilRef = useRef(0);
@@ -175,10 +192,10 @@ export default function VoiceSession({
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
-  const clearMuteTimer = () => {
-    if (muteStopTimerRef.current != null) {
-      window.clearTimeout(muteStopTimerRef.current);
-      muteStopTimerRef.current = null;
+  const clearReleaseTimer = () => {
+    if (releaseTimerRef.current != null) {
+      window.clearTimeout(releaseTimerRef.current);
+      releaseTimerRef.current = null;
     }
   };
 
@@ -265,7 +282,14 @@ export default function VoiceSession({
         if (usd != null) addVoiceCost(usd);
       }
     },
-    onError: (sessionError) => setError(sessionError.message),
+    onError: (sessionError) =>
+      setError((previous) =>
+        previous != null &&
+        sessionError.message.startsWith("Realtime WebSocket closed unexpectedly") &&
+        !previous.startsWith("Realtime WebSocket closed unexpectedly")
+          ? `${previous} (${sessionError.message})`
+          : sessionError.message,
+      ),
   });
 
   const { status, messages, events, isCapturing, isPlaying, startAudioCapture, stopPlayback } =
@@ -398,7 +422,7 @@ export default function VoiceSession({
   useEffect(() => {
     const face = faceForSession({
       status,
-      isCapturing: isCapturing && !muted,
+      isCapturing: isCapturing && talking,
       isPlaying,
       hasError: error != null,
     });
@@ -410,51 +434,63 @@ export default function VoiceSession({
          must not leave him asleep either: `idle` is the state a visitor finds him in. */
       useAstroStore.getState().syncSession(ASTRO_DEFAULT_EXPRESSION, true);
     };
-  }, [status, isCapturing, muted, isPlaying, error]);
+  }, [status, isCapturing, talking, isPlaying, error]);
 
   const isPlayingRef = useRef(isPlaying);
+  const talkingRef = useRef(talking);
   useEffect(() => {
     isPlayingRef.current = isPlaying;
+    talkingRef.current = talking;
   });
 
   /**
-   * Events sent before the socket opens are dropped, so capture waits for
-   * `connected` (which the SDK sets on the session-created event) rather than
-   * starting right after `connect()` resolves.
+   * Events sent before the socket opens are dropped, so capture waits for `connected`
+   * (which the SDK sets on session-created) and only runs while Push-to-Talk is held.
    *
    * `realtime.stopAudioCapture()` stops every track on the stream it receives when
    * `api.token` is set, so we pass a clone while `streamRef` holds the live master
-   * stream for `AudioWaveform` and subsequent "Falar" resumes.
+   * stream for `AudioWaveform` and subsequent Push-to-Talk holds.
    */
   useEffect(() => {
-    if (status !== "connected" || isCapturing || muted) return;
+    if (status !== "connected" || isCapturing || !talking) return;
 
     const master = streamRef.current;
     if (!master || !hasLiveAudioTrack(master)) return;
 
     stopMediaStream(captureStreamRef.current);
     const captureStream = cloneAudioStream(master);
-    setAudioTracksEnabled(captureStream, true);
+    setAudioTracksEnabled(captureStream, !isPlayingRef.current);
     captureStreamRef.current = captureStream;
     startAudioCapture(captureStream);
-    if (isPlayingRef.current) {
-      setAudioTracksEnabled(captureStream, false);
+  }, [status, isCapturing, talking, micStream, startAudioCapture]);
+
+  /* If Push-to-Talk was held before the socket or mic finished opening, clock hold duration from capture readiness. */
+  useEffect(() => {
+    if (status !== "connected" || !talking || micStream == null) return;
+    if (holdStartRef.current == null) {
+      holdStartRef.current = Date.now();
     }
-  }, [status, isCapturing, muted, micStream, startAudioCapture]);
+  }, [status, talking, micStream]);
 
   /**
-   * The model must never hear itself, and pausing with `[■]` must immediately
-   * send silence rather than room noise while closing out any active speech turn.
+   * The model must never hear itself. When Astro is silent and Push-to-Talk is
+   * held, re-enable the capture track; when released, `endTalk` manages the
+   * brief syllable tail and silent VAD flush before tearing capture down.
    */
   useEffect(() => {
-    setAudioTracksEnabled(captureStreamRef.current, !isPlaying && !muted);
-  }, [isPlaying, muted]);
+    if (isPlaying) {
+      setAudioTracksEnabled(captureStreamRef.current, false);
+    } else if (talking) {
+      setAudioTracksEnabled(captureStreamRef.current, true);
+    }
+  }, [isPlaying, talking]);
 
   /* Clean up any cloned capture tracks when leaving the connected state. */
   useEffect(() => {
     if (status !== "connected") return;
     return () => {
-      clearMuteTimer();
+      clearReleaseTimer();
+      holdStartRef.current = null;
       stopMediaStream(captureStreamRef.current);
       captureStreamRef.current = null;
     };
@@ -465,7 +501,8 @@ export default function VoiceSession({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      clearMuteTimer();
+      clearReleaseTimer();
+      holdStartRef.current = null;
       stopMediaStream(captureStreamRef.current);
       captureStreamRef.current = null;
       stopMediaStream(streamRef.current);
@@ -523,16 +560,22 @@ export default function VoiceSession({
     }
   };
 
-  const start = async () => {
-    clearMuteTimer();
+  const start = async ({ keepTalking = false }: { keepTalking?: boolean } = {}) => {
+    clearReleaseTimer();
+    holdStartRef.current = null;
     suppressUntilRef.current = 0;
-    setHasStarted(true);
     setError(null);
     setNotice(null);
-    /* Hanging up while muted must not leave the next session muted. */
-    setMuted(false);
+    if (!keepTalking) {
+      talkingRef.current = false;
+      setTalking(false);
+    }
 
-    if (!(await openMicrophone())) return;
+    if (!(await openMicrophone())) {
+      talkingRef.current = false;
+      setTalking(false);
+      return;
+    }
 
     /*
      * A second failure point, and a separate message: by here the microphone is open, so a
@@ -549,7 +592,11 @@ export default function VoiceSession({
   };
 
   const stop = () => {
-    clearMuteTimer();
+    clearReleaseTimer();
+    holdStartRef.current = null;
+    activePointerIdRef.current = null;
+    talkingRef.current = false;
+    setTalking(false);
     suppressUntilRef.current = 0;
     stopPlayback();
     realtime.stopAudioCapture();
@@ -608,39 +655,19 @@ export default function VoiceSession({
   );
 
   const isLive = status === "connected" || status === "connecting";
+  const isAssistantSpeaking = isLive && isPlaying;
 
   /**
-   * The character's start/stop, published for the overlay.
-   *
-   * He is the page's start button, but the microphone permission and the socket live here —
-   * so the overlay calls through the store rather than reaching into this component. The
-   * wrappers are stable (they read refs), because `start` and `stop` are rebound on every
-   * render and an effect that depended on them would re-register constantly.
+   * Cuts off Astro's spoken reply right away without activating or altering the user's
+   * push-to-talk state. Called by the Interrupt button, by tapping Astro 3D, or automatically
+   * when pressing Push-to-Talk while Astro is speaking.
    */
-  const startRef = useRef(start);
-  useEffect(() => {
-    startRef.current = start;
-  });
-
-  useEffect(() => {
-    useAstroStore.getState().setVoice({
-      start: () => void startRef.current(),
-      /* `stopRef` already exists for the idle hang-up, and is re-pointed every render for
-         exactly this reason: `stop` closes over `realtime`, which the hook rebinds. */
-      stop: () => stopRef.current(),
-    });
-
-    return () => useAstroStore.getState().setVoice(null);
-  }, []);
-
-  /* What a tap on him means. Published here because this is where `status` lives. */
-  useEffect(() => {
-    useAstroStore.getState().setLive(isLive);
-  }, [isLive]);
-
   const interruptAssistant = (): boolean => {
     const active = isPlayingRef.current || isResponseActive(eventsRef.current);
     stopPlaybackRef.current();
+    if (talkingRef.current) {
+      setAudioTracksEnabled(captureStreamRef.current, true);
+    }
     if (!active) return false;
 
     suppressIndexRef.current = eventsRef.current.length;
@@ -655,44 +682,126 @@ export default function VoiceSession({
     return true;
   };
 
-  const toggleMute = () => {
-    if (!muted) {
-      const interrupted = interruptAssistant();
-      setMuted(true);
-      setAudioTracksEnabled(captureStreamRef.current, false);
-      clearMuteTimer();
+  /**
+   * The character's start/stop/interrupt handle, published for the overlay.
+   *
+   * He is the page's start and tap-to-interrupt button, while the microphone permission and
+   * the socket live here — so the overlay calls through the store rather than reaching into
+   * this component. The wrappers are stable (they read refs), because `start`, `stop`, and
+   * `interruptAssistant` close over values rebound on every render.
+   */
+  const startRef = useRef(start);
+  const interruptRef = useRef(interruptAssistant);
+  useEffect(() => {
+    startRef.current = start;
+    interruptRef.current = interruptAssistant;
+  });
 
-      if (interrupted) {
-        realtime.stopAudioCapture();
-        stopMediaStream(captureStreamRef.current);
-        captureStreamRef.current = null;
-        return;
-      }
+  useEffect(() => {
+    useAstroStore.getState().setVoice({
+      start: () => void startRef.current(),
+      /* `stopRef` already exists for the idle hang-up, and is re-pointed every render for
+         exactly this reason: `stop` closes over `realtime`, which the hook rebinds. */
+      stop: () => stopRef.current(),
+      interrupt: () => void interruptRef.current(),
+    });
 
-      muteStopTimerRef.current = window.setTimeout(() => {
-        muteStopTimerRef.current = null;
-        realtime.stopAudioCapture();
-        stopMediaStream(captureStreamRef.current);
-        captureStreamRef.current = null;
-      }, MUTE_SILENCE_TAIL_MS);
+    return () => useAstroStore.getState().setVoice(null);
+  }, []);
+
+  /* What a tap on him means. Published here because this is where `status` and `isPlaying` live. */
+  useEffect(() => {
+    useAstroStore.getState().setLive(isLive);
+  }, [isLive]);
+
+  useEffect(() => {
+    useAstroStore.getState().setSpeaking(isAssistantSpeaking);
+    return () => useAstroStore.getState().setSpeaking(false);
+  }, [isAssistantSpeaking]);
+
+  const stopCaptureAndStreams = () => {
+    realtime.stopAudioCapture();
+    stopMediaStream(captureStreamRef.current);
+    captureStreamRef.current = null;
+  };
+
+  const beginTalk = (pointerId?: number) => {
+    clearReleaseTimer();
+    if (talkingRef.current) return;
+
+    if (pointerId != null) activePointerIdRef.current = pointerId;
+    talkingRef.current = true;
+    setTalking(true);
+
+    if (statusRef.current === "disconnected") {
+      void start({ keepTalking: true });
       return;
     }
 
-    interruptAssistant();
-    clearMuteTimer();
+    if (isPlayingRef.current || isResponseActive(eventsRef.current)) {
+      interruptAssistant();
+    }
+
+    if (statusRef.current === "connected") {
+      holdStartRef.current = Date.now();
+    }
+
     const existing = streamRef.current;
     if (existing && hasLiveAudioTrack(existing)) {
       setAudioTracksEnabled(captureStreamRef.current, !isPlayingRef.current);
-      setMuted(false);
       return;
     }
 
     void (async () => {
-      if (await openMicrophone()) {
-        setMuted(false);
+      if (!(await openMicrophone())) {
+        talkingRef.current = false;
+        setTalking(false);
+        holdStartRef.current = null;
       }
     })();
   };
+
+  const endTalk = (commit: boolean) => {
+    if (!talkingRef.current) return;
+
+    talkingRef.current = false;
+    setTalking(false);
+    activePointerIdRef.current = null;
+    const holdStart = holdStartRef.current;
+    holdStartRef.current = null;
+    clearReleaseTimer();
+
+    if (statusRef.current !== "connected" || holdStart == null) {
+      stopCaptureAndStreams();
+      return;
+    }
+
+    const heldMs = Date.now() - holdStart;
+    if (!commit || heldMs < PTT_MIN_HOLD_MS) {
+      stopCaptureAndStreams();
+      return;
+    }
+
+    releaseTimerRef.current = window.setTimeout(() => {
+      setAudioTracksEnabled(captureStreamRef.current, false);
+      releaseTimerRef.current = window.setTimeout(() => {
+        releaseTimerRef.current = null;
+        stopCaptureAndStreams();
+      }, PTT_VAD_SILENCE_MS);
+    }, PTT_RELEASE_TAIL_MS);
+  };
+
+  const endTalkRef = useRef(endTalk);
+  useEffect(() => {
+    endTalkRef.current = endTalk;
+  });
+
+  useEffect(() => {
+    if (!talking) return;
+    const onWindowBlur = () => endTalkRef.current(false);
+    window.addEventListener("blur", onWindowBlur);
+    return () => window.removeEventListener("blur", onWindowBlur);
+  }, [talking]);
 
   /**
    * The transcript is a sheet, not a column: the app the coding agent builds is
@@ -700,7 +809,6 @@ export default function VoiceSession({
    * the app's scroll pushed the app off screen with every line.
    */
   const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const [projectsOpen, setProjectsOpen] = useState(false);
   const [seenTurns, setSeenTurns] = useState(0);
   const unread = transcriptOpen ? 0 : Math.max(0, messages.length - seenTurns);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
@@ -709,6 +817,8 @@ export default function VoiceSession({
     setTranscriptOpen(false);
     setSeenTurns(messages.length);
   };
+
+  useImperativeHandle(sessionRef, () => ({ closeTranscript }));
 
   useEffect(() => {
     if (transcriptOpen) transcriptEndRef.current?.scrollIntoView({ block: "end" });
@@ -722,15 +832,16 @@ export default function VoiceSession({
    */
   const docked = useMediaQuery(DOCKED_TRANSCRIPT_QUERY);
   const heroSlotRef = useRef<HTMLDivElement>(null);
-  const isHero = !hasStarted && !isLive && viewBuilder.screen == null && !fullscreen;
+  /* Stay large and centered for fresh / blank projects until the coding agent starts building. */
+  const isHero = viewBuilder.screen == null && viewBuilder.status == null && !fullscreen;
 
   useEffect(() => {
-    if (!isHero) return;
+    if (!isHero || isLive) return;
     const timer = window.setInterval(() => {
       setPromptIndex((current) => (current + 1) % HERO_PROMPTS.length);
     }, HERO_PROMPT_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [isHero]);
+  }, [isHero, isLive]);
 
   useEffect(() => {
     if (!isHero) {
@@ -778,25 +889,17 @@ export default function VoiceSession({
       window.cancelAnimationFrame(rafId);
       observer.disconnect();
       window.removeEventListener("resize", updateHeroSpot);
-      useAstroStore.getState().setHeroSpot(null);
     };
-  }, [isHero, docked, transcriptOpen, projectsOpen]);
+  }, [isHero, isLive, talking, docked, transcriptOpen, projectsOpen]);
+
+  useEffect(() => () => useAstroStore.getState().setHeroSpot(null), []);
 
   const toggleTranscript = () => {
     if (transcriptOpen) {
       closeTranscript();
     } else {
-      setProjectsOpen(false);
+      onOpenTranscript?.();
       setTranscriptOpen(true);
-    }
-  };
-
-  const toggleProjects = () => {
-    if (projectsOpen) {
-      setProjectsOpen(false);
-    } else {
-      closeTranscript();
-      setProjectsOpen(true);
     }
   };
 
@@ -812,6 +915,7 @@ export default function VoiceSession({
     setActiveProjectId(null);
     restoreState(undefined);
     viewBuilder.loadView(null);
+    useAstroStore.getState().setAnchor(null);
   };
 
   const handleActiveProjectDeleted = () => {
@@ -820,8 +924,6 @@ export default function VoiceSession({
 
   const transcriptBody = (
     <>
-      <UsageMeter />
-
       {/**
        * Dev-only, and the fastest way to tell the two bring-up failures apart:
        * `audio-delta` arriving with nothing audible is the playback path, no
@@ -881,15 +983,13 @@ export default function VoiceSession({
 
   const activity = !isLive
     ? null
-    : muted
-      ? "silenciado"
+    : talking
+      ? "ouvindo"
       : isPlaying
         ? "falando"
-        : isCapturing
-          ? "ouvindo"
-          : status === "connecting"
-            ? "conectando"
-            : null;
+        : status === "connecting"
+          ? "conectando"
+          : null;
 
   return (
     <>
@@ -915,7 +1015,7 @@ export default function VoiceSession({
             docked={docked}
             password={password}
             activeProjectId={activeProjectId}
-            onClose={() => setProjectsOpen(false)}
+            onClose={() => onCloseProjects?.()}
             onSelectProject={handleSelectProject}
             onNewProject={handleNewProject}
             onActiveProjectDeleted={handleActiveProjectDeleted}
@@ -929,7 +1029,7 @@ export default function VoiceSession({
                 title="Voltar para a tela original"
                 aria-label="Voltar para a tela original"
               >
-                <LiquidGlassIcon name="exit-fullscreen" size={16} />
+                <LiquidGlassIcon name="exit-fullscreen" size={18} />
                 Voltar
               </button>
             )}
@@ -941,17 +1041,37 @@ export default function VoiceSession({
                     className="voice-stage__astro-hero-slot"
                     aria-hidden="true"
                   />
-                  <p key={promptIndex} className="voice-stage__headline">
-                    {HERO_PROMPTS[promptIndex]}
+                  <p key={isLive ? "live" : promptIndex} className="voice-stage__headline">
+                    {isLive
+                      ? talking
+                        ? "Estou ouvindo…"
+                        : isPlaying
+                          ? "Astro está falando"
+                          : "Pronto para criar"
+                      : HERO_PROMPTS[promptIndex]}
                   </p>
-                  <span className="voice-stage__subline">Toque no astro para começar</span>
+                  <span className="voice-stage__subline">
+                    {isLive
+                      ? status === "connecting"
+                        ? "Conectando ao Astro…"
+                        : talking
+                          ? "Solte o botão quando terminar de falar"
+                          : isPlaying
+                            ? "Toque no Astro para interromper ou segure para falar"
+                            : "Segure o botão abaixo para falar"
+                      : "Toque no astro ou segure o botão para começar"}
+                  </span>
                 </div>
               ) : (
                 <div className="voice-stage__empty">
                   <p className="voice-stage__headline">
-                    {isLive
-                      ? "Estou ouvindo. Pode pedir o que quiser."
-                      : "Toque em Iniciar ou no Astro."}
+                    {viewBuilder.status != null
+                      ? "Desenvolvendo seu projeto…"
+                      : talking
+                        ? "Estou ouvindo…"
+                        : isLive
+                          ? "Segure para falar."
+                          : "Toque no Astro ou segure para falar."}
                   </p>
                   <IonNote>
                     Peça algo (um jogo, um temporizador, uma lista) e aparece aqui em tela cheia.{" "}
@@ -1040,64 +1160,78 @@ export default function VoiceSession({
                   <LiquidGlassIcon
                     name="chat"
                     tone={transcriptOpen ? "active" : "default"}
-                    size={20}
+                    size={23}
                   />
                   {unread > 0 && <IonBadge className="voice-bar__badge">{unread}</IonBadge>}
-                </button>
-
-                <button
-                  type="button"
-                  className={`apple-liquid-glass-btn${projectsOpen ? " apple-liquid-glass-btn--active" : ""}`}
-                  onClick={toggleProjects}
-                  title={projectsOpen ? "Ocultar projetos" : "Projetos salvos"}
-                  aria-label={projectsOpen ? "Ocultar projetos" : "Projetos salvos"}
-                >
-                  <LiquidGlassIcon
-                    name="folder"
-                    tone={projectsOpen ? "active" : "default"}
-                    size={20}
-                  />
                 </button>
               </div>
 
               <div className="voice-bar__center">
-                {isLive ? (
-                  muted ? (
-                    <button
-                      type="button"
-                      className="apple-liquid-glass-pill apple-liquid-glass-pill--primary"
-                      onClick={toggleMute}
-                      title="Falar"
-                      aria-label="Falar"
-                    >
-                      <LiquidGlassIcon name="mic" tone="cream" size={18} />
-                      Falar
-                    </button>
-                  ) : (
+                <button
+                  type="button"
+                  className={`apple-liquid-glass-pill ${talking ? "apple-liquid-glass-pill--ember voice-bar__ptt--active" : "apple-liquid-glass-pill--primary"} voice-bar__ptt`}
+                  aria-pressed={talking}
+                  aria-label={talking ? "Solte para enviar" : "Segurar para falar"}
+                  title={talking ? "Solte para enviar" : "Segurar para falar"}
+                  onContextMenu={(event) => event.preventDefault()}
+                  onPointerDown={(event) => {
+                    if (event.button > 0) return;
+                    event.preventDefault();
+                    try {
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    } catch {
+                      /* Pointer capture can be absent in synthetic or headless tests. */
+                    }
+                    beginTalk(event.pointerId);
+                  }}
+                  onPointerUp={(event) => {
+                    if (
+                      activePointerIdRef.current != null &&
+                      event.pointerId !== activePointerIdRef.current
+                    ) {
+                      return;
+                    }
+                    endTalk(true);
+                  }}
+                  onPointerCancel={() => endTalk(false)}
+                  onLostPointerCapture={() => endTalk(false)}
+                  onKeyDown={(event) => {
+                    if (event.key !== " " && event.key !== "Enter") return;
+                    event.preventDefault();
+                    if (!event.repeat) beginTalk();
+                  }}
+                  onKeyUp={(event) => {
+                    if (event.key !== " " && event.key !== "Enter") return;
+                    event.preventDefault();
+                    endTalk(true);
+                  }}
+                  onBlur={() => endTalk(false)}
+                >
+                  {talking ? (
                     <>
-                      <button
-                        type="button"
-                        className="apple-liquid-glass-square"
-                        onClick={toggleMute}
-                        title="Parar de falar"
-                        aria-label="Parar de falar"
-                      >
-                        <LiquidGlassIcon name="stop-square" tone="cream" size={18} />
-                      </button>
                       <AudioWaveform
                         stream={micStream}
-                        active={isLive && !muted && isCapturing && !isPlaying}
+                        active={isLive && talking && isCapturing && !isPlaying}
                       />
+                      <span>Solte para enviar</span>
                     </>
-                  )
-                ) : (
+                  ) : (
+                    <>
+                      <LiquidGlassIcon name="mic" tone="cream" size={22} />
+                      <span>Segurar para falar</span>
+                    </>
+                  )}
+                </button>
+                {isAssistantSpeaking && !talking && (
                   <button
                     type="button"
-                    className="apple-liquid-glass-pill apple-liquid-glass-pill--primary"
-                    onClick={() => void start()}
+                    className="apple-liquid-glass-pill apple-liquid-glass-pill--dark voice-bar__interrupt"
+                    onClick={() => void interruptAssistant()}
+                    title="Interromper Astro"
+                    aria-label="Interromper Astro"
                   >
-                    <LiquidGlassIcon name="mic" tone="cream" size={18} />
-                    Iniciar
+                    <LiquidGlassIcon name="stop" tone="ember" size={20} />
+                    <span className="voice-bar__interrupt-label">Interromper</span>
                   </button>
                 )}
               </div>
