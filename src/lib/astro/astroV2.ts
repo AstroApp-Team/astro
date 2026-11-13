@@ -107,10 +107,17 @@ export const ASTRO_V2_LOOK_RANGE = { x: 0.34, y: 0.26 } as const;
  * defaults are what the sheet looks like.
  */
 export const ASTRO_V2_TUNABLES = {
-  /** Spatial frequency of the colour wave, per world unit. Higher = finer ribbons. */
-  waveFreq: 3.4,
-  /** How far the wave moves the gradient coordinate, in gradient-widths. 0 = a clean gradient. */
-  waveAmp: 0.2,
+  /**
+   * Spatial frequency of the colour wave, per world unit. Higher = finer ribbons. Low on
+   * purpose: at 3.4 the bands broke into an archipelago of colour islands.
+   */
+  waveFreq: 2.2,
+  /**
+   * How far the wave moves the gradient coordinate, in gradient-widths. 0 = a clean
+   * gradient. Small enough that the clamp at the ramp's ends is never hit, which is what
+   * turned soft bands into hard-edged islands.
+   */
+  waveAmp: 0.09,
   /** Wave phase per second. The character is calm: a full ripple takes several seconds. */
   waveSpeed: 0.45,
   /** Seconds for one full palette breath. Slow enough to be felt, not watched. */
@@ -130,12 +137,19 @@ export const ASTRO_V2_TUNABLES = {
   /** Gradient width relative to the body: 1 spans the body diagonally, 0.8 is a tighter ramp. */
   gradientScale: 1,
   /**
+   * Where on the sheet's ramp the body's paint starts, `0..1`. The body spans
+   * `rampStart..1`, so it sits on the orange rather than the amber, and — because the
+   * halo's inner colour *is* the ramp's top stop — his edge can never melt into the glow,
+   * whatever the wave and the drift do. Applied last, so nothing can push past it.
+   */
+  rampStart: 0.22,
+  /**
    * Where the halo has faded to nothing, in body radii from his centre, on screen.
    *
    * Every halo distance is measured in the screen plane (`x, y`), never through the
    * sphere: the glow is a disc behind him, as on astroapp.com.br, not a shell around him.
    */
-  haloSize: 1.9,
+  haloSize: 1.6,
   /**
    * Where the halo is at **full strength**, in body radii. `1` is his silhouette: the glow
    * is thickest where it meets the body and decays outward — a bloom that hugs the disc.

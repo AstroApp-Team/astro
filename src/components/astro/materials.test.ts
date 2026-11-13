@@ -5,6 +5,7 @@ import { ASTRO_V2_PALETTE, ASTRO_V2_TUNABLES } from "../../lib/astro/astroV2.ts"
 import {
   applyTunables,
   bodyFragmentShader,
+  bodyUniforms,
   bodyVertexShader,
   eyeFragmentShader,
   eyeUniforms,
@@ -38,6 +39,19 @@ describe("body and halo paint", () => {
 
   it("blends the body's stops linearly, as the drawing does", () => {
     expect(bodyFragmentShader).not.toContain("smoothstep(0.0, uStopMid");
+  });
+
+  it("never paints the amber the halo glows in, whatever the wave does", () => {
+    /* The halo's inner colour is the ramp's top stop. The body's ramp starts below it, and
+       that remap comes after every term that moves the coordinate, so no wave or drift can
+       push his edge into the glow's colour. */
+    applyTunables(ASTRO_V2_TUNABLES);
+    expect(ASTRO_V2_PALETTE.haloInner).toBe(ASTRO_V2_PALETTE.top);
+    expect(bodyUniforms.uRampStart.value).toBeGreaterThan(0.15);
+
+    const remap = bodyFragmentShader.indexOf("t = mix(uRampStart, 1.0, t);");
+    expect(remap).toBeGreaterThan(-1);
+    expect(bodyFragmentShader.lastIndexOf("t = ")).toBe(remap);
   });
 });
 
