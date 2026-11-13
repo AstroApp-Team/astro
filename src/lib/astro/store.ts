@@ -58,28 +58,38 @@ export type AstroStore = {
   anchor: { x: number; y: number } | null;
   /** True between `pointerdown` and `pointerup` on his handle. */
   dragging: boolean;
+  /** True while the view stage is in fullscreen mode and Astro should disappear. */
+  hidden: boolean;
+  /** Centered initial hero slot above the greeting copy, or `null` once the user starts. */
+  heroSpot: { x: number; y: number } | null;
   /**
    * Is a conversation open (or opening)?
    *
-   * The overlay needs this to decide what a tap on him means — start, or a greeting —
-   * and the answer lives in `VoiceSession`, so it is published here rather than
+   * The overlay needs this to decide what a tap on him means — start, interrupt, or a
+   * greeting — and the answer lives in `VoiceSession`, so it is published here rather than
    * duplicated as a second source of truth.
    */
   live: boolean;
+  /** True while Astro is actively playing a spoken reply. */
+  speaking: boolean;
   /**
-   * The session's own start/stop, published by `VoiceSession` while it is mounted.
+   * The session's own start/stop/interrupt controls, published by `VoiceSession` while mounted.
    *
-   * The character is the start button, but the microphone permission and the socket
-   * belong to that component, so a tap sends a command through here instead of reaching
-   * over it. `null` while the gate is up: with no password there is nothing to start.
+   * The character is the start and tap-to-interrupt button, while the microphone permission,
+   * playback queue, and socket belong to that component, so a tap sends a command through here
+   * instead of reaching over it. `null` while the gate is up: with no password there is nothing
+   * to start.
    */
-  voice: { start(): void; stop(): void } | null;
+  voice: { start(): void; stop(): void; interrupt?: () => void } | null;
   setLook(x: number, y: number): void;
   setLookOrigin(x: number, y: number, radius: number): void;
   setAnchor(anchor: { x: number; y: number } | null): void;
   setDragging(dragging: boolean): void;
+  setHidden(hidden: boolean): void;
+  setHeroSpot(heroSpot: { x: number; y: number } | null): void;
   setLive(live: boolean): void;
-  setVoice(voice: { start(): void; stop(): void } | null): void;
+  setSpeaking(speaking: boolean): void;
+  setVoice(voice: { start(): void; stop(): void; interrupt?: () => void } | null): void;
   /**
    * Show a state the session implies.
    *
@@ -110,7 +120,10 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
   lookRadius: 0,
   anchor: null,
   dragging: false,
+  hidden: false,
+  heroSpot: null,
   live: false,
+  speaking: false,
   voice: null,
 
   setLook(x, y) {
@@ -129,8 +142,20 @@ export const useAstroStore = create<AstroStore>((set, get) => ({
     set({ dragging });
   },
 
+  setHidden(hidden) {
+    set({ hidden });
+  },
+
+  setHeroSpot(heroSpot) {
+    set({ heroSpot });
+  },
+
   setLive(live) {
     set({ live });
+  },
+
+  setSpeaking(speaking) {
+    set({ speaking });
   },
 
   setVoice(voice) {

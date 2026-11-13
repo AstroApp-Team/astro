@@ -13,6 +13,12 @@ const config: CapacitorConfig = {
   appId: "dev.astro.app",
   appName: "Astro",
   webDir: "dist/client",
+  server: {
+    androidScheme: "http",
+  },
+  android: {
+    allowMixedContent: true,
+  },
 };
 
 export default config;

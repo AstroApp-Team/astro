@@ -30,6 +30,12 @@ export default defineConfig({
     ...(isVitest ? [] : [cloudflare()]),
   ]),
 
+  server: {
+    host: true,
+    port: 5173,
+    strictPort: true,
+  },
+
   staged: {
     "*": "vp check --fix",
   },

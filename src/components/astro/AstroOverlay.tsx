@@ -44,6 +44,7 @@ import { ASTRO_REACTION_MS } from "../../lib/astro/expression.ts";
 import {
   ASTRO_CORNER_HALO_WORLD,
   anchoredPosition,
+  characterScale,
   clampAnchor,
   cornerPosition,
   orthographicHalfExtent,
@@ -168,10 +169,22 @@ function CornerCharacter() {
   /* Subscribed, not read with `getState()`: a drag has to move the mesh, and this is the one
      prop on the character that comes from the page. */
   const anchor = useAstroStore((state) => state.anchor);
+  const heroSpot = useAstroStore((state) => state.heroSpot);
 
   /* Orthographic: R3F sizes the frustum in pixels (`left = -width/2`) and divides by
      `zoom`, so a world unit occupies `zoom` pixels. Only `zoom` is ours. */
   const zoom = orthographicZoom(size.width, size.height, HALO_COVERAGE);
+  const extent = orthographicHalfExtent(size.width, size.height, zoom);
+  const scale = characterScale(heroSpot != null, anchor != null);
+
+  let position: [number, number, number];
+  if (anchor != null) {
+    position = anchoredPosition(anchor, extent, CHARACTER_Z);
+  } else if (heroSpot != null) {
+    position = [heroSpot.x * extent.halfWidth, heroSpot.y * extent.halfHeight, CHARACTER_Z];
+  } else {
+    position = cornerPosition(extent, CHARACTER_Z);
+  }
 
   /* Applied in a layout effect, not during render, and on a camera read from `get()`
      rather than the subscribed `camera`: the React Compiler (panicThreshold
@@ -184,14 +197,6 @@ function CornerCharacter() {
     live.zoom = zoom;
     live.updateProjectionMatrix();
   }, [getThree, camera, zoom]);
-
-  const extent = orthographicHalfExtent(size.width, size.height, zoom);
-  /* `null` anchor means the shipping corner; anything else is where the user dropped him,
-     clamped because a resize can move the edges in under it. */
-  const position =
-    anchor == null
-      ? cornerPosition(extent, CHARACTER_Z)
-      : anchoredPosition(anchor, extent, CHARACTER_Z);
 
   /*
    * His position in the *same* viewport space the pointer is written in, so the pointer
@@ -206,12 +211,12 @@ function CornerCharacter() {
   const originY = position[1] / extent.halfHeight;
   /* `zoom` is pixels per world unit, so this is the glow's radius on screen — the one
      quantity the press handler needs and the canvas is the only place that knows. */
-  const haloRadiusPx = ASTRO_CORNER_HALO_WORLD * zoom;
+  const haloRadiusPx = ASTRO_CORNER_HALO_WORLD * zoom * scale;
   useLayoutEffect(() => {
     useAstroStore.getState().setLookOrigin(originX, originY, haloRadiusPx);
   }, [originX, originY, haloRadiusPx]);
 
-  return <AstroCharacter position={position} />;
+  return <AstroCharacter position={position} scale={scale} />;
 }
 
 /**
@@ -234,6 +239,7 @@ function DragHandle() {
   const lookOrigin = useAstroStore((state) => state.lookOrigin);
   const lookRadius = useAstroStore((state) => state.lookRadius);
   const live = useAstroStore((state) => state.live);
+  const speaking = useAstroStore((state) => state.speaking);
   const [dragging, setDragging] = useState(false);
 
   const settleTimer = useRef<number | undefined>(undefined);
@@ -249,20 +255,17 @@ function DragHandle() {
   useEffect(() => () => window.clearTimeout(settleTimer.current), []);
 
   const centre = anchor ?? lookOrigin;
-  const radius = lookRadius * POKE_RADIUS_RATIO;
+  const radius = lookRadius > 0 ? Math.max(lookRadius * POKE_RADIUS_RATIO, 22) : 0;
 
   /**
    * Pointer pixels → an anchor, clamped by the character's own body radius.
    *
-   * The zoom is recovered from the halo's on-screen radius (`lookRadius`), which is the one
-   * number the canvas publishes; with it the same `clampAnchor` the renderer uses applies
-   * here, so the handle and the mesh cannot disagree about where the edge is.
+   * Uses the viewport's orthographic zoom directly so clamping stays exact while
+   * Astro animates between shrunk and full-size radii.
    */
   const anchorAt = (x: number, y: number) => {
     const next = pixelsToViewport({ x, y }, window.innerWidth, window.innerHeight);
-    if (lookRadius <= 0) return next;
-
-    const zoom = lookRadius / ASTRO_CORNER_HALO_WORLD;
+    const zoom = orthographicZoom(window.innerWidth, window.innerHeight, HALO_COVERAGE);
     return clampAnchor(next, orthographicHalfExtent(window.innerWidth, window.innerHeight, zoom));
   };
 
@@ -283,6 +286,7 @@ function DragHandle() {
       moved: false,
     };
     setDragging(true);
+    useAstroStore.getState().setDragging(true);
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -302,41 +306,46 @@ function DragHandle() {
   /**
    * Up ends the gesture, and a gesture that never moved is a tap.
    *
-   * The tap is the character's whole job on this page: it starts the conversation when
-   * there is none. Once one is open it is only a greeting, because hanging up is the
-   * separate button's job — a character that also hung up would end calls by accident every
-   * time someone poked him.
+   * When disconnected it starts the voice session, and while connected it greets.
    */
   const onPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const current = drag.current;
     drag.current = null;
     setDragging(false);
+    const store = useAstroStore.getState();
+    store.setDragging(false);
     if (current == null || current.pointerId !== event.pointerId || current.moved) return;
 
-    const store = useAstroStore.getState();
     store.react();
     window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => store.settle(), ASTRO_REACTION_MS.max);
 
-    if (tapIntent(store.live) !== "start") return;
+    const intent = tapIntent(store.live, store.speaking);
+    if (intent === "start") {
+      /*
+       * He is the start button, but a locked page has no session to start — `voice` is `null`
+       * while the gate is up. A tap there still has to *answer*, or a first-time visitor taps
+       * the character and concludes nothing works: it puts the cursor in the password field,
+       * which is the one thing standing between them and a conversation.
+       */
+      if (store.voice) {
+        store.voice.start();
+        return;
+      }
 
-    /*
-     * He is the start button, but a locked page has no session to start — `voice` is `null`
-     * while the gate is up. A tap there still has to *answer*, or a first-time visitor taps
-     * the character and concludes nothing works: it puts the cursor in the password field,
-     * which is the one thing standing between them and a conversation.
-     */
-    if (store.voice) {
-      store.voice.start();
+      document.querySelector<HTMLInputElement>("ion-input input")?.focus();
       return;
     }
 
-    document.querySelector<HTMLInputElement>("ion-input input")?.focus();
+    if (intent === "interrupt") {
+      store.voice?.interrupt?.();
+    }
   };
 
   const onPointerCancel = () => {
     drag.current = null;
     setDragging(false);
+    useAstroStore.getState().setDragging(false);
   };
 
   return (
@@ -352,7 +361,13 @@ function DragHandle() {
         height: radius * 2,
         visibility: radius > 0 ? "visible" : "hidden",
       }}
-      aria-label={live ? "Astro is listening — tap to greet him" : "Start talking to Astro"}
+      aria-label={
+        !live
+          ? "Começar a conversar com o Astro"
+          : speaking
+            ? "Astro está falando — toque para interrompê-lo"
+            : "Astro está ouvindo — toque para cumprimentá-lo"
+      }
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -364,6 +379,7 @@ function DragHandle() {
 export default function AstroOverlay() {
   /* A tab the user has left is a paused render: this layer is a presence, not a process. */
   const [visible, setVisible] = useState(true);
+  const hidden = useAstroStore((state) => state.hidden);
   useEffect(() => {
     const onVisibility = () => setVisible(!document.hidden);
     document.addEventListener("visibilitychange", onVisibility);
@@ -374,7 +390,7 @@ export default function AstroOverlay() {
     const follow = (event: PointerEvent) => {
       /* Mouse only: a finger that drags to scroll the page would drag his eyes with it. The
          touch path is `pointerdown` — one position per touch, held like a resting cursor. */
-      if (event.pointerType === "touch") return;
+      if (event.pointerType === "touch" || useAstroStore.getState().hidden) return;
 
       const look = lookDirectionFromPointer(event);
       useAstroStore.getState().setLook(look.x, look.y);
@@ -404,6 +420,7 @@ export default function AstroOverlay() {
    */
   useEffect(() => {
     const poke = (event: PointerEvent) => {
+      if (useAstroStore.getState().hidden) return;
       const look = lookDirectionFromPointer(event);
       useAstroStore.getState().setLook(look.x, look.y);
     };
@@ -421,7 +438,7 @@ export default function AstroOverlay() {
    * overlays, and `pointer-events: none` means he never eats a press.
    */
   return (
-    <div className="astro-overlay">
+    <div className={`astro-overlay${hidden ? " astro-overlay--hidden" : ""}`}>
       {/* Scoped to the canvas: a WebView with no GL context loses the character, not the
           page. The boundary's own notice is styled into this corner by `theme/astro.css`. */}
       <CanvasBoundary what="Astro">
@@ -437,7 +454,7 @@ export default function AstroOverlay() {
            * *after* that inline default, so this wins.
            */
           style={{ pointerEvents: "none" }}
-          frameloop={visible ? "always" : "never"}
+          frameloop={visible && !hidden ? "always" : "never"}
           /* `orthographic`, not a declared camera element: R3F builds the default camera from
              this flag, and a declared `<orthographicCamera>` would just sit in the scene as an
              object the renderer never looks through. */
@@ -459,7 +476,7 @@ export default function AstroOverlay() {
       {/* Outside the boundary on purpose: a WebView with no WebGL loses the character, and
           with him the page's only start button would go too — the notice inside
           `CanvasBoundary` is then the thing to press, which is why it is a real button. */}
-      <DragHandle />
+      {!hidden && <DragHandle />}
     </div>
   );
 }

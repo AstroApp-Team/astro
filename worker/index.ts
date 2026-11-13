@@ -9,8 +9,20 @@ import {
   REALTIME_TOOLS,
   VOICE_MODEL_ID,
 } from "../shared/realtime.ts";
-import { PasswordSchema, RealtimeSetupSchema, ViewRequestSchema } from "../shared/schemas.ts";
-import type { ViewUIMessage } from "../shared/view.ts";
+import {
+  AuthQuerySchema,
+  CreateProjectSchema,
+  PasswordSchema,
+  ProjectIdParamSchema,
+  RealtimeSetupSchema,
+  SaveProjectFileSchema,
+  UpdateProjectStateSchema,
+  ViewRequestSchema,
+} from "../shared/schemas.ts";
+import { viewSpec, viewTitle, type ViewUIMessage } from "../shared/view.ts";
+import { createDb } from "./db/client.ts";
+import { D1ProjectRepository } from "./repositories/d1-project-repository.ts";
+import type { ProjectRepository } from "./repositories/project-repository.ts";
 import { buildView, rebuildModel, viewModel } from "./view-agent.ts";
 
 /**
@@ -39,6 +51,10 @@ function passwordMatches(candidate: string, expected: string): boolean {
     difference |= candidate.charCodeAt(index) ^ expected.charCodeAt(index);
   }
   return difference === 0;
+}
+
+function projectRepository(db: D1Database): ProjectRepository {
+  return new D1ProjectRepository(createDb(db));
 }
 
 /**
@@ -160,7 +176,135 @@ const api = new Hono<AppEnv>()
     });
 
     return createUIMessageStreamResponse({ stream });
-  });
+  })
+
+  /** Lists saved projects ordered by most recently updated. */
+  .get("/projects", zValidator("query", AuthQuerySchema), async (c) => {
+    const query = c.req.valid("query");
+    if (!passwordMatches(query[PASSWORD_QUERY_PARAM] ?? "", c.env.APP_PASSWORD)) {
+      return c.json({ error: "Wrong password" }, 401);
+    }
+
+    const projects = await projectRepository(c.env.DB).listAll();
+    return c.json({ projects });
+  })
+
+  /** Creates a new project with its initial `index.html` and optional state. */
+  .post("/projects", zValidator("json", CreateProjectSchema), async (c) => {
+    const { password, title, spec, html, stateData } = c.req.valid("json");
+    if (!passwordMatches(password, c.env.APP_PASSWORD)) {
+      return c.json({ error: "Wrong password" }, 401);
+    }
+
+    const resolvedTitle = title.trim() || viewTitle(html);
+    const resolvedSpec = spec || (viewSpec(html) ?? []).join("\n");
+
+    const project = await projectRepository(c.env.DB).create({
+      title: resolvedTitle,
+      spec: resolvedSpec,
+      initialFile: { filePath: "index.html", content: html },
+      ...(stateData !== undefined && { initialStateData: stateData }),
+    });
+
+    return c.json({ project }, 201);
+  })
+
+  /** Fetches a single project along with its files and latest serialized state. */
+  .get(
+    "/projects/:id",
+    zValidator("param", ProjectIdParamSchema),
+    zValidator("query", AuthQuerySchema),
+    async (c) => {
+      const query = c.req.valid("query");
+      if (!passwordMatches(query[PASSWORD_QUERY_PARAM] ?? "", c.env.APP_PASSWORD)) {
+        return c.json({ error: "Wrong password" }, 401);
+      }
+
+      const { id } = c.req.valid("param");
+      const project = await projectRepository(c.env.DB).getById(id);
+      if (!project) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+
+      return c.json({ project });
+    },
+  )
+
+  /** Upserts a source file (`index.html`, etc.) and updates project metadata. */
+  .put(
+    "/projects/:id/files",
+    zValidator("param", ProjectIdParamSchema),
+    zValidator("json", SaveProjectFileSchema),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const { password, filePath, content, title, spec } = c.req.valid("json");
+      if (!passwordMatches(password, c.env.APP_PASSWORD)) {
+        return c.json({ error: "Wrong password" }, 401);
+      }
+
+      const file = await projectRepository(c.env.DB).saveFile({
+        projectId: id,
+        filePath,
+        content,
+        ...(title !== undefined || spec !== undefined
+          ? {
+              projectMeta: {
+                ...(title !== undefined && { title }),
+                ...(spec !== undefined && { spec }),
+              },
+            }
+          : {}),
+      });
+
+      if (!file) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+
+      return c.json({ file });
+    },
+  )
+
+  /** Upserts the serialized JSON state of a project. */
+  .put(
+    "/projects/:id/state",
+    zValidator("param", ProjectIdParamSchema),
+    zValidator("json", UpdateProjectStateSchema),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const { password, stateData } = c.req.valid("json");
+      if (!passwordMatches(password, c.env.APP_PASSWORD)) {
+        return c.json({ error: "Wrong password" }, 401);
+      }
+
+      const state = await projectRepository(c.env.DB).updateState(id, stateData);
+      if (!state) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+
+      return c.json({ state });
+    },
+  )
+
+  /** Deletes a project and cascades removal to its files and state. */
+  .delete(
+    "/projects/:id",
+    zValidator("param", ProjectIdParamSchema),
+    zValidator("query", AuthQuerySchema),
+    async (c) => {
+      const query = c.req.valid("query");
+      if (!passwordMatches(query[PASSWORD_QUERY_PARAM] ?? "", c.env.APP_PASSWORD)) {
+        return c.json({ error: "Wrong password" }, 401);
+      }
+
+      const { id } = c.req.valid("param");
+      const deleted = await projectRepository(c.env.DB).delete(id);
+      if (!deleted) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+
+      return c.json({ ok: true } as const);
+    },
+  );
 
 const app = new Hono<AppEnv>().use("/api/*", cors({ origin: NATIVE_ORIGINS })).route("/api", api);
 

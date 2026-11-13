@@ -1,56 +1,46 @@
 /**
- * Ionic theme variables.
+ * Ionic theme variables & Astro Liquid Glass design tokens.
  *
- * The palette is the stylesheet's — `assets/astro-stylesheet.svg`, "Paleta de Cores" —
- * and nothing here is invented: the six printed swatches are the whole vocabulary, and
- * every surface, border and label below is one of them or a mix of two.
- *
- *   #FF8B00  laranja   primary      the character's top stop, the accent
- *   #FA6B2F  âmbar     secondary    the character's mid stop
- *   #FE3402  brasa     danger       the character's bottom stop; also the only red
- *   #EDCA99  areia     tertiary     warm neutral, for a quiet filled button
- *   #FEFBF5  papel     text         the eye cream: the app's ink on a dark page
- *   #1A152C  tinta     background   the sheet's own page colour
- *
- * Two consequences worth stating, because they are the reasons this file overrides so
- * much rather than just `--ion-color-primary`:
- *
- * 1. **The app is dark regardless of the OS.** `palettes/dark.system.css` is still
- *    imported (Ionic's internals read `--ion-background-color-step-*`), but the ink page
- *    is not a preference here: a warm orange glow on a white page is a smudge, and the
- *    character is always on screen. Hence `:root.ios, :root.md` below — the system
- *    palette sets background and text at that specificity, so a bare `:root` would lose.
- * 2. **The greys are mixes, not greys.** Ionic's step scale is a neutral ramp; used as-is
- *    it puts cool grey bubbles on a navy page and the two look like different palettes.
- *    Every step here is `#FEFBF5` mixed into `#1A152C`, which keeps the transcript and
- *    the composer on the same temperature as the character.
+ * Palette:
+ *   #1A152C  Deep Indigo / Blue  main application background & glass base
+ *   #FEFBF5  Off-White / Cream   primary light text & crystalline glass highlights
+ *   #EDCA99  Warm Sand / Beige   secondary badges & muted warm accents
+ *   #FF8B00  Amber / Orange      primary highlights and gradient starts
+ *   #FA6B2F  Coral / Terracotta  transitions and secondary states
+ *   #FE3402  Accent Red-Orange   focal gradients, active states, and strong glows
  */
 
 @import "@ionic/react/css/palettes/dark.system.css";
 
 :root {
-  /* The stylesheet's six, as the vocabulary everything else is derived from. */
+  /* Core brand palette */
   --astro-ink: #1a152c;
   --astro-paper: #fefbf5;
+  --astro-sand: #edca99;
   --astro-orange: #ff8b00;
   --astro-amber: #fa6b2f;
   --astro-ember: #fe3402;
-  --astro-sand: #edca99;
 
-  --ion-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Primary brand gradients */
+  --astro-gradient-brand: linear-gradient(135deg, #ff8b00 0%, #fa6b2f 50%, #fe3402 100%);
+  --astro-gradient-card-1: linear-gradient(135deg, #fe3402 0%, #fa6b2f 50%, #fe3402 100%);
+  --astro-gradient-card-2: linear-gradient(135deg, #fe3402 0%, #ff8b00 60%, #fa6b2f 100%);
 
-  /* Orange is the brand, so it is used where a filled, affirmative control is wanted. */
+  /* Typography */
+  --ion-font-family: "Urbanist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Ionic palette tokens */
   --ion-color-primary: #ff8b00;
   --ion-color-primary-rgb: 255, 139, 0;
-  --ion-color-primary-contrast: #1a152c;
-  --ion-color-primary-contrast-rgb: 26, 21, 44;
+  --ion-color-primary-contrast: #fefbf5;
+  --ion-color-primary-contrast-rgb: 254, 251, 245;
   --ion-color-primary-shade: #e07a00;
   --ion-color-primary-tint: #ff971a;
 
   --ion-color-secondary: #fa6b2f;
   --ion-color-secondary-rgb: 250, 107, 47;
-  --ion-color-secondary-contrast: #1a152c;
-  --ion-color-secondary-contrast-rgb: 26, 21, 44;
+  --ion-color-secondary-contrast: #fefbf5;
+  --ion-color-secondary-contrast-rgb: 254, 251, 245;
   --ion-color-secondary-shade: #dc5e29;
   --ion-color-secondary-tint: #fa7a44;
 
@@ -61,7 +51,6 @@
   --ion-color-tertiary-shade: #d1b287;
   --ion-color-tertiary-tint: #efcfa3;
 
-  /* Ember. The only colour in the palette that reads as an alarm, so it is `danger`. */
   --ion-color-danger: #fe3402;
   --ion-color-danger-rgb: 254, 52, 2;
   --ion-color-danger-contrast: #fefbf5;
@@ -69,7 +58,6 @@
   --ion-color-danger-shade: #e02e02;
   --ion-color-danger-tint: #fe481b;
 
-  /* The sheet has no green: a "connected" state is orange, and the sand carries the rest. */
   --ion-color-success: #ff8b00;
   --ion-color-success-rgb: 255, 139, 0;
   --ion-color-success-contrast: #1a152c;
@@ -84,8 +72,6 @@
   --ion-color-warning-shade: #dc5e29;
   --ion-color-warning-tint: #fa7a44;
 
-  /* `light` is a raised surface, `medium` a muted label, `dark` the text — the same
-     inversion Ionic's own dark palette uses, in the sheet's colours. */
   --ion-color-light: #252036;
   --ion-color-light-rgb: 37, 32, 54;
   --ion-color-light-contrast: #fefbf5;
@@ -93,12 +79,12 @@
   --ion-color-light-shade: #211c30;
   --ion-color-light-tint: #3b364a;
 
-  --ion-color-medium: #75717c;
-  --ion-color-medium-rgb: 117, 113, 124;
-  --ion-color-medium-contrast: #fefbf5;
-  --ion-color-medium-contrast-rgb: 254, 251, 245;
-  --ion-color-medium-shade: #67636d;
-  --ion-color-medium-tint: #837f8a;
+  --ion-color-medium: #a99db8;
+  --ion-color-medium-rgb: 169, 157, 184;
+  --ion-color-medium-contrast: #1a152c;
+  --ion-color-medium-contrast-rgb: 26, 21, 44;
+  --ion-color-medium-shade: #958aa2;
+  --ion-color-medium-tint: #b2a7bf;
 
   --ion-color-dark: #fefbf5;
   --ion-color-dark-rgb: 254, 251, 245;
@@ -107,7 +93,7 @@
   --ion-color-dark-shade: #e0ddd8;
   --ion-color-dark-tint: #fefcf6;
 
-  /* Legacy step scale: paper mixed into ink, so `step-50` is nearest the text. */
+  /* Warm neutral step scale */
   --ion-color-step-50: #f3f0eb;
   --ion-color-step-100: #e7e4e1;
   --ion-color-step-150: #dcd8d7;
@@ -115,7 +101,7 @@
   --ion-color-step-300: #bab6b9;
   --ion-color-step-400: #a39fa5;
   --ion-color-step-500: #8c8890;
-  --ion-color-step-600: #75717c;
+  --ion-color-step-600: #a99db8;
   --ion-color-step-700: #5e5a68;
   --ion-color-step-800: #484354;
   --ion-color-step-900: #312c40;
@@ -124,8 +110,7 @@
 
 /*
  * Ionic sets background and text on `:root.ios` / `:root.md` from the system palette,
- * which outranks a bare `:root`, so both platforms are named here. This is what makes
- * the page ink whatever the OS is set to.
+ * which outranks a bare `:root`, so both platforms are pinned here.
  */
 :root,
 :root.ios,
@@ -135,7 +120,7 @@
   --ion-text-color: #fefbf5;
   --ion-text-color-rgb: 254, 251, 245;
 
-  /* Surfaces that step toward the text: toolbar, cards, fields. */
+  /* Surfaces that step from #1A152C toward #FEFBF5 */
   --ion-background-color-step-50: #201a33;
   --ion-background-color-step-100: #252036;
   --ion-background-color-step-150: #2b2540;
@@ -156,7 +141,6 @@
   --ion-background-color-step-900: #bab6b9;
   --ion-background-color-step-950: #c6c2c4;
 
-  /* The reverse direction, for muted labels on a raised surface. */
   --ion-text-color-step-50: #c6c2c4;
   --ion-text-color-step-100: #bab6b9;
   --ion-text-color-step-150: #afabb0;
@@ -178,8 +162,17 @@
   --ion-text-color-step-950: #201a33;
 
   --ion-item-background: #1a152c;
-  --ion-toolbar-background: #1a152c;
-  --ion-toolbar-border-color: #302a48;
-  --ion-card-background: #252036;
-  --ion-tab-bar-background: #201a33;
+  --ion-toolbar-background: rgba(26, 21, 44, 0.62);
+  --ion-toolbar-color: #fefbf5;
+  --ion-toolbar-border-color: rgba(254, 251, 245, 0.14);
+  --ion-border-color: rgba(254, 251, 245, 0.14);
+  --ion-card-background: rgba(37, 32, 54, 0.62);
+  --ion-tab-bar-background: rgba(26, 21, 44, 0.72);
+}
+
+html,
+body {
+  background: #1a152c;
+  color: #fefbf5;
+  font-family: var(--ion-font-family);
 }

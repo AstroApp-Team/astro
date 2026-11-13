@@ -5,7 +5,9 @@ import {
   ASTRO_CORNER_EDGE_RATIO,
   ASTRO_CORNER_HALO_WORLD,
   ASTRO_CORNER_INSET_RATIO,
+  ASTRO_HERO_SCALE,
   anchoredPosition,
+  characterScale,
   clampAnchor,
   cornerPosition,
   orthographicHalfExtent,
@@ -214,5 +216,15 @@ describe("dragging", () => {
     const tiny = { halfWidth: 0.01, halfHeight: 0.01 };
     const clamped = clampAnchor({ x: 0.8, y: -0.8 }, tiny);
     expect(clamped).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("characterScale", () => {
+  it("enlarges Astro on the hero stage and returns to 1 once building or anchored", () => {
+    expect(ASTRO_HERO_SCALE).toBeGreaterThan(1.4);
+    expect(characterScale(true, false)).toBe(ASTRO_HERO_SCALE);
+    expect(characterScale(true, true)).toBe(1);
+    expect(characterScale(false, false)).toBe(1);
+    expect(characterScale(false, true)).toBe(1);
   });
 });
