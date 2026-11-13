@@ -39,17 +39,22 @@ export const ASTRO_V2_BODY_RADIUS = ASTRO_V2_DIAMETER / 2;
  * The sheet's ratios are the *proportions* to keep, not the size to copy: on a phone
  * the body is ~120 px across, and `58 × 111 / 833` puts each eye at ~9 × 17 px, where
  * the well's walls are two pixels and the prism reads as a sticker again. `sizeScale`
- * widens the pair without changing their aspect or their spacing ratio.
+ * widens the pair without changing their aspect. It was 1.3; at that size the pair
+ * crowded the face next to astroapp.com.br's Astro, so it is 1.15, with `spread` moving
+ * them 10% further apart to keep the face open.
  */
+const EYE_SIZE_SCALE = 1.15;
+const EYE_SPREAD = 1.1;
+
 export const ASTRO_V2_EYE = {
-  sizeScale: 1.3,
-  width: ASTRO_GEOMETRY.eyeWidth * ASTRO_V2_DIAMETER * 1.3,
+  sizeScale: EYE_SIZE_SCALE,
+  width: ASTRO_GEOMETRY.eyeWidth * ASTRO_V2_DIAMETER * EYE_SIZE_SCALE,
   /**
    * The sheet's own 2 : 1 oval, at `sizeScale`. Unchanged on purpose: the height is what
    * makes the pair read as eyes rather than as dots, and shortening it was a misreading
    * of "the geometry is a little tall" — the number that was wrong is `depth`.
    */
-  height: ASTRO_GEOMETRY.eyeHeight * ASTRO_V2_DIAMETER * 1.3,
+  height: ASTRO_GEOMETRY.eyeHeight * ASTRO_V2_DIAMETER * EYE_SIZE_SCALE,
   /**
    * How far the prism sinks into the body — the parallax that says "cavity".
    *
@@ -58,7 +63,7 @@ export const ASTRO_V2_EYE = {
    * lying on the body instead of a hole cut into it.
    */
   depth: 0.039,
-  separation: ASTRO_GEOMETRY.eyeSeparation * ASTRO_V2_DIAMETER,
+  separation: ASTRO_GEOMETRY.eyeSeparation * ASTRO_V2_DIAMETER * EYE_SPREAD,
   /** `-49 / 833` of `D`. Positive y is up here, so the eye line is slightly above the centre. */
   line: (49 / 833) * ASTRO_V2_DIAMETER,
   /** The prism is sunk this far below the surface, so the shell's silhouette stays the sphere's. */
@@ -66,13 +71,11 @@ export const ASTRO_V2_EYE = {
 } as const;
 
 /**
- * Halo shell radius: the sheet's clear space, `1.9 R`.
+ * How far the halo reaches: the sheet's clear space, `1.9 R`.
  *
- * The shell is a sphere in front of the body, so its *centre* faces the camera and
- * would cover the character — the shader's whole job is to make that centre
- * transparent and the grazing band opaque. Its radius is the size of that band, which
- * is why the stylesheet's `clearSpace` is the authority here: a shell tighter than
- * `1.8 R` crops the glow into a visible ring.
+ * The layout's number — the corner keeps this much of him on screen. The glow itself
+ * ends at `haloSize` and swells past it by its pulse and while he speaks, so the disc
+ * it is drawn on is larger (see `AstroCharacter`).
  */
 export const ASTRO_V2_HALO_RADIUS = ASTRO_V2_BODY_RADIUS * 1.9;
 
@@ -86,8 +89,8 @@ export const ASTRO_V2_HALO_RADIUS = ASTRO_V2_BODY_RADIUS * 1.9;
  * Sized against the scene's own limit, not by eye: `AstroV2Character` caps
  * `hypot(x, y)` at `0.82 R` so the prism never reaches the silhouette (where the
  * surface root turns imaginary and the eye shows only its rim). At
- * `separation / 2 = 0.098`, `line = 0.065` and `R = 0.55`, the cap is `0.451`, so
- * `x` tops out at `0.098 + 0.34 = 0.438` and `y` at `0.065 + 0.26 = 0.325` — the
+ * `separation / 2 = 0.108`, `line = 0.065` and `R = 0.55`, the cap is `0.451`, so
+ * `x` tops out at `0.108 + 0.34 = 0.448` and `y` at `0.065 + 0.26 = 0.325` — the
  * widest gaze that still lands inside the cap. These were `0.24 / 0.17`, which the rig
  * read as "the eyes stay too close to the centre"; the pair now crosses most of the
  * face at the screen's edge and is still never clamped on a straight horizontal pull
@@ -126,23 +129,30 @@ export const ASTRO_V2_TUNABLES = {
   brightness: 1,
   /** Gradient width relative to the body: 1 spans the body diagonally, 0.8 is a tighter ramp. */
   gradientScale: 1,
-  /** Halo shell radius, in body radii. */
+  /**
+   * Where the halo has faded to nothing, in body radii from his centre, on screen.
+   *
+   * Every halo distance is measured in the screen plane (`x, y`), never through the
+   * sphere: the glow is a disc behind him, as on astroapp.com.br, not a shell around him.
+   */
   haloSize: 1.9,
   /**
-   * The angle where the halo is at **full strength**, as `1 - |dot(normal, view)|`.
-   *
-   * `0.16` is the body's own silhouette at the default `haloSize` of 1.9:
-   * `sqrt(1 - (1/1.9)²) ≈ 0.85` facing, `1 - 0.85 ≈ 0.15` shallow. The glow is therefore
-   * thickest exactly where it meets the body and decays *outward*, which is the sheet's
-   * halo — a bloom that hugs the disc. (It was inverted: full strength out at the shell's
-   * rim left a bright ring with a dark gap against the body.) The shader feather the
-   * seam at the body's silhouette itself, so this number only has to be near it.
+   * Where the halo is at **full strength**, in body radii. `1` is his silhouette: the glow
+   * is thickest where it meets the body and decays outward — a bloom that hugs the disc.
    */
-  haloEdgeStart: 0.16,
-  /** Where the glow has decayed to nothing: near the shell's own rim (`1`). */
-  haloEdgeEnd: 0.95,
+  haloEdgeStart: 1,
   /** Overall halo opacity. */
   haloOpacity: 1,
+  /** How hard the fade falls off past `haloEdgeStart`: 1 eases out, higher is tighter. */
+  haloPower: 1,
+  /** The halo's breath: its reach swells and shrinks by this fraction. astroapp.com.br's is ~6%. */
+  haloPulseAmount: 0.05,
+  /** Seconds for one halo breath. astroapp.com.br's glow loops every 4 s. */
+  haloPulsePeriod: 4,
+  /** How much further the halo reaches at full voice, as a fraction of its size. */
+  haloSpeechReach: 0.18,
+  /** How much brighter the halo gets at full voice. */
+  haloSpeechGlow: 0.3,
 } as const;
 
 /**
@@ -181,7 +191,10 @@ export const ASTRO_V2_PALETTE = {
    * gradient across it is noise. See `eyeUniforms.uInner` and `uWallOpacity`.
    */
   eyeWall: "#995F48",
-  /** Halo shell: the sheet's glow, and the bloom it fades into. */
-  haloInner: "#FB5F25",
-  haloOuter: "#FF8B00",
+  /**
+   * Halo: bright `#FF8B00` against the body, redder `#FB5F25` as it spreads — the order
+   * astroapp.com.br's two glow layers stack in. (They were the other way round.)
+   */
+  haloInner: "#FF8B00",
+  haloOuter: "#FB5F25",
 } as const;

@@ -1,39 +1,64 @@
-import { Color, OrthographicCamera, PerspectiveCamera } from "three";
+import { Color } from "three";
 import { describe, expect, it } from "vite-plus/test";
 
-import { ASTRO_V2_PALETTE } from "../../lib/astro/astroV2.ts";
-import { bodyVertexShader, eyeFragmentShader, eyeUniforms, haloVertexShader } from "./materials.ts";
+import { ASTRO_V2_PALETTE, ASTRO_V2_TUNABLES } from "../../lib/astro/astroV2.ts";
+import {
+  applyTunables,
+  bodyFragmentShader,
+  bodyVertexShader,
+  eyeFragmentShader,
+  eyeUniforms,
+  haloFragmentShader,
+  haloReach,
+  haloUniforms,
+  haloVertexShader,
+} from "./materials.ts";
 
 /**
- * Both programs shade by facing angle — the body's rim bloom and the halo's grazing
- * band are `dot(normal, viewDirection)` — so the ray they measure against has to be the
- * camera's, not the fragment's. `normalize(-viewPosition)` is the ray to the camera only
- * under perspective; under an orthographic camera the rays are parallel, and with the
- * character parked in a corner that expression aims at the *corner*, skewing both terms
- * toward whichever side he sits on. That was the report "the halo is pointing in the
- * wrong direction".
+ * The body and the halo are painted in the screen plane. A colour that reads depth — a
+ * `z`, a normal, a facing angle — paints the sphere's curvature onto him, which is what
+ * made him read as a lit 3D ball next to astroapp.com.br's flat drawing. The *geometry*
+ * stays 3D (the eyes sit in wells on a sphere); only the paint is flat.
  */
-describe("the view ray the shaders measure facing against", () => {
-  it("reads the orthographic flag from a matrix element three fills that way", () => {
-    const orthographic = new OrthographicCamera(-5, 5, 3, -3, 0.1, 100);
-    orthographic.updateProjectionMatrix();
+describe("body and halo paint", () => {
+  const programs = {
+    bodyVertexShader,
+    bodyFragmentShader,
+    haloVertexShader,
+    haloFragmentShader,
+  };
 
-    const perspective = new PerspectiveCamera(45, 1.6, 0.1, 100);
-    perspective.updateProjectionMatrix();
+  for (const [name, source] of Object.entries(programs)) {
+    it(`${name} reads only x and y`, () => {
+      expect(source).not.toMatch(
+        /\.z\b|\.xyz\b|\bnormal\b|normalMatrix|viewDirection|cameraPosition/,
+      );
+    });
+  }
 
-    /* GLSL's `projectionMatrix[3][3]` is element 15 (column-major, bottom-right): 1 for
-       parallel rays, 0 for rays through the camera's origin. */
-    expect(orthographic.projectionMatrix.elements[15]).toBe(1);
-    expect(perspective.projectionMatrix.elements[15]).toBe(0);
+  it("blends the body's stops linearly, as the drawing does", () => {
+    expect(bodyFragmentShader).not.toContain("smoothstep(0.0, uStopMid");
+  });
+});
+
+describe("the halo", () => {
+  it("is drawn on a quad big enough for its widest breath at full voice", () => {
+    applyTunables(ASTRO_V2_TUNABLES);
+    const t = ASTRO_V2_TUNABLES;
+    const widest =
+      t.haloEdgeStart +
+      (t.haloSize - t.haloEdgeStart) * (1 + t.haloPulseAmount) * (1 + t.haloSpeechReach);
+    expect(haloReach(t)).toBeGreaterThan(widest);
+    expect(haloUniforms.uSize.value).toBeCloseTo(haloUniforms.uBodyRadius.value * haloReach(t), 6);
   });
 
-  it("asks the projection rather than assuming a camera position", () => {
-    for (const shader of [bodyVertexShader, haloVertexShader]) {
-      expect(shader).toContain("projectionMatrix[3][3]");
-      expect(shader).toContain("viewDirection(viewPosition.xyz)");
-      /* The regression this guards: the perspective-only form, which points at his corner. */
-      expect(shader).not.toContain("normalize(-viewPosition.xyz)");
-    }
+  it("is bright against the body and redder outside it", () => {
+    expect(haloUniforms.uColorInner.value.getHexString()).toBe("ff8b00");
+    expect(haloUniforms.uColorOuter.value.getHexString()).toBe("fb5f25");
+  });
+
+  it("fades out in its own colour, never toward black", () => {
+    expect(haloFragmentShader).toContain("vec4(col, min(alpha, 1.0))");
   });
 });
 
