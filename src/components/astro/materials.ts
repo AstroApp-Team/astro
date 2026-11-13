@@ -70,6 +70,7 @@ export const bodyUniforms = {
   uColorAmount: { value: 1 },
   uBrightness: { value: 1 },
   uGradientScale: { value: 1 },
+  uRampStart: { value: 0 },
 };
 
 /* Exported for `materials.test.ts`, which guards that the paint reads only `x, y`. */
@@ -98,6 +99,7 @@ export const bodyFragmentShader = /* glsl */ `
   uniform float uColorAmount;
   uniform float uBrightness;
   uniform float uGradientScale;
+  uniform float uRampStart;
 
   varying vec2 vWorld;
 
@@ -138,6 +140,13 @@ export const bodyFragmentShader = /* glsl */ `
      */
     float drift = 0.5 + 0.5 * sin(uTime / max(uColorPeriod, 0.001) * 6.2831853);
     t = clamp(t + (drift - 0.5) * 2.0 * uColorAmount, 0.0, 1.0);
+
+    /*
+     * The body only uses the ramp from uRampStart down: last, so neither the wave nor the
+     * drift can reach the amber top stop the halo glows in, and his edge always reads
+     * against the glow instead of melting into it.
+     */
+    t = mix(uRampStart, 1.0, t);
 
     /*
      * Linear between stops, as the drawing's gradient is. A smoothstep here flattens the
@@ -448,6 +457,7 @@ export function applyTunables(tunables: AstroV2Tunables): void {
   bodyUniforms.uColorAmount.value = tunables.colorAmount;
   bodyUniforms.uBrightness.value = tunables.brightness;
   bodyUniforms.uGradientScale.value = tunables.gradientScale;
+  bodyUniforms.uRampStart.value = tunables.rampStart;
 
   haloUniforms.uEdgeStart.value = tunables.haloEdgeStart;
   haloUniforms.uEdgeEnd.value = tunables.haloSize;
