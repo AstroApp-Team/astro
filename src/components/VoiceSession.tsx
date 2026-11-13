@@ -35,15 +35,17 @@ import {
   stopMediaStream,
 } from "../lib/media-stream.ts";
 import { sealViewHtml, VIEW_ALLOW, VIEW_SANDBOX } from "../lib/seal-view.ts";
+import { setAskerMode, useAskerMode } from "../lib/asker-mode.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
 import { useMediaQuery } from "../lib/use-media-query.ts";
+import { usePushToTalk } from "../lib/use-push-to-talk.ts";
 import { useProjectAutoSave } from "../lib/use-projects.ts";
 import { useViewBuilder } from "../lib/use-view-builder.ts";
 import { describeViewEvent, useViewEvents } from "../lib/use-view-events.ts";
 import { addVoiceCost, startSessionClock, stopSessionClock } from "../lib/voice-usage.ts";
-import AudioWaveform from "./AudioWaveform.tsx";
 import LiquidGlassIcon from "./LiquidGlassIcon.tsx";
+import PushToTalkButton from "./PushToTalkButton.tsx";
 import ProjectsSheet, { type LoadedProject } from "./ProjectsSheet.tsx";
 
 /**
@@ -69,8 +71,8 @@ const sessionConfig = {
     "page (or game) mid-use is cheap and encouraged — for a tweak, describe " +
     "just the change.\n\n" +
     "When a page has outgrown quick edits — the user says things are broken, " +
-    "inconsistent or missing, a change broke something else, or the app reports " +
-    "errors from the page — call rebuild_view instead: a stronger model rewrites " +
+    "inconsistent or missing, or a change broke something else — call " +
+    "rebuild_view instead: a stronger model rewrites " +
     "it cleanly from the features asked for so far, keeping the user's data. It " +
     "is slower, so tell the user it will take a moment.\n\n" +
     "render_view returns the moment the work starts, not when the page is " +
@@ -78,7 +80,12 @@ const sessionConfig = {
     "Messages that begin with '(app status)' are the app talking to you, not " +
     "the user: no one said them aloud. Use them to tell the user the page has " +
     "landed, what it shows, or that it failed — briefly, and never read one out " +
-    "word for word.",
+    "word for word.\n\n" +
+    "You only change the page when the user asks you to, in their own words. An " +
+    "(app status) message is never a request: not an error, not a problem found " +
+    "by a check, not a missing feature. Never call render_view or rebuild_view " +
+    "because of one. If something looks wrong, say so in a sentence and ask " +
+    "whether they want it fixed, then wait for their answer.",
   voice: VOICE_NAME,
   // Stated explicitly so the browser's capture/playback rate and the model's
   // format cannot disagree. Omit these and the provider picks its own.
@@ -93,6 +100,41 @@ const sessionConfig = {
   // commit/clear frames closes the WebSocket with code 1008). Push-to-talk
   // gates local microphone capture to the hold window instead.
   turnDetection: { type: "server-vad" },
+} satisfies NonNullable<Experimental_UseRealtimeOptions["sessionConfig"]>;
+
+/**
+ * Asker mode's system prompt: Astro interviews the user before he builds.
+ *
+ * It is its own prompt, written as a section on top of the normal one rather than a copy of
+ * it: the tool, (app status) and "only when asked" rules are the same in both modes, and a copy
+ * would drift. Where the two disagree — the normal prompt says to reach for the screen right
+ * away — this section says it wins.
+ */
+const ASKER_INSTRUCTIONS =
+  "ASKER MODE. The user turned this mode on because they want to be asked before anything " +
+  "is built. These rules override the guidance above wherever the two disagree.\n\n" +
+  "Before you call render_view for a new page or app, interview the user first. Find out " +
+  "what matters for it: what it is for, the main features, how it should look (colors, " +
+  "style, layout), and any content or data it should show. Ask one short question at a " +
+  "time and wait for the answer — usually three to five questions in all. Skip anything the " +
+  "user already told you, and offer a couple of examples when a question is open-ended.\n\n" +
+  "When you have enough, sum up the plan in one or two sentences and ask whether you can " +
+  "start. Call render_view only after the user says yes, and put every answer they gave " +
+  "into the request — the coding agent knows only what you write.\n\n" +
+  "For a change to a page already on screen, ask one clarifying question if the request is " +
+  "ambiguous; a clear, small change only needs a quick confirmation. Always confirm before " +
+  "rebuild_view.\n\n" +
+  "If the user says to skip the questions or just start, start right away.";
+
+/**
+ * The session config for asker mode. A module constant for the same reason as
+ * `sessionConfig`: the hook compares it by identity, so it must be the same object on every
+ * render. Switching modes swaps one constant for the other, which the hook treats as a new
+ * session — `changeMode` hangs up first so the old one ends cleanly.
+ */
+const askerSessionConfig = {
+  ...sessionConfig,
+  instructions: `${sessionConfig.instructions}\n\n${ASKER_INSTRUCTIONS}`,
 } satisfies NonNullable<Experimental_UseRealtimeOptions["sessionConfig"]>;
 
 /**
@@ -120,6 +162,20 @@ const PTT_RELEASE_TAIL_MS = 180;
 
 /** Silent audio window fed after the release tail so server-vad closes the turn promptly. */
 const PTT_VAD_SILENCE_MS = 600;
+
+/** The close button every floating banner carries. */
+function BannerClose({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="voice-banner__close"
+      aria-label="Fechar aviso"
+      onClick={onClick}
+    >
+      ✕
+    </button>
+  );
+}
 
 /** Minimum connected hold time (ms) before a release commits audio as a turn. */
 const PTT_MIN_HOLD_MS = 120;
@@ -151,6 +207,8 @@ function isResponseActive(events: ReadonlyArray<{ type: string }>): boolean {
 
 export type VoiceSessionHandle = {
   closeTranscript(): void;
+  /** Turn asker mode on or off. A live conversation is ended, since it was set up for the other mode. */
+  changeMode(asker: boolean): void;
 };
 
 export default function VoiceSession({
@@ -170,8 +228,18 @@ export default function VoiceSession({
   onExitFullscreen?: () => void;
   sessionRef?: Ref<VoiceSessionHandle>;
 }) {
+  const askerMode = useAskerMode();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The build failure the user closed; a new build clears it so the next failure shows. */
+  const [dismissedFailure, setDismissedFailure] = useState<string | null>(null);
+  /**
+   * True while the model's current response was started by the app, not by the user: set when
+   * the app asks for a spoken report, cleared when the user next presses to talk. A tool call
+   * made in that window is refused (see `onToolCall`) — the model only edits the page when the
+   * user asked, whatever an (app status) message said.
+   */
+  const [appTurn, setAppTurn] = useState(false);
   const [promptIndex, setPromptIndex] = useState(0);
   /**
    * Push-to-talk keeps the microphone silent by default while connected and only streams
@@ -184,7 +252,12 @@ export default function VoiceSession({
   const captureStreamRef = useRef<MediaStream | null>(null);
   const releaseTimerRef = useRef<number | null>(null);
   const holdStartRef = useRef<number | null>(null);
-  const activePointerIdRef = useRef<number | null>(null);
+  /**
+   * Resets the push-to-talk gesture (idle/pressing/locked). It lives in `usePushToTalk`, declared
+   * further down because it needs `beginTalk`/`endTalk`; the session-ending paths above reach it
+   * through this ref.
+   */
+  const resetGestureRef = useRef<() => void>(() => {});
   const suppressIndexRef = useRef(0);
   const suppressUntilRef = useRef(0);
   const suppressProjectEventsUntilRef = useRef(0);
@@ -226,7 +299,7 @@ export default function VoiceSession({
   const realtime = experimental_useRealtime({
     model: voiceModel,
     api: { token: realtimeSetupUrl(password) },
-    sessionConfig,
+    sessionConfig: askerMode ? askerSessionConfig : sessionConfig,
     sampleRate: AUDIO_SAMPLE_RATE,
     /**
      * Whatever this returns (as long as it is not `undefined`) is sent back as
@@ -240,6 +313,16 @@ export default function VoiceSession({
      * actually news.
      */
     onToolCall: ({ toolCall }) => {
+      if (appTurn) {
+        return {
+          ok: false,
+          error:
+            "Refused: the user has not asked for a change. An (app status) message is not a " +
+            "request. Tell the user what you noticed in a sentence, ask whether they want it " +
+            "fixed, and wait for their answer.",
+        };
+      }
+
       const errors = pageErrors.map((error) => error.message);
 
       if (toolCall.toolName === REBUILD_VIEW_TOOL_NAME) {
@@ -251,6 +334,7 @@ export default function VoiceSession({
           return { ok: false, error: "There is no page on screen to rebuild. Use render_view." };
         }
 
+        setDismissedFailure(null);
         viewBuilder.build(args.reason, { mode: "rebuild", pageErrors: errors });
         return {
           ok: true,
@@ -268,6 +352,7 @@ export default function VoiceSession({
         return { ok: false, error: "render_view needs a non-empty `request` string." };
       }
 
+      setDismissedFailure(null);
       viewBuilder.build(args.request, { pageErrors: errors });
       return {
         ok: true,
@@ -298,11 +383,13 @@ export default function VoiceSession({
   const eventsRef = useRef(events);
   const statusRef = useRef(status);
   const cancelResponseRef = useRef(realtime.cancelResponse);
+  const requestResponseRef = useRef(realtime.requestResponse);
   const stopPlaybackRef = useRef(stopPlayback);
   useEffect(() => {
     eventsRef.current = events;
     statusRef.current = status;
     cancelResponseRef.current = realtime.cancelResponse;
+    requestResponseRef.current = realtime.requestResponse;
     stopPlaybackRef.current = stopPlayback;
   });
 
@@ -334,14 +421,43 @@ export default function VoiceSession({
    * the realtime protocol accepts from a client — hence the prefix, which the
    * instructions explain so the model does not read these aloud.
    */
+  const requestAppResponse = () => {
+    setAppTurn(true);
+    requestResponseRef.current();
+  };
+  /** Held in a ref so the idle flush below can call it from an effect. */
+  const requestAppResponseRef = useRef(requestAppResponse);
+  useEffect(() => {
+    requestAppResponseRef.current = requestAppResponse;
+  });
+
   const reportToVoice = (report: string, { speak = true } = {}) => {
     if (status !== "connected") return;
     realtime.sendEvent({
       type: "conversation-item-create",
       item: { type: "text-message", role: "user", text: `(app status) ${report}` },
     });
-    if (speak) realtime.requestResponse();
+    if (!speak) return;
+    /*
+     * Asking for a response while Astro is mid-sentence starts a new one, and the
+     * provider cuts the current reply off. The report is already in the conversation,
+     * so it waits here and is spoken once he has finished.
+     */
+    if (isPlaying || isResponseActive(events)) {
+      speakWhenIdleRef.current = true;
+      return;
+    }
+    requestAppResponse();
   };
+
+  /** A spoken report that arrived while Astro was talking. See `reportToVoice`. */
+  const speakWhenIdleRef = useRef(false);
+  useEffect(() => {
+    if (!speakWhenIdleRef.current) return;
+    if (status !== "connected" || talking || isPlaying || isResponseActive(events)) return;
+    speakWhenIdleRef.current = false;
+    requestAppResponseRef.current();
+  }, [events, isPlaying, talking, status]);
 
   /**
    * Held in a ref for the same reason as `stopRef` below: the realtime hook
@@ -490,6 +606,7 @@ export default function VoiceSession({
     if (status !== "connected") return;
     return () => {
       clearReleaseTimer();
+      resetGestureRef.current();
       holdStartRef.current = null;
       stopMediaStream(captureStreamRef.current);
       captureStreamRef.current = null;
@@ -560,16 +677,15 @@ export default function VoiceSession({
     }
   };
 
-  const start = async ({ keepTalking = false }: { keepTalking?: boolean } = {}) => {
+  const start = async () => {
     clearReleaseTimer();
     holdStartRef.current = null;
     suppressUntilRef.current = 0;
     setError(null);
     setNotice(null);
-    if (!keepTalking) {
-      talkingRef.current = false;
-      setTalking(false);
-    }
+    talkingRef.current = false;
+    setTalking(false);
+    resetGestureRef.current();
 
     if (!(await openMicrophone())) {
       talkingRef.current = false;
@@ -594,9 +710,9 @@ export default function VoiceSession({
   const stop = () => {
     clearReleaseTimer();
     holdStartRef.current = null;
-    activePointerIdRef.current = null;
     talkingRef.current = false;
     setTalking(false);
+    resetGestureRef.current();
     suppressUntilRef.current = 0;
     stopPlayback();
     realtime.stopAudioCapture();
@@ -725,18 +841,15 @@ export default function VoiceSession({
     captureStreamRef.current = null;
   };
 
-  const beginTalk = (pointerId?: number) => {
+  const beginTalk = () => {
     clearReleaseTimer();
     if (talkingRef.current) return;
 
-    if (pointerId != null) activePointerIdRef.current = pointerId;
+    /* The user is speaking: whatever the model does next is theirs to ask for. */
+    setAppTurn(false);
+
     talkingRef.current = true;
     setTalking(true);
-
-    if (statusRef.current === "disconnected") {
-      void start({ keepTalking: true });
-      return;
-    }
 
     if (isPlayingRef.current || isResponseActive(eventsRef.current)) {
       interruptAssistant();
@@ -757,6 +870,7 @@ export default function VoiceSession({
         talkingRef.current = false;
         setTalking(false);
         holdStartRef.current = null;
+        resetGestureRef.current();
       }
     })();
   };
@@ -766,7 +880,6 @@ export default function VoiceSession({
 
     talkingRef.current = false;
     setTalking(false);
-    activePointerIdRef.current = null;
     const holdStart = holdStartRef.current;
     holdStartRef.current = null;
     clearReleaseTimer();
@@ -791,17 +904,18 @@ export default function VoiceSession({
     }, PTT_RELEASE_TAIL_MS);
   };
 
-  const endTalkRef = useRef(endTalk);
-  useEffect(() => {
-    endTalkRef.current = endTalk;
+  /**
+   * The push-to-talk gesture. It decides when a press becomes a recording (`onStart`), when the
+   * recording ends and whether it is sent (`onEnd`), and what the button looks like; everything
+   * about audio stays in `beginTalk` / `endTalk` above.
+   */
+  const ptt = usePushToTalk({
+    onStart: () => beginTalk(),
+    onEnd: (send) => endTalk(send),
   });
-
   useEffect(() => {
-    if (!talking) return;
-    const onWindowBlur = () => endTalkRef.current(false);
-    window.addEventListener("blur", onWindowBlur);
-    return () => window.removeEventListener("blur", onWindowBlur);
-  }, [talking]);
+    resetGestureRef.current = ptt.reset;
+  });
 
   /**
    * The transcript is a sheet, not a column: the app the coding agent builds is
@@ -818,7 +932,23 @@ export default function VoiceSession({
     setSeenTurns(messages.length);
   };
 
-  useImperativeHandle(sessionRef, () => ({ closeTranscript }));
+  const changeMode = (asker: boolean) => {
+    if (asker === askerMode) return;
+    const live = statusRef.current !== "disconnected";
+    if (live) stopRef.current();
+    setNotice(
+      asker
+        ? live
+          ? "Modo perguntador ativado. A conversa foi reiniciada — toque no Astro para continuar."
+          : "Modo perguntador ativado: o Astro vai fazer perguntas antes de criar."
+        : live
+          ? "Modo perguntador desativado. A conversa foi reiniciada — toque no Astro para continuar."
+          : "Modo perguntador desativado.",
+    );
+    setAskerMode(asker);
+  };
+
+  useImperativeHandle(sessionRef, () => ({ closeTranscript, changeMode }));
 
   useEffect(() => {
     if (transcriptOpen) transcriptEndRef.current?.scrollIntoView({ block: "end" });
@@ -1059,7 +1189,7 @@ export default function VoiceSession({
                           : isPlaying
                             ? "Toque no Astro para interromper ou segure para falar"
                             : "Segure o botão abaixo para falar"
-                      : "Toque no astro ou segure o botão para começar"}
+                      : "Toque no astro para começar"}
                   </span>
                 </div>
               ) : (
@@ -1071,7 +1201,7 @@ export default function VoiceSession({
                         ? "Estou ouvindo…"
                         : isLive
                           ? "Segure para falar."
-                          : "Toque no Astro ou segure para falar."}
+                          : "Toque no Astro para começar."}
                   </p>
                   <IonNote>
                     Peça algo (um jogo, um temporizador, uma lista) e aparece aqui em tela cheia.{" "}
@@ -1117,17 +1247,24 @@ export default function VoiceSession({
                   <span>{viewBuilder.status}</span>
                 </div>
               )}
-              {viewBuilder.failure != null && (
+              {viewBuilder.failure != null && viewBuilder.failure !== dismissedFailure && (
                 <div className="voice-banner voice-banner--error" role="alert">
-                  Não foi possível criar a página: {viewBuilder.failure}
+                  <span>Não foi possível criar a página: {viewBuilder.failure}</span>
+                  <BannerClose onClick={() => setDismissedFailure(viewBuilder.failure)} />
                 </div>
               )}
               {error != null && (
                 <div className="voice-banner voice-banner--error" role="alert">
-                  {error}
+                  <span>{error}</span>
+                  <BannerClose onClick={() => setError(null)} />
                 </div>
               )}
-              {notice != null && <div className="voice-banner">{notice}</div>}
+              {notice != null && (
+                <div className="voice-banner">
+                  <span>{notice}</span>
+                  <BannerClose onClick={() => setNotice(null)} />
+                </div>
+              )}
             </div>
 
             {activity != null && (
@@ -1167,61 +1304,16 @@ export default function VoiceSession({
               </div>
 
               <div className="voice-bar__center">
-                <button
-                  type="button"
-                  className={`apple-liquid-glass-pill ${talking ? "apple-liquid-glass-pill--ember voice-bar__ptt--active" : "apple-liquid-glass-pill--primary"} voice-bar__ptt`}
-                  aria-pressed={talking}
-                  aria-label={talking ? "Solte para enviar" : "Segurar para falar"}
-                  title={talking ? "Solte para enviar" : "Segurar para falar"}
-                  onContextMenu={(event) => event.preventDefault()}
-                  onPointerDown={(event) => {
-                    if (event.button > 0) return;
-                    event.preventDefault();
-                    try {
-                      event.currentTarget.setPointerCapture(event.pointerId);
-                    } catch {
-                      /* Pointer capture can be absent in synthetic or headless tests. */
-                    }
-                    beginTalk(event.pointerId);
-                  }}
-                  onPointerUp={(event) => {
-                    if (
-                      activePointerIdRef.current != null &&
-                      event.pointerId !== activePointerIdRef.current
-                    ) {
-                      return;
-                    }
-                    endTalk(true);
-                  }}
-                  onPointerCancel={() => endTalk(false)}
-                  onLostPointerCapture={() => endTalk(false)}
-                  onKeyDown={(event) => {
-                    if (event.key !== " " && event.key !== "Enter") return;
-                    event.preventDefault();
-                    if (!event.repeat) beginTalk();
-                  }}
-                  onKeyUp={(event) => {
-                    if (event.key !== " " && event.key !== "Enter") return;
-                    event.preventDefault();
-                    endTalk(true);
-                  }}
-                  onBlur={() => endTalk(false)}
-                >
-                  {talking ? (
-                    <>
-                      <AudioWaveform
-                        stream={micStream}
-                        active={isLive && talking && isCapturing && !isPlaying}
-                      />
-                      <span>Solte para enviar</span>
-                    </>
-                  ) : (
-                    <>
-                      <LiquidGlassIcon name="mic" tone="cream" size={22} />
-                      <span>Segurar para falar</span>
-                    </>
-                  )}
-                </button>
+                {/* Hidden until the socket is open: Astro is the only way to start a conversation. */}
+                {status === "connected" && (
+                  <PushToTalkButton
+                    state={ptt.state}
+                    tooShort={ptt.tooShort}
+                    buttonProps={ptt.buttonProps}
+                    micStream={micStream}
+                    waveformActive={isLive && talking && isCapturing && !isPlaying}
+                  />
+                )}
                 {isAssistantSpeaking && !talking && (
                   <button
                     type="button"

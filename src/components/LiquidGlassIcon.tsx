@@ -15,6 +15,7 @@ export type LiquidGlassIconName =
   | "fullscreen"
   | "exit-fullscreen"
   | "settings"
+  | "astro-ask"
   | "arrow-back";
 
 export type LiquidGlassIconTone = "default" | "active" | "ember" | "cream";
@@ -431,6 +432,40 @@ function renderGlyph(name: LiquidGlassIconName, strokeId: string, maskId: string
             strokeLinejoin="round"
           />
           <circle cx="12" cy="12" r="3" stroke={stroke} strokeWidth="1.6" />
+        </>
+      );
+
+    case "astro-ask":
+      /* Astro himself, in his own orange whatever the tone: the sphere and the two vertical
+         oval eyes from the design sheet, with a question mark over his head. Only the mark
+         follows the tone, so the button still reads as on/off. */
+      return (
+        <>
+          <defs>
+            <linearGradient
+              id={`${maskId}-body`}
+              x1="7"
+              y1="10.5"
+              x2="18"
+              y2="22"
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="#FF8B00" />
+              <stop offset="55%" stopColor="#FA6B2F" />
+              <stop offset="100%" stopColor="#FE3402" />
+            </linearGradient>
+          </defs>
+          <circle cx="12" cy="16" r="6.2" fill={`url(#${maskId}-body)`} />
+          <ellipse cx="9.9" cy="15.7" rx="0.95" ry="1.6" fill="#FEFBF5" />
+          <ellipse cx="14.1" cy="15.7" rx="0.95" ry="1.6" fill="#FEFBF5" />
+          <path
+            d="M9.8 3.4a2.2 2.2 0 1 1 3.6 1.7c-.9.65-1.4 1-1.4 1.9"
+            stroke={stroke}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="12" cy="8.4" r="0.85" fill={spec.strokeStart} />
         </>
       );
 

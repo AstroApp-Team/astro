@@ -13,6 +13,7 @@ import { useLocation } from "react-router-dom";
 import LiquidGlassIcon from "../components/LiquidGlassIcon.tsx";
 import PasswordGate from "../components/PasswordGate.tsx";
 import VoiceSession, { type VoiceSessionHandle } from "../components/VoiceSession.tsx";
+import { useAskerMode } from "../lib/asker-mode.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { usePassword } from "../lib/password.ts";
 import { useFullscreen } from "../lib/use-fullscreen.ts";
@@ -29,6 +30,7 @@ export default function Voice() {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const sessionRef = useRef<VoiceSessionHandle>(null);
   const password = usePassword();
+  const askerMode = useAskerMode();
   const router = useIonRouter();
   const { pathname } = useLocation();
   const {
@@ -90,6 +92,20 @@ export default function Voice() {
             <IonTitle className="astro-header__title">Astro</IonTitle>
             {password !== "" && (
               <IonButtons slot="end" className="astro-header__actions">
+                <button
+                  type="button"
+                  className={`apple-liquid-glass-btn apple-liquid-glass-btn--sm${askerMode ? " apple-liquid-glass-btn--active" : ""}`}
+                  onClick={() => sessionRef.current?.changeMode(!askerMode)}
+                  aria-pressed={askerMode}
+                  title={askerMode ? "Desativar modo perguntador" : "Ativar modo perguntador"}
+                  aria-label="Modo perguntador"
+                >
+                  <LiquidGlassIcon
+                    name="astro-ask"
+                    tone={askerMode ? "active" : "default"}
+                    size={20}
+                  />
+                </button>
                 <button
                   type="button"
                   className="apple-liquid-glass-btn apple-liquid-glass-btn--sm"
