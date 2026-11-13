@@ -249,12 +249,12 @@ export function describeLanding(landed: View, baseline: string | null, problems:
   if (removed.length > 0) {
     text +=
       ` It no longer lists these features: ${removed.join("; ")}. If the user did not ask ` +
-      "for that, have them put back.";
+      "for that, mention it and ask whether they want them back. Do not change the page yourself.";
   }
   if (problems.length > 0) {
     text +=
-      ` A check still finds problems: ${problems.join("; ")}. If the page keeps misbehaving, ` +
-      "rebuild_view rewrites it cleanly.";
+      ` A check still finds problems: ${problems.join("; ")}. Mention it briefly and ask ` +
+      "whether they want it fixed. Do not change the page yourself.";
   }
   return text;
 }

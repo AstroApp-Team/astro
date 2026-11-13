@@ -21,12 +21,13 @@ describe("describeLanding", () => {
     expect(text).toContain("no longer lists these features: Tabs for Painel and Transações");
   });
 
-  it("passes on problems the automatic fixes could not clear, and points at a rebuild", () => {
+  it("passes on problems the automatic fixes could not clear, and asks before changing anything", () => {
     const text = describeLanding({ title: "Budget", html: page("Adds income") }, null, [
       "action buy() from the starting state: s.wallet is undefined",
     ]);
 
     expect(text).toContain("s.wallet is undefined");
-    expect(text).toContain("rebuild_view");
+    expect(text).toContain("Do not change the page yourself");
+    expect(text).not.toContain("rebuild_view");
   });
 });
