@@ -3,6 +3,7 @@ import { IonReactRouter } from "@ionic/react-router";
 import { Navigate, Route } from "react-router-dom";
 
 import AstroOverlay from "./components/astro/AstroOverlay.tsx";
+import { useGlassLight } from "./lib/use-glass-light.ts";
 import Settings from "./pages/Settings.tsx";
 import Voice from "./pages/Voice.tsx";
 
@@ -14,6 +15,9 @@ import Voice from "./pages/Voice.tsx";
  * the native view stack do not work.
  */
 export default function App() {
+  /* The light every glass control catches, moving with the phone. */
+  useGlassLight();
+
   return (
     <IonApp>
       <IonReactRouter>

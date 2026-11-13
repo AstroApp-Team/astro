@@ -373,15 +373,17 @@ describe("VoiceSession hero Astro lifecycle", () => {
       const held = await press(7, 420);
       expect(realtimeState.startAudioCapture).toHaveBeenCalledTimes(1);
 
-      /* Not far enough: still a plain hold, no buzz. */
+      /* Not far enough: still a plain hold, no buzz — and the arrow still points the way. */
       fireEvent.pointerMove(held, { pointerId: 7, clientY: 400 });
       expect(screen.getByRole("button", { name: "Solte para enviar" })).toBeTruthy();
       expect(vibrate).not.toHaveBeenCalled();
+      expect(document.querySelector(".ptt__arrow")).not.toBeNull();
 
       /* Past the threshold: locked, with a buzz, the stop button, and a running timer. */
       fireEvent.pointerMove(held, { pointerId: 7, clientY: 420 - PTT_LOCK_THRESHOLD_PX });
       const locked = screen.getByRole("button", { name: "Parar e enviar" });
       expect(vibrate).toHaveBeenCalledTimes(1);
+      expect(document.querySelector(".ptt__arrow")).toBeNull();
       expect(screen.getByRole("timer").textContent).toBe("0:00");
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000);
@@ -529,6 +531,22 @@ describe("VoiceSession hero Astro lifecycle", () => {
 
       act(() => sessionRef.current?.changeMode(false));
       expect(realtimeState.options?.sessionConfig).toBe(normal);
+    });
+
+    it("toggles asker mode from the button in the footer's right corner", () => {
+      render(<VoiceSession password="pw" />);
+      const toggle = screen.getByRole("button", { name: "Modo perguntador" });
+      expect(toggle.closest(".voice-bar__right")).not.toBeNull();
+      expect(toggle.getAttribute("aria-pressed")).toBe("false");
+
+      fireEvent.click(toggle);
+      expect(getAskerMode()).toBe(true);
+      expect(
+        screen.getByRole("button", { name: "Modo perguntador" }).getAttribute("aria-pressed"),
+      ).toBe("true");
+
+      fireEvent.click(screen.getByRole("button", { name: "Modo perguntador" }));
+      expect(getAskerMode()).toBe(false);
     });
 
     it("hangs up a live conversation before switching", () => {

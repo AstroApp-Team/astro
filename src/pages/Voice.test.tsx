@@ -63,7 +63,7 @@ describe("Voice header controls", () => {
     setPassword("");
   });
 
-  it("places Settings and Projects in the top-left corner and omits spend/forget-password", () => {
+  it("keeps every header control together in one row and omits spend/forget-password", () => {
     render(
       <MemoryRouter initialEntries={["/voice"]}>
         <Voice />
@@ -71,15 +71,15 @@ describe("Voice header controls", () => {
     );
 
     const startSlot = screen.getByTestId("header-start");
-    const endSlot = screen.getByTestId("header-end");
+    expect(screen.queryByTestId("header-end")).toBeNull();
 
     const settingsBtn = within(startSlot).getByRole("button", { name: "Configurações" });
     const projectsBtn = within(startSlot).getByRole("button", { name: "Projetos salvos" });
-    expect(settingsBtn).toBeTruthy();
-    expect(projectsBtn).toBeTruthy();
-
-    expect(within(endSlot).getByRole("button", { name: "Tela cheia" })).toBeTruthy();
-    expect(within(endSlot).getByRole("button", { name: "Limpar conversa" })).toBeTruthy();
+    expect(
+      within(startSlot)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Configurações", "Projetos salvos", "Tela cheia", "Limpar conversa"]);
 
     expect(screen.queryByRole("button", { name: "Esquecer senha" })).toBeNull();
     expect(screen.queryByText(/^\$\d/)).toBeNull();
