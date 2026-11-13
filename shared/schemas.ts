@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { PASSWORD_QUERY_PARAM } from "./realtime.ts";
 import { MAX_VIEW_HTML_BYTES, MAX_VIEW_STATE_BYTES } from "./view.ts";
+import { VIEW_MODEL_IDS } from "./view-models.ts";
 
 /**
  * Zod lives here rather than in realtime.ts so the SPA can import the shared
@@ -52,6 +53,11 @@ export const ViewRequestSchema = PasswordSchema.extend({
   mode: z.enum(["edit", "rebuild"]).default("edit"),
   /** What the page on screen threw while in use — the bugs no static check sees. */
   pageErrors: z.array(z.string().max(300)).max(5).optional(),
+  /**
+   * The model chosen in Settings. Only the allowlisted ids pass, and a `rebuild` ignores it:
+   * that mode always runs on its own strong model.
+   */
+  model: z.enum(VIEW_MODEL_IDS).optional(),
 });
 
 /**

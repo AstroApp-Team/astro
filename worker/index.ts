@@ -131,7 +131,7 @@ const api = new Hono<AppEnv>()
    * transient too: the client banks it.
    */
   .post("/view", zValidator("json", ViewRequestSchema), (c) => {
-    const { password, request, currentHtml, mode, pageErrors } = c.req.valid("json");
+    const { password, request, currentHtml, mode, pageErrors, model } = c.req.valid("json");
 
     if (!passwordMatches(password, c.env.APP_PASSWORD)) {
       return c.json({ error: "Wrong password" }, 401);
@@ -145,7 +145,7 @@ const api = new Hono<AppEnv>()
     const stream = createUIMessageStream<ViewUIMessage>({
       execute: async ({ writer }) => {
         const view = await buildView({
-          model: mode === "rebuild" ? rebuildModel(apiKey) : viewModel(apiKey),
+          model: mode === "rebuild" ? rebuildModel(apiKey) : viewModel(apiKey, model),
           mode,
           request,
           currentHtml,

@@ -17,9 +17,16 @@ import {
   type View,
   type ViewProgress,
 } from "../shared/view.ts";
+import { DEFAULT_VIEW_MODEL_ID, type ViewModelId } from "../shared/view-models.ts";
 
 /**
- * Claude Haiku 5.5, chosen because its provider *streams tool arguments*: the
+ * The default is Claude Sonnet 5.5 (it was Haiku 5.5 until the user asked for better pages at
+ * the cost of speed); Settings → Modelo lets the user pick another allowlisted model per
+ * device, sent with each request (`shared/view-models.ts`). The figures below were measured on Haiku and are not Sonnet's: expect slower and
+ * dearer builds, and check that Sonnet streams tool arguments too (see below) before relying
+ * on pages painting while they are written.
+ *
+ * Claude Haiku 5.5 was chosen because its provider *streams tool arguments*: the
  * page reaches the screen while `write_view` is still being written. DeepSeek
  * V4.1 Flash (the previous model) is served from Baseten, which buffers a tool
  * call's whole input into one delta, so nothing could render until it was done.
@@ -36,7 +43,7 @@ import {
  * is $0.30→$1.20, `-fast` twice that). Re-measure before switching: whether
  * tool input streams is a property of the serving provider, not the model.
  */
-export const VIEW_MODEL_ID = "anthropic/claude-haiku-5.5";
+export const VIEW_MODEL_ID: ViewModelId = DEFAULT_VIEW_MODEL_ID;
 
 /**
  * The coding agent's model, reached through the same AI Gateway key that mints
@@ -46,8 +53,8 @@ export const VIEW_MODEL_ID = "anthropic/claude-haiku-5.5";
  * secret: that is the seam `MockLanguageModelV4` plugs into, and it is the only
  * way to test the loop without paying a provider to be non-deterministic.
  */
-export function viewModel(apiKey: string): LanguageModel {
-  return createGateway({ apiKey })(VIEW_MODEL_ID);
+export function viewModel(apiKey: string, id: ViewModelId = VIEW_MODEL_ID): LanguageModel {
+  return createGateway({ apiKey })(id);
 }
 
 /**

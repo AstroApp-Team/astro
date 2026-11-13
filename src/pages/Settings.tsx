@@ -12,6 +12,7 @@ import {
 import { useEffect } from "react";
 
 import LiquidGlassIcon from "../components/LiquidGlassIcon.tsx";
+import ModelPicker from "../components/ModelPicker.tsx";
 import UsageMeter from "../components/UsageMeter.tsx";
 import { useAstroStore } from "../lib/astro/store.ts";
 import { setPassword, usePassword } from "../lib/password.ts";
@@ -115,6 +116,18 @@ export default function Settings() {
                 );
               })}
             </fieldset>
+          </section>
+
+          <section className="settings-card" aria-labelledby="settings-model-title">
+            <div className="settings-card__header">
+              <h2 id="settings-model-title" className="settings-card__title">
+                Modelo
+              </h2>
+              <IonNote className="settings-card__subtitle">
+                O modelo que cria e edita as páginas. Trocar pede a senha.
+              </IonNote>
+            </div>
+            <ModelPicker />
           </section>
 
           <section className="settings-card" aria-labelledby="settings-security-title">

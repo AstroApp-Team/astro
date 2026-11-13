@@ -171,11 +171,11 @@ projects (`app`, `worker`, `node`) share strict settings from
 - **`rebuild_view` is the voice model's escape hatch for a tangled page.** It
   sends `mode: "rebuild"`: `REBUILD_MODEL_ID` with some reasoning rewrites the
   whole page from its spec, drafts are withheld so the old page stays usable,
-  and state carries over by key (or `Astro.restore`). Edits stay on Haiku.
+  and state carries over by key (or `Astro.restore`). Edits use `VIEW_MODEL_ID` (Sonnet 5.5 now, Haiku 5.5 before).
 - **Live rendering depends on the provider streaming tool arguments.** Drafts
   reach the iframe from `write_view`'s `onInputDelta` (as `data-draft`), which
   only fires under `agent.stream()` and only if the provider streams input.
-  Haiku 5.5 does; DeepSeek on Baseten sends the whole input as one delta, so
+  Haiku 5.5 does (Sonnet 5.5, the current `VIEW_MODEL_ID`, is unverified); DeepSeek on Baseten sends the whole input as one delta, so
   the page appears all at once. Check before switching `VIEW_MODEL_ID`.
 - **Keep the coding agent's output small.** `reasoning: "none"`, a "simplest
   thing that works" prompt, and `VIEW_BASE_CSS` injected by `sealViewHtml` (so

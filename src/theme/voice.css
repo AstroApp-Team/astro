@@ -1084,6 +1084,66 @@ ion-header.astro-header {
   --lg-rim: rgba(255, 214, 160, 0.6);
 }
 
+/* Model picker: one glass row per model, the chosen one tinted; picking another opens a
+   password prompt right under the list. */
+.model-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.model-picker__options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.model-picker__option {
+  width: 100%;
+  height: auto;
+  min-height: 56px;
+  padding: 0.55rem 1.1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.1rem;
+  text-align: left;
+}
+
+.model-picker__label {
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+.model-picker__hint {
+  font-size: 0.82rem;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.model-picker__option[aria-pressed="true"] {
+  --lg-tint: rgba(255, 139, 0, 0.24);
+  --lg-rim: rgba(255, 214, 160, 0.6);
+}
+
+.model-picker__unlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.model-picker__ask p {
+  margin: 0;
+  font-family: var(--ion-font-family);
+  font-size: 0.95rem;
+}
+
+.model-picker__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
 .settings-layout {
   max-width: 34rem;
   margin: 0.5rem auto 0;

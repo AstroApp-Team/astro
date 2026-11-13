@@ -142,6 +142,16 @@ describe("worker routing", () => {
     ).toBe(401);
   });
 
+  it("accepts only allowlisted models in a view request", async () => {
+    // Validation runs before the password check, so a model outside the list is a 400 and an
+    // allowlisted one gets as far as the (wrong) password.
+    const body = { password: "nope", request: "draw a spiral" };
+    expect((await view({ ...body, model: "anthropic/claude-haiku-5.5" })).status).toBe(401);
+    expect((await view({ ...body, model: "anthropic/claude-opus-5.5" })).status).toBe(401);
+    expect((await view({ ...body, model: "openai/gpt-9-ultra" })).status).toBe(400);
+    expect((await view({ ...body, model: "" })).status).toBe(400);
+  });
+
   it("rejects a view request with nothing in it", async () => {
     expect((await view({ password: PASSWORD, request: "" })).status).toBe(400);
   });

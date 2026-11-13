@@ -10,6 +10,7 @@ import {
   type ViewUIMessage,
 } from "../../shared/view.ts";
 import { viewUrl } from "./api.ts";
+import { getViewModel } from "./view-model.ts";
 import { runViewCheck } from "./view-check.ts";
 import { addViewCost } from "./voice-usage.ts";
 
@@ -115,6 +116,8 @@ export function useViewBuilder({ password }: { password: string }) {
         body: {
           password,
           mode: options.mode,
+          /* Read when the request goes out, so a change in Settings applies to the next build. */
+          model: getViewModel(),
           ...(options.currentHtml != null && { currentHtml: options.currentHtml }),
           ...(options.pageErrors != null &&
             options.pageErrors.length > 0 && { pageErrors: options.pageErrors }),
