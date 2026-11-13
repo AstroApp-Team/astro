@@ -31,7 +31,7 @@ import { DEFAULT_VIEW_MODEL_ID } from "../../shared/view-models.ts";
 import { getViewModel, setViewModel } from "../lib/view-model.ts";
 import ModelPicker from "./ModelPicker.tsx";
 
-const HAIKU = "anthropic/claude-haiku-5.5";
+const SONNET = "anthropic/claude-sonnet-5.5";
 
 describe("ModelPicker", () => {
   beforeEach(() => {
@@ -49,7 +49,7 @@ describe("ModelPicker", () => {
 
   it("starts on the default model with no password prompt", () => {
     render(<ModelPicker />);
-    expect(screen.getByRole("button", { name: /Sonnet 5.5/ }).getAttribute("aria-pressed")).toBe(
+    expect(screen.getByRole("button", { name: /Haiku 5.5/ }).getAttribute("aria-pressed")).toBe(
       "true",
     );
     expect(screen.queryByLabelText("Senha")).toBeNull();
@@ -59,7 +59,7 @@ describe("ModelPicker", () => {
     authMock.mockResolvedValue({ ok: true });
     render(<ModelPicker />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Haiku 5.5/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sonnet 5.5/ }));
     // Nothing changes yet: the prompt is up and the old model is still in use.
     expect(getViewModel()).toBe(DEFAULT_VIEW_MODEL_ID);
     expect(screen.getByText(/Digite a senha para trocar para/)).toBeTruthy();
@@ -67,11 +67,11 @@ describe("ModelPicker", () => {
     type("the-password");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
-    await waitFor(() => expect(getViewModel()).toBe(HAIKU));
+    await waitFor(() => expect(getViewModel()).toBe(SONNET));
     expect(authMock).toHaveBeenCalledWith({ json: { password: "the-password" } });
-    expect(localStorage.getItem("astro.view-model.v1")).toBe(HAIKU);
+    expect(localStorage.getItem("astro.view-model.v1")).toBe(SONNET);
     expect(screen.queryByLabelText("Senha")).toBeNull();
-    expect(screen.getByRole("button", { name: /Haiku 5.5/ }).getAttribute("aria-pressed")).toBe(
+    expect(screen.getByRole("button", { name: /Sonnet 5.5/ }).getAttribute("aria-pressed")).toBe(
       "true",
     );
   });
@@ -80,7 +80,7 @@ describe("ModelPicker", () => {
     authMock.mockResolvedValue({ ok: false });
     render(<ModelPicker />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Haiku 5.5/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sonnet 5.5/ }));
     type("wrong");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
@@ -90,7 +90,7 @@ describe("ModelPicker", () => {
 
   it("does not call the Worker for an empty password", () => {
     render(<ModelPicker />);
-    fireEvent.click(screen.getByRole("button", { name: /Haiku 5.5/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sonnet 5.5/ }));
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
     expect(screen.getByText("Digite a senha para trocar o modelo.")).toBeTruthy();
@@ -101,7 +101,7 @@ describe("ModelPicker", () => {
     authMock.mockRejectedValue(new Error("offline"));
     render(<ModelPicker />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Haiku 5.5/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sonnet 5.5/ }));
     type("whatever");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
 
@@ -113,10 +113,10 @@ describe("ModelPicker", () => {
     authMock.mockResolvedValue({ ok: true });
     render(<ModelPicker />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Haiku 5.5/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Sonnet 5.5/ }));
     type("pw");
     fireEvent.click(screen.getByRole("button", { name: "Confirmar" }));
-    await waitFor(() => expect(getViewModel()).toBe(HAIKU));
+    await waitFor(() => expect(getViewModel()).toBe(SONNET));
 
     fireEvent.click(screen.getByRole("button", { name: /Opus 5.5/ }));
     // The password is never remembered between changes.
@@ -124,6 +124,6 @@ describe("ModelPicker", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     expect(screen.queryByLabelText("Senha")).toBeNull();
-    expect(getViewModel()).toBe(HAIKU);
+    expect(getViewModel()).toBe(SONNET);
   });
 });

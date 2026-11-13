@@ -20,9 +20,8 @@ import {
 import { DEFAULT_VIEW_MODEL_ID, type ViewModelId } from "../shared/view-models.ts";
 
 /**
- * The default is Claude Sonnet 5.5 (it was Haiku 5.5 until the user asked for better pages at
- * the cost of speed); Settings → Modelo lets the user pick another allowlisted model per
- * device, sent with each request (`shared/view-models.ts`). The figures below were measured on Haiku and are not Sonnet's: expect slower and
+ * The default is Claude Haiku 5.5. Settings → Modelo lets the user pick another allowlisted
+ * model per device, sent with each request (`shared/view-models.ts`). The figures below were measured on Haiku and are not Sonnet's: expect slower and
  * dearer builds, and check that Sonnet streams tool arguments too (see below) before relying
  * on pages painting while they are written.
  *

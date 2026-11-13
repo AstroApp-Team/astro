@@ -16,8 +16,11 @@ export const VIEW_MODEL_IDS = [
 
 export type ViewModelId = (typeof VIEW_MODEL_IDS)[number];
 
-/** What a request without a `model` runs on, and what a fresh device starts with. */
-export const DEFAULT_VIEW_MODEL_ID: ViewModelId = "anthropic/claude-sonnet-5.5";
+/**
+ * What a request without a `model` runs on, and what a fresh device starts with. Haiku: Sonnet
+ * and Opus cost several times more per build.
+ */
+export const DEFAULT_VIEW_MODEL_ID: ViewModelId = "anthropic/claude-haiku-5.5";
 
 export const VIEW_MODEL_INFO: Record<ViewModelId, { label: string; hint: string }> = {
   "anthropic/claude-haiku-5.5": { label: "Haiku 5.5", hint: "Rápido e barato" },
