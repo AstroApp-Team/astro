@@ -11,7 +11,7 @@ import {
   IonTitle,
   IonToolbar,
 } from "@ionic/react";
-import { gateway } from "ai";
+import { experimental_decodeRealtimeAudio as decodeRealtimeAudio, gateway } from "ai";
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import {
@@ -37,6 +37,7 @@ import {
 import { sealViewHtml, VIEW_ALLOW, VIEW_SANDBOX } from "../lib/seal-view.ts";
 import { setAskerMode, useAskerMode } from "../lib/asker-mode.ts";
 import { useAstroStore } from "../lib/astro/store.ts";
+import { astroVoiceLevel, voiceClock } from "../lib/astro/voice-level.ts";
 import { useIdleHangUp } from "../lib/use-idle-hang-up.ts";
 import { useMediaQuery } from "../lib/use-media-query.ts";
 import { usePushToTalk } from "../lib/use-push-to-talk.ts";
@@ -833,6 +834,33 @@ export default function VoiceSession({
   useEffect(() => {
     useAstroStore.getState().setSpeaking(isAssistantSpeaking);
     return () => useAstroStore.getState().setSpeaking(false);
+  }, [isAssistantSpeaking]);
+
+  /**
+   * Astro's voice level, for the halo. Each new `audio-delta` is scheduled on the meter
+   * the way the SDK schedules its playback (see `voice-level.ts`). Walked from the end
+   * until an event already seen, so a long session does not rescan its whole history.
+   */
+  const meteredRef = useRef(new WeakSet<object>());
+  useEffect(() => {
+    const fresh: string[] = [];
+    for (let i = events.length - 1; i >= 0; i--) {
+      const event = events[i];
+      if (event === undefined || meteredRef.current.has(event)) break;
+      meteredRef.current.add(event);
+      if (event.type === "audio-delta") fresh.push(event.delta);
+    }
+    /* Leftovers of an interrupted reply are stopped as they arrive, so they are not metered. */
+    if (suppressUntilRef.current > Date.now()) return;
+    const now = voiceClock();
+    for (let i = fresh.length - 1; i >= 0; i--) {
+      astroVoiceLevel.push(decodeRealtimeAudio(fresh[i]!), AUDIO_SAMPLE_RATE, now);
+    }
+  }, [events]);
+
+  /* Playback stopped — finished, interrupted or hung up — so nothing queued will be heard. */
+  useEffect(() => {
+    if (!isAssistantSpeaking) astroVoiceLevel.clear();
   }, [isAssistantSpeaking]);
 
   const stopCaptureAndStreams = () => {

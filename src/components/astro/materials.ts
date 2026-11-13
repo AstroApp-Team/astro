@@ -22,46 +22,30 @@
  * are fitted to.
  */
 
-import { AdditiveBlending, BackSide, Color, ShaderMaterial, Vector3 } from "three";
+import { AdditiveBlending, BackSide, Color, ShaderMaterial, Vector2 } from "three";
 
 import {
   ASTRO_V2_BODY_RADIUS,
-  ASTRO_V2_HALO_RADIUS,
   ASTRO_V2_PALETTE,
   type AstroV2Tunables,
 } from "../../lib/astro/astroV2.ts";
 
 /**
- * The diagonal the body's gradient runs along — the sheet's `137deg`, in world units.
+ * The diagonal the body's gradient runs along, in the screen plane.
  *
- * Pointing up and slightly to the right, so `t = 0` is the top of the body and `t = 1`
- * its bottom-right, which is the order `ASTRO_V2_PALETTE` is written in. Normalised
- * per-instance rather than in the shader: `normalize` once beats a `normalize` per
- * fragment for a constant.
+ * astroapp.com.br's Astro (a Rive file, `astro.riv`) draws the body as a linear
+ * gradient on a disc rotated -45°: `#FF8B00` at the top-left, `#FA6B2F` at 54%,
+ * `#FE3402` at the bottom-right. With +y up that is `(-1, 1)` — `t = 0` up-left.
+ *
+ * Two components on purpose. **No body or halo colour reads depth**: the camera is
+ * orthographic, so `x, y` are screen position, and a colour that also reads `z` (or a
+ * normal, or the view angle) paints the sphere's curvature onto him — the lit-ball look
+ * that set him apart from the drawing. The geometry stays 3D; only the paint is flat.
+ * `materials.test.ts` keeps it that way.
  */
-const GRADIENT_DIR = new Vector3(0.35, 1, 0.15).normalize();
+const GRADIENT_DIR = new Vector2(-1, 1).normalize();
 
 const color = (hex: string) => new Color(hex);
-
-/**
- * The view ray at a fragment, in view space. Shared by the body and the halo.
- *
- * Under a **perspective** camera every fragment is seen from the camera's origin, so the
- * ray really is `-viewPosition`. Under an **orthographic** one the rays are parallel, and
- * `-viewPosition` is then dominated by how far the character sits from the view axis — so
- * every view-dependent term skews toward whichever side he was moved to. That is what
- * "the halo is pointing the wrong direction" was: the grazing band is `1 - dot(normal,
- * view)`, and it was being measured against a ray aimed off toward the corner.
- *
- * `projectionMatrix[3][3]` is 1.0 for an orthographic frustum and 0.0 for a perspective
- * one, so one `mix` covers both and there is no uniform to keep in step with the camera.
- */
-const VIEW_DIRECTION = /* glsl */ `
-  vec3 viewDirection(vec3 viewPosition) {
-    float orthographic = projectionMatrix[3][3];
-    return normalize(mix(-viewPosition, vec3(0.0, 0.0, 1.0), orthographic));
-  }
-`;
 
 /* ── body ────────────────────────────────────────────────────────────────────── */
 
@@ -71,16 +55,13 @@ export const bodyUniforms = {
   /** Body radius, for turning a world-space offset into a `0..1` gradient coordinate. */
   uRadius: { value: ASTRO_V2_BODY_RADIUS },
   /** Where the gradient is centred — the group's position, so the wave travels with the character. */
-  uCenter: { value: new Vector3(0, 0, 0) },
+  uCenter: { value: new Vector2(0, 0) },
   uGradientDir: { value: GRADIENT_DIR.clone() },
   /** Where the middle stop sits on the ramp. The sheet's 54% is not the midpoint of a lerp. */
   uStopMid: { value: 0.54 },
   uColorTop: { value: color(ASTRO_V2_PALETTE.top) },
   uColorMid: { value: color(ASTRO_V2_PALETTE.mid) },
   uColorBottom: { value: color(ASTRO_V2_PALETTE.bottom) },
-  /** Edge bloom, in the sheet's `#FF8B00`. */
-  uRimColor: { value: color(ASTRO_V2_PALETTE.top) },
-  uRimStrength: { value: 0.45 },
   /** Wave multipliers — the knobs `ASTRO_V2_TUNABLES` sets. */
   uWaveFreq: { value: 1 },
   uWaveAmp: { value: 1 },
@@ -89,38 +70,28 @@ export const bodyUniforms = {
   uColorAmount: { value: 1 },
   uBrightness: { value: 1 },
   uGradientScale: { value: 1 },
+  uRampStart: { value: 0 },
 };
 
-/* Exported for `materials.test.ts`, which guards the view ray both programs share. */
+/* Exported for `materials.test.ts`, which guards that the paint reads only `x, y`. */
 export const bodyVertexShader = /* glsl */ `
-  varying vec3 vWorld;
-  varying vec3 vViewNormal;
-  varying vec3 vViewDir;
-
-  ${VIEW_DIRECTION}
+  varying vec2 vWorld;
 
   void main() {
-    vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
-
-    vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
-    vViewDir = viewDirection(viewPosition.xyz);
-    vViewNormal = normalize(normalMatrix * normal);
-
-    gl_Position = projectionMatrix * viewPosition;
+    vWorld = (modelMatrix * vec4(position, 1.0)).xy;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
-const bodyFragmentShader = /* glsl */ `
+export const bodyFragmentShader = /* glsl */ `
   uniform float uTime;
   uniform float uRadius;
-  uniform vec3 uCenter;
-  uniform vec3 uGradientDir;
+  uniform vec2 uCenter;
+  uniform vec2 uGradientDir;
   uniform float uStopMid;
   uniform vec3 uColorTop;
   uniform vec3 uColorMid;
   uniform vec3 uColorBottom;
-  uniform vec3 uRimColor;
-  uniform float uRimStrength;
   uniform float uWaveFreq;
   uniform float uWaveAmp;
   uniform float uWaveSpeed;
@@ -128,21 +99,18 @@ const bodyFragmentShader = /* glsl */ `
   uniform float uColorAmount;
   uniform float uBrightness;
   uniform float uGradientScale;
+  uniform float uRampStart;
 
-  varying vec3 vWorld;
-  varying vec3 vViewNormal;
-  varying vec3 vViewDir;
-
+  varying vec2 vWorld;
 
   void main() {
     /*
-     * The gradient coordinate comes from the fragment's **world position**, not from
-     * its uv. A uv is a property of the sphere's parameterisation — it wraps at the
-     * seam and squeezes at the poles — so a gradient built from it rotates with the
-     * mesh and prints a seam down the back. Position has neither problem, and because
-     * it is *world* position the bands also flow as the character drifts.
+     * The gradient coordinate comes from the fragment's **world position** in the screen
+     * plane, not from its uv or its depth. A uv wraps at the seam and squeezes at the
+     * poles; depth bends the bands around the sphere's curvature. Screen-plane position
+     * has neither, and because it is *world* position the bands flow as he drifts.
      */
-    vec3 offset = vWorld - uCenter;
+    vec2 offset = vWorld - uCenter;
     float t = 0.5 - dot(offset, uGradientDir) * uGradientScale / (2.0 * uRadius);
 
     /*
@@ -155,7 +123,7 @@ const bodyFragmentShader = /* glsl */ `
     float wave =
         sin(vWorld.x * uWaveFreq + phase)
       * cos(vWorld.y * uWaveFreq * 1.27 - phase * 0.8)
-      + 0.55 * sin(vWorld.z * uWaveFreq * 0.83 + vWorld.y * uWaveFreq * 0.61 + phase * 0.45);
+      + 0.55 * sin(vWorld.x * uWaveFreq * 0.83 + vWorld.y * uWaveFreq * 0.61 + phase * 0.45);
 
     t = clamp(t + wave * uWaveAmp, 0.0, 1.0);
 
@@ -173,15 +141,33 @@ const bodyFragmentShader = /* glsl */ `
     float drift = 0.5 + 0.5 * sin(uTime / max(uColorPeriod, 0.001) * 6.2831853);
     t = clamp(t + (drift - 0.5) * 2.0 * uColorAmount, 0.0, 1.0);
 
+    /*
+     * The body only uses the ramp from uRampStart down: last, so neither the wave nor the
+     * drift can reach the amber top stop the halo glows in, and his edge always reads
+     * against the glow instead of melting into it.
+     */
+    t = mix(uRampStart, 1.0, t);
+
+    /*
+     * Linear between stops, as the drawing's gradient is. A smoothstep here flattens the
+     * colour around each stop into a plateau and steepens the band between them.
+     * No edge term either: the drawing's silhouette is crisp, and a facing-angle rim is
+     * what read as a lit 3D ball.
+     */
     vec3 col = t < uStopMid
-      ? mix(uColorTop, uColorMid, smoothstep(0.0, uStopMid, t))
-      : mix(uColorMid, uColorBottom, smoothstep(uStopMid, 1.0, t));
+      ? mix(uColorTop, uColorMid, t / uStopMid)
+      : mix(uColorMid, uColorBottom, (t - uStopMid) / (1.0 - uStopMid));
 
-    /* Edge bloom: the rim picks up the top stop, which is the sheet's own rim colour. */
-    float rim = pow(1.0 - clamp(dot(vViewNormal, vViewDir), 0.0, 1.0), 3.0);
-    col += uRimColor * rim * uRimStrength;
+    /*
+     * The silhouette's own antialiasing. The canvas runs without MSAA, and with no rim or
+     * glow over the edge any more, the sphere's outline stair-steps. Coverage falls from
+     * 1 to 0 over the last pixel inside the circle, so the edge blends onto the halo
+     * behind it. uRadius breathes with the mesh, so this tracks the real outline.
+     */
+    float edge = length(offset) / uRadius;
+    float coverage = 1.0 - smoothstep(1.0 - fwidth(edge), 1.0, edge);
 
-    gl_FragColor = vec4(col * uBrightness, 1.0);
+    gl_FragColor = vec4(col * uBrightness, coverage);
 
     #include <colorspace_fragment>
   }
@@ -191,6 +177,8 @@ export const bodyMaterial = new ShaderMaterial({
   uniforms: bodyUniforms,
   vertexShader: bodyVertexShader,
   fragmentShader: bodyFragmentShader,
+  /* For the edge's coverage alpha. It still draws after the halo, which is in the opaque pass. */
+  transparent: true,
   toneMapped: false,
 });
 
@@ -318,8 +306,7 @@ export const eyeMaterial = new ShaderMaterial({
    * The character's eyes shine *through* the body: a sunken well that is occluded by
    * the surface it is sunk into would be invisible from the front. `depthTest` off,
    * `depthWrite` off, and a render order after the body — so they are always the top
-   * layer of the character, which is also why they are drawn before the halo's
-   * additive pass cannot wash them out (see `haloMaterial`'s order).
+   * layer of the character. The halo is drawn before the body, so it cannot wash them out.
    */
   depthTest: false,
   depthWrite: false,
@@ -331,106 +318,103 @@ export const eyeMaterial = new ShaderMaterial({
 /* ── halo ────────────────────────────────────────────────────────────────────── */
 
 export const haloUniforms = {
-  /** Shell radius. The vertex shader scales the unit sphere by this, so size is a uniform, not a scale. */
-  uSize: { value: ASTRO_V2_HALO_RADIUS },
-  /** `1 - |dot(normal, view)|` where the glow is at **full strength** — the body's silhouette. */
-  uEdgeStart: { value: 0.16 },
-  /** …and where it has decayed to nothing, just inside the shell's own rim. */
-  uEdgeEnd: { value: 0.95 },
-  /**
-   * `bodyRadius / shellRadius`, so the shader can feather the seam at the body's own
-   * silhouette instead of trusting `uEdgeStart` to stay in step with `haloSize`.
-   */
-  uBodyRatio: { value: 1 / 1.9 },
-  uOpacity: { value: 0.86 },
-  /** Half-width of the feather at the body's silhouette, in shallow units. */
-  uInnerFade: { value: 0.1 },
+  /** Half-size of the quad the glow is drawn on, in the group's units. Big enough for its widest breath. */
+  uSize: { value: ASTRO_V2_BODY_RADIUS * 2.2 },
+  /** The body's radius *this frame* (it breathes), so the glow keeps hugging it. */
+  uBodyRadius: { value: ASTRO_V2_BODY_RADIUS },
+  /** Full strength out to here, in body radii. */
+  uEdgeStart: { value: 1 },
+  /** Faded to nothing here, in body radii. */
+  uEdgeEnd: { value: 1.9 },
+  uOpacity: { value: 1 },
+  /** Shapes the fade: 1 eases out, higher falls off faster. */
+  uPower: { value: 1 },
   uColorInner: { value: color(ASTRO_V2_PALETTE.haloInner) },
   uColorOuter: { value: color(ASTRO_V2_PALETTE.haloOuter) },
-  /** Shapes the decay: 1 is linear between the two edges, 2 falls off faster. */
-  uPower: { value: 1.6 },
   /**
-   * The body's colour drift, in ramp units, handed in by the scene each frame.
-   *
-   * The halo is a separate program with its own `uTime`, so it cannot derive this from
-   * the body's clock without a second accumulation that drifts. Passing the number keeps
-   * the two in lockstep by construction, and because it only slides between the sheet's
-   * two glow colours it cannot name a third one.
+   * The body's colour drift, in ramp units, handed in by the scene each frame, so the two
+   * stay in lockstep. It only slides between the halo's two printed colours.
    */
   uDrift: { value: 0 },
+  /** The body's clock, handed in per frame — the breath rides the same pause-aware time. */
+  uTime: { value: 0 },
+  uPulseAmount: { value: 0.05 },
+  uPulsePeriod: { value: 4 },
+  /**
+   * How loud Astro is speaking, `0..1`, already smoothed by the scene.
+   *
+   * The scene feeds it from `astroVoiceLevel` (see `lib/astro/voice-level.ts`); anything
+   * else that wants the halo to swell — a listening cue, a build finishing — can write it.
+   */
+  uSpeech: { value: 0 },
+  uSpeechReach: { value: 0.18 },
+  uSpeechGlow: { value: 0.3 },
 };
 
 export const haloVertexShader = /* glsl */ `
   uniform float uSize;
 
-  varying vec3 vViewNormal;
-  varying vec3 vViewDir;
-
-  ${VIEW_DIRECTION}
+  varying vec2 vLocal;
 
   void main() {
-    vec3 scaled = position * uSize;
-
-    vec4 viewPosition = modelViewMatrix * vec4(scaled, 1.0);
-    vViewDir = viewDirection(viewPosition.xyz);
-    vViewNormal = normalize(normalMatrix * normal);
-
-    gl_Position = projectionMatrix * viewPosition;
+    /* A flat quad facing the camera, in the group's own units (so his scale applies). */
+    vLocal = position.xy * uSize;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(vLocal, 0.0, 1.0);
   }
 `;
 
-const haloFragmentShader = /* glsl */ `
+export const haloFragmentShader = /* glsl */ `
+  uniform float uBodyRadius;
   uniform float uEdgeStart;
   uniform float uEdgeEnd;
   uniform float uOpacity;
-  uniform float uInnerFade;
+  uniform float uPower;
   uniform vec3 uColorInner;
   uniform vec3 uColorOuter;
-  uniform float uPower;
-  uniform float uBodyRatio;
   uniform float uDrift;
+  uniform float uTime;
+  uniform float uPulseAmount;
+  uniform float uPulsePeriod;
+  uniform float uSpeech;
+  uniform float uSpeechReach;
+  uniform float uSpeechGlow;
 
-  varying vec3 vViewNormal;
-  varying vec3 vViewDir;
+  varying vec2 vLocal;
 
   void main() {
     /*
-     * The shell is in front of the body, so it cannot be hidden by depth — the alpha
-     * has to do the hiding. shallow is 0 where the shell faces the camera (over the
-     * body's middle) and 1 at its silhouette, so a ramp on it is exactly "the glow is
-     * the band where the surface turns away", which is the stylesheet's halo.
+     * Distance from his centre **on screen**, in body radii. It was a facing angle on a
+     * sphere shell, which put the falloff on the sphere's curvature instead of on
+     * the page — a glow that thinned near the body and bunched up at the rim.
      */
-    float facing = clamp(abs(dot(normalize(vViewNormal), normalize(vViewDir))), 0.0, 1.0);
-    float shallow = 1.0 - facing;
+    float d = length(vLocal) / uBodyRadius;
 
     /*
-     * The decay runs **outward**: full strength where the glow meets the body, nothing
-     * near the shell's rim. Inverted, this read as a bright ring floating a few pixels
-     * off the disc with a dark gap between them — the sheet's halo is a bloom that hugs
-     * the body and dissolves into the page, not an outline.
+     * The fade band breathes and swells with his voice; the start stays on his silhouette,
+     * so the glow never pulls away from the body and leaves a gap.
      */
-    float ramp = 1.0 - smoothstep(uEdgeStart, uEdgeEnd, shallow);
-    ramp = pow(clamp(ramp, 0.0, 1.0), uPower);
+    float breath = 1.0 + uPulseAmount * sin(uTime * 6.2831853 / max(uPulsePeriod, 0.001));
+    float reach = breath * (1.0 + uSpeechReach * uSpeech);
+    float end = uEdgeStart + max(uEdgeEnd - uEdgeStart, 0.001) * reach;
+
+    float fade = smoothstep(uEdgeStart, end, d);
 
     /*
-     * The seam against the body. uEdgeStart is a *number* — the user can slide it — but
-     * the body's silhouette is at sqrt(1 - (bodyR/shellR)²) of shallow, which moves with
-     * haloSize. Feathering around the geometry's own edge rather than around the slider
-     * keeps the join clean at every size, and leaves the slider free to shape the decay.
+     * Fades to transparent *in its own colour*. astroapp.com.br's Rive glow fades toward
+     * transparent black and darkens into a muddy ring before it disappears; that is a
+     * side effect of the Rive export, not the design.
      */
-    /*
-     * shallow at the body's silhouette — the *complement* of the facing angle there.
-     * Getting this backwards (using the facing angle itself) puts the feather at 0.85
-     * while the visible band starts at 0.15, so the multiply is zero across the whole
-     * band and the halo disappears with no error to explain it.
-     */
-    float bodyShallow = 1.0 - sqrt(max(1.0 - uBodyRatio * uBodyRatio, 0.0));
-    float feather = smoothstep(bodyShallow - uInnerFade, bodyShallow + uInnerFade, shallow);
+    float alpha = pow(1.0 - fade, uPower);
 
-    /* Both stops are printed sheet colours (#FB5F25 to #FF8B00), so the drift slides
-       between them instead of rotating the hue off the palette. */
-    vec3 col = mix(uColorInner, uColorOuter, clamp(shallow + uDrift, 0.0, 1.0));
-    gl_FragColor = vec4(col, ramp * feather * uOpacity);
+    /*
+     * Speaking brightens the fade by lifting it toward 1 with an exponent, never by
+     * multiplying: a multiply clips at 1 and leaves a flat plateau with a hard ring
+     * where it ends.
+     */
+    alpha = pow(alpha, 1.0 / (1.0 + uSpeechGlow * uSpeech)) * uOpacity;
+
+    vec3 col = mix(uColorInner, uColorOuter, clamp(fade + uDrift, 0.0, 1.0));
+    gl_FragColor = vec4(col, min(alpha, 1.0));
 
     #include <colorspace_fragment>
   }
@@ -440,14 +424,19 @@ export const haloMaterial = new ShaderMaterial({
   uniforms: haloUniforms,
   vertexShader: haloVertexShader,
   fragmentShader: haloFragmentShader,
-  transparent: true,
+  /**
+   * The glow sits **behind** the body, as in the drawing: drawn first, then covered by
+   * the opaque body. That needs the *opaque* pass — three always draws transparent
+   * materials after opaque ones, whatever their `renderOrder` — so `transparent` is off
+   * and `renderOrder` -1 (in `AstroCharacter`) puts it ahead of the body. Blending still
+   * applies: three only drops it for `NormalBlending` on an opaque material.
+   *
+   * Additive: a glow adds light to whatever is behind it, and the page under the canvas
+   * is dark. Depth is ignored so nothing can clip the disc.
+   */
+  transparent: false,
   depthTest: false,
   depthWrite: false,
-  /**
-   * Additive: a glow adds light to whatever is behind it, and the page under the
-   * canvas is dark. Additive also means the shell's transparent middle contributes
-   * nothing rather than blending a dark rim over the body.
-   */
   blending: AdditiveBlending,
   toneMapped: false,
 });
@@ -457,8 +446,8 @@ export const haloMaterial = new ShaderMaterial({
  *
  * One function, not a write per slider: the page owns the numbers, and every consumer
  * (a slider, a future Theatre track, a test) goes through this so no uniform can be
- * missed when one is added. `uTime` and the eye weights are deliberately not here —
- * those are the scene's per-frame animation, not the look's constants.
+ * missed when one is added. `uTime`, `uSpeech` and the eye weights are deliberately not
+ * here — those are the scene's per-frame animation, not the look's constants.
  */
 export function applyTunables(tunables: AstroV2Tunables): void {
   bodyUniforms.uWaveFreq.value = tunables.waveFreq;
@@ -468,10 +457,25 @@ export function applyTunables(tunables: AstroV2Tunables): void {
   bodyUniforms.uColorAmount.value = tunables.colorAmount;
   bodyUniforms.uBrightness.value = tunables.brightness;
   bodyUniforms.uGradientScale.value = tunables.gradientScale;
+  bodyUniforms.uRampStart.value = tunables.rampStart;
 
   haloUniforms.uEdgeStart.value = tunables.haloEdgeStart;
-  haloUniforms.uEdgeEnd.value = tunables.haloEdgeEnd;
+  haloUniforms.uEdgeEnd.value = tunables.haloSize;
   haloUniforms.uOpacity.value = tunables.haloOpacity;
-  haloUniforms.uSize.value = ASTRO_V2_BODY_RADIUS * tunables.haloSize;
-  haloUniforms.uBodyRatio.value = 1 / tunables.haloSize;
+  haloUniforms.uPower.value = tunables.haloPower;
+  haloUniforms.uPulseAmount.value = tunables.haloPulseAmount;
+  haloUniforms.uPulsePeriod.value = tunables.haloPulsePeriod;
+  haloUniforms.uSpeechReach.value = tunables.haloSpeechReach;
+  haloUniforms.uSpeechGlow.value = tunables.haloSpeechGlow;
+  haloUniforms.uSize.value = ASTRO_V2_BODY_RADIUS * haloReach(tunables);
+}
+
+/**
+ * The furthest the glow can reach, in body radii: its widest breath at full voice, plus
+ * the body's own ±1.5% breath. The quad is this big so the fade is never cropped.
+ */
+export function haloReach(tunables: AstroV2Tunables): number {
+  const band = Math.max(tunables.haloSize - tunables.haloEdgeStart, 0);
+  const widest = (1 + tunables.haloPulseAmount) * (1 + tunables.haloSpeechReach);
+  return (tunables.haloEdgeStart + band * widest) * 1.02;
 }

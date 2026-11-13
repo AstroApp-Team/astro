@@ -1,5 +1,5 @@
 /**
- * Astro v2's body: one sphere, two eye prisms, one halo shell — all shader-lit.
+ * Astro v2's body: one sphere, two eye prisms, one halo disc — all shader-painted.
  *
  * Ported from the refactor branch's `presentation/canvas/astroV2/AstroV2Character.tsx`.
  * Two things were removed on the way over, and both were Theatre-only:
@@ -38,6 +38,7 @@ import {
 } from "../../lib/astro/astroV2.ts";
 import { followPointer, followsPointer, resolveEyePose } from "../../lib/astro/pose.ts";
 import { useAstroStore, useAstroV2Store } from "../../lib/astro/store.ts";
+import { astroVoiceLevel, voiceClock } from "../../lib/astro/voice-level.ts";
 
 import { eyeGeometry } from "./eyeGeometry.ts";
 import {
@@ -92,6 +93,8 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
   const morph = useRef({ happy: 0, sleepy: 0, stretch: 1 });
   /** Smoothed attention, in sheet-normalised `[-1, 1]`. */
   const look = useRef({ x: 0, y: 0 });
+  /** Smoothed voice level for the halo: quick to rise with a syllable, slower to settle. */
+  const speech = useRef(0);
   /** The body's world position, reused per frame so the loop allocates nothing. */
   const world = useRef(new Vector3());
   /** Target and spring state for fluid hero-to-corner glide and scale transitions. */
@@ -200,7 +203,7 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
      */
     if (bodyRef.current) {
       bodyRef.current.getWorldPosition(world.current);
-      bodyUniforms.uCenter.value.copy(world.current);
+      bodyUniforms.uCenter.value.set(world.current.x, world.current.y);
     }
 
     /* ── where the eyes look ── */
@@ -231,6 +234,8 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
     if (bodyRef.current) {
       bodyRef.current.scale.setScalar(radius * breathe);
     }
+    /* World units, breath included: the shader's edge coverage sits on this outline. */
+    bodyUniforms.uRadius.value = radius * motion.scale * breathe;
 
     for (const [ref, side] of [
       [leftEyeRef, -1],
@@ -273,7 +278,17 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
     }
 
     /* ── the halo ── */
-    haloUniforms.uSize.value = radius * tunables.haloSize;
+    /* The body breathes, and the glow's start is his silhouette, so it follows the breath. */
+    haloUniforms.uBodyRadius.value = radius * breathe;
+    haloUniforms.uTime.value = bodyUniforms.uTime.value;
+
+    /*
+     * His voice. Read only while he is audibly speaking: the meter is cleared when playback
+     * stops, but `speaking` is the session's own word on it and costs nothing to check.
+     */
+    const voice = store.speaking ? astroVoiceLevel.level(voiceClock()) : 0;
+    speech.current = damp(speech.current, voice, voice > speech.current ? 22 : 5, dt);
+    haloUniforms.uSpeech.value = speech.current;
 
     /*
      * The halo's colour drift rides the same clock as the body's, so the two cannot drift
@@ -290,13 +305,12 @@ export function AstroCharacter({ position = [0, 1.6, 0], scale = 1 }: AstroChara
   return (
     <group ref={groupRef}>
       {/*
-        The halo renders *after* the body (`renderOrder` 1) and additively, so its
-        transparent middle adds nothing over the sphere and only the rim glows. Its
-        material ignores depth on purpose: the shell is larger than the body, and a depth
-        test there would let a wall the camera can see through hide the body's silhouette.
+        The halo is a flat disc *behind* the body: drawn first (`renderOrder` -1, opaque
+        pass — see `haloMaterial`) so the body paints over its middle, as in the drawing.
+        A quad, not a shell: its falloff is a distance on screen, not an angle on a sphere.
       */}
-      <mesh material={haloMaterial} renderOrder={1}>
-        <sphereGeometry args={[1, 64, 48]} />
+      <mesh material={haloMaterial} renderOrder={-1}>
+        <planeGeometry args={[2, 2]} />
       </mesh>
 
       <mesh ref={bodyRef} material={bodyMaterial} scale={ASTRO_V2_BODY_RADIUS}>
