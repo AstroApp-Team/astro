@@ -133,7 +133,7 @@ export function parseViewError(data: unknown): string | null {
 /** Phrased for the voice model, which has to describe this out loud. */
 export function describeViewEvent(event: ViewEvent): string {
   return (
-    `The user interacted with the page: ${event.name}` +
+    `O usuário interagiu com a página: ${event.name}` +
     (event.value === undefined ? "." : ` = ${String(event.value)}.`)
   );
 }

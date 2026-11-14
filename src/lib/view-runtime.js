@@ -49,7 +49,7 @@
       parent.postMessage(message, "*");
     } catch (error) {
       // A state with a function or DOM node in it cannot be cloned.
-      reportError(error, "posting to the app");
+      reportError(error, "enviando ao app");
     }
   };
 
@@ -74,8 +74,8 @@
         // An inline module script fires this when one of its imports fails to load.
         reportError(
           url
-            ? `could not load ${url} — check the URL`
-            : "a module script's import failed to load — check its import URLs and versions",
+            ? `não foi possível carregar ${url} — confira a URL`
+            : "falha ao carregar um import de um script module — confira as URLs e versões dos imports",
         );
       } else if (target === window) {
         reportError(event.error ?? event.message);
@@ -208,7 +208,7 @@
           try {
             fn(state, ...args);
           } catch (error) {
-            reportError(error, `action ${name}`);
+            reportError(error, `ação ${name}`);
           }
           schedule();
           save();
@@ -277,8 +277,8 @@
     const pageScripts = [...document.scripts].filter((s) => !s.hasAttribute("data-astro"));
     if (pageScripts.length > 0 && view == null) {
       errors.push(
-        "The page has a script but never calls Astro.view(...) — everything on screen " +
-          "must come from the view.",
+        "A página tem um script mas nunca chama Astro.view(...) — tudo que aparece na tela " +
+          "precisa vir da view.",
       );
     }
 
@@ -289,7 +289,7 @@
       try {
         raw[name](state);
       } catch (error) {
-        reportError(error, `action ${name}() from the starting state`);
+        reportError(error, `ação ${name}() a partir do estado inicial`);
         continue;
       }
       renderNow();

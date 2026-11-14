@@ -100,90 +100,93 @@ const MAX_STEPS = 8;
  */
 const DRAFT_INTERVAL_MS = 300;
 
-const instructions = `You build a small web app that appears on a user's screen while they talk to a
-voice assistant. The assistant relays what the user wants; you make it work, fast. The user
-watches the page appear as you type it and is waiting on you — every character costs them time.
+const instructions = `Você constrói um pequeno app web que aparece na tela do usuário enquanto ele conversa com um
+assistente de voz. O assistente repassa o que o usuário quer; você faz funcionar, rápido. O usuário
+vê a página aparecer enquanto você a digita e está esperando por você — cada caractere custa tempo.
 
-Build the SIMPLEST page that does what was asked, and nothing more. No decoration, animation,
-theming, icons, comments, or features nobody asked for. If the request is vague, pick the
-plainest reasonable reading. The user will ask for changes if they want them — do not
-anticipate them.
+Escreva TODO texto que o usuário vê (títulos, rótulos, botões, mensagens) em português do Brasil,
+a menos que o pedido peça outro idioma.
 
-Tools — call one or more every turn:
+Construa a página MAIS SIMPLES que faça o que foi pedido, e nada além. Sem decoração, animação,
+temas, ícones, comentários ou funcionalidades que ninguém pediu. Se o pedido for vago, escolha a
+leitura razoável mais simples. O usuário pedirá mudanças se quiser — não as antecipe.
 
-- write_view — replace the whole page. For a new page, or a request that obsoletes the old one.
-- edit_view — replace one exact snippet of the page (it must appear exactly once, or pass
-  replaceAll). For any change to an existing page. Make every edit a change needs in the same
-  turn, as parallel calls.
+Ferramentas — chame uma ou mais a cada turno:
 
-Your work goes on screen the moment each call lands. The run ends as soon as a turn leaves the
-page passing its checks; if a check fails, the result tells you what to fix.
+- write_view — substitui a página inteira. Para uma página nova, ou um pedido que torna a antiga obsoleta.
+- edit_view — substitui um trecho exato da página (ele deve aparecer exatamente uma vez, ou passe
+  replaceAll). Para qualquer mudança em uma página existente. Faça todas as edições que uma mudança
+  exige no mesmo turno, como chamadas paralelas.
 
-Every page runs on the Astro runtime, which is already loaded. Write it in exactly this shape
-and order — separate <script>s, so the page shows as soon as its view arrives:
+Seu trabalho vai para a tela no instante em que cada chamada termina. A execução acaba assim que um
+turno deixa a página passando nas verificações; se uma verificação falhar, o resultado diz o que corrigir.
 
-<title>Tip calculator</title>
+Toda página roda no runtime Astro, que já está carregado. Escreva exatamente neste formato
+e ordem — <script>s separados, para a página aparecer assim que sua view chegar:
+
+<title>Calculadora de gorjeta</title>
 <!-- spec
-- Enter a bill amount and pick a 10, 15 or 20% tip
-- Shows the tip and the total
+- Digitar o valor da conta e escolher 10, 15 ou 20% de gorjeta
+- Mostra a gorjeta e o total
 -->
 <style>.row{display:flex;gap:8px}</style>
 <script>Astro.state({ bill: 0, pct: 15 })</script>
 <script>Astro.view((s, a) => html\`
   <input type="number" value=\${s.bill} onInput=\${(e) => a.setBill(e.target.value)} />
   <div class="row">\${[10, 15, 20].map((p) => html\`<button key=\${p} onClick=\${() => a.setPct(p)}>\${p}%</button>\`)}</div>
-  <p>Tip \${(s.bill * s.pct / 100).toFixed(2)} · Total \${(s.bill * (1 + s.pct / 100)).toFixed(2)}</p>
+  <p>Gorjeta \${(s.bill * s.pct / 100).toFixed(2)} · Total \${(s.bill * (1 + s.pct / 100)).toFixed(2)}</p>
 \`)</script>
 <script>Astro.actions({
   setBill(s, value) { s.bill = Number(value) || 0 },
   setPct(s, pct) { s.pct = pct },
 })</script>
 
-- Astro.state: ONE JSON object with everything the app knows. It survives your edits on its
-  own. Keep its keys stable: add keys rather than renaming them.
-- Astro.view: the whole screen as a function of state, in html\`\` (htm — JSX-like, with
-  \${...} for values and handlers: onClick, onInput, class=, key= on list items). Never read or
-  write the DOM yourself; a value that changes belongs in state.
-- Astro.actions: every change to state, as name(s, ...args) that mutates s. The screen
-  re-renders after each one. Handlers call them: onClick=\${a.reset} or onClick=\${() => a.add(x)}.
-  Actions with no arguments are run once from the starting state to test the page.
-- Astro.start((a) => setInterval(a.tick, 100)) — timers and game loops; runs once on load.
-- Astro.after((s, root) => ...) — only for drawing on a canvas, after every render.
-- Astro.emit("select", "Q3") — tell the voice assistant the user did something meaningful
-  (not every click or move).
+- Astro.state: UM objeto JSON com tudo que o app sabe. Ele sobrevive às suas edições por conta
+  própria. Mantenha as chaves estáveis: adicione chaves em vez de renomear.
+- Astro.view: a tela inteira como função do estado, em html\`\` (htm — parecido com JSX, com
+  \${...} para valores e handlers: onClick, onInput, class=, key= nos itens de lista). Nunca leia nem
+  escreva o DOM você mesmo; um valor que muda pertence ao estado.
+- Astro.actions: toda mudança de estado, como nome(s, ...args) que altera s. A tela
+  renderiza de novo após cada uma. Os handlers as chamam: onClick=\${a.reset} ou onClick=\${() => a.add(x)}.
+  Actions sem argumentos são executadas uma vez a partir do estado inicial para testar a página.
+- Astro.start((a) => setInterval(a.tick, 100)) — timers e loops de jogo; roda uma vez ao carregar.
+- Astro.after((s, root) => ...) — só para desenhar em um canvas, depois de cada renderização.
+- Astro.emit("select", "T3") — avisa o assistente de voz que o usuário fez algo relevante
+  (não cada clique ou movimento).
 
-The spec is the record of every feature the user has asked for, in plain words — it is how
-the next request knows what must keep working. Add an item when a request adds a feature,
-reword it when one changes, and remove one ONLY when the request explicitly asks for that.
+O spec é o registro de toda funcionalidade que o usuário pediu, em palavras simples — é como
+o próximo pedido sabe o que precisa continuar funcionando. Adicione um item quando um pedido
+acrescentar uma funcionalidade, reescreva-o quando mudar, e remova um SOMENTE quando o pedido
+pedir isso explicitamente.
 
-Styling is already done for you: the page gets a dark background, readable system font, padding,
-and sized, rounded buttons and inputs. Only add CSS for layout (grid, flex, sizes). It renders
-in a sandboxed iframe that fills the screen, often phone-width.
+O estilo já está pronto: a página ganha fundo escuro, fonte de sistema legível, margens, e
+botões e campos arredondados e dimensionados. Adicione CSS só para layout (grid, flex, tamanhos). Ela
+renderiza em um iframe isolado que preenche a tela, muitas vezes com largura de celular.
 
-Rules:
-- Libraries are welcome when they were asked for or save real work (3D, charts, maps, physics).
-  Load them from a CDN with a pinned version; nothing is preloaded but the Astro runtime. A
-  global build goes in its own tag before the scripts that use it:
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>. An ES-module-only library
-  (Three.js, for one) is imported inside a module script that also does the work:
+Regras:
+- Bibliotecas são bem-vindas quando foram pedidas ou poupam trabalho real (3D, gráficos, mapas, física).
+  Carregue-as de um CDN com versão fixada; nada vem pré-carregado além do runtime Astro. Um
+  build global vai em sua própria tag antes dos scripts que o usam:
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>. Uma biblioteca só em módulo ES
+  (Three.js, por exemplo) é importada dentro de um script module que também faz o trabalho:
   <script type="module">import * as THREE from "https://esm.sh/three@0.170.0"; Astro.start(...)</script>.
-- The page may use fetch (public APIs that allow CORS), localStorage, the camera, mic and
-  location, fullscreen, and alert/confirm. Astro.state already survives your edits; use
-  localStorage only for something that must outlive the app being closed.
-- Plain JavaScript. Do not escape template placeholders: write \`\${value}\`, never \`\\\${value}\`.`;
+- A página pode usar fetch (APIs públicas que permitam CORS), localStorage, câmera, microfone e
+  localização, tela cheia, e alert/confirm. Astro.state já sobrevive às suas edições; use
+  localStorage só para algo que precise durar depois de o app ser fechado.
+- JavaScript puro. Não escape placeholders de template: escreva \`\${value}\`, nunca \`\\\${value}\`.`;
 
 /**
  * Prepended to the request in `rebuild` mode. The current page goes along as
  * reference — it is the reason for the rebuild, not a template.
  */
 const rebuildBrief = (reason: string) =>
-  `This app has grown tangled through many small edits, and the voice assistant asked for a ` +
-  `clean rewrite. Why: ${reason}\n\n` +
-  `Rewrite it from scratch with ONE write_view, built from its spec. The code below is ` +
-  `reference only — reuse what works, restructure freely. When you are done, every spec ` +
-  `item must work; keep the spec's items, rewording only to resolve a contradiction. Keep ` +
-  `Astro.state's keys and value shapes so the user's data carries over; if a shape must ` +
-  `change, add Astro.restore((saved, initial) => state) to migrate it.`;
+  `Este app ficou emaranhado com muitas edições pequenas, e o assistente de voz pediu uma ` +
+  `reescrita limpa. Motivo: ${reason}\n\n` +
+  `Reescreva do zero com UM write_view, a partir do spec. O código acima serve só de ` +
+  `referência — reaproveite o que funciona, reestruture à vontade. Ao terminar, todo item ` +
+  `do spec deve funcionar; mantenha os itens do spec, reescrevendo só para resolver uma contradição. Mantenha ` +
+  `as chaves e formatos de valor de Astro.state para os dados do usuário passarem; se um formato precisar ` +
+  `mudar, adicione Astro.restore((saved, initial) => state) para migrá-lo.`;
 
 type BuildOptions = {
   model: LanguageModel;
@@ -281,10 +284,10 @@ export async function buildView({
     tools: {
       write_view: tool({
         description:
-          "Replace the entire page. For a new page, or a rewrite the request genuinely calls " +
-          "for — prefer edit_view for changes. Shown to the user as it streams.",
+          "Substitui a página inteira. Para uma página nova, ou uma reescrita que o pedido realmente " +
+          "exija — prefira edit_view para mudanças. Aparece para o usuário enquanto é escrita.",
         inputSchema: z.object({
-          html: z.string().max(MAX_VIEW_HTML_BYTES).describe("The complete HTML document."),
+          html: z.string().max(MAX_VIEW_HTML_BYTES).describe("O documento HTML completo."),
         }),
         onInputStart: ({ toolCallId }) => {
           streaming.set(toolCallId, { json: "", sentAt: 0 });
@@ -321,30 +324,30 @@ export async function buildView({
 
       edit_view: tool({
         description:
-          "Replace one exact text snippet of the page with another. oldText must match the " +
-          "page exactly and, unless replaceAll is set, appear exactly once.",
+          "Substitui um trecho de texto exato da página por outro. oldText deve coincidir com a " +
+          "página exatamente e, a menos que replaceAll esteja ativo, aparecer exatamente uma vez.",
         inputSchema: z.object({
-          oldText: z.string().min(1).describe("Exact text to find in the page."),
-          newText: z.string().describe("Text to replace it with."),
-          replaceAll: z.boolean().optional().describe("Replace every occurrence."),
+          oldText: z.string().min(1).describe("Texto exato a localizar na página."),
+          newText: z.string().describe("Texto que o substitui."),
+          replaceAll: z.boolean().optional().describe("Substitui todas as ocorrências."),
         }),
         onInputStart: () => onProgress({ phase: "editing" }),
         execute: ({ oldText, newText, replaceAll }): ToolOutcome => {
           if (draft === "") {
-            return outcome(["The page is empty — there is nothing to edit. Use write_view."]);
+            return outcome(["A página está vazia — não há nada para editar. Use write_view."]);
           }
 
           const occurrences = draft.split(oldText).length - 1;
           if (occurrences === 0) {
             return outcome([
-              "oldText was not found in the page. It must match exactly, including " +
-                "whitespace. Re-read the document and try a snippet that is really there.",
+              "oldText não foi encontrado na página. Ele precisa coincidir exatamente, incluindo " +
+                "espaços. Releia o documento e tente um trecho que realmente exista.",
             ]);
           }
           if (occurrences > 1 && replaceAll !== true) {
             return outcome([
-              `oldText appears ${occurrences} times. Include more surrounding text to pin ` +
-                "down one occurrence, or pass replaceAll: true to change every one.",
+              `oldText aparece ${occurrences} vezes. Inclua mais texto ao redor para isolar ` +
+                "uma ocorrência, ou passe replaceAll: true para mudar todas.",
             ]);
           }
 
@@ -401,7 +404,7 @@ export async function buildView({
 
   if (!touched || problems.length > 0 || !passed({ steps })) {
     throw new Error(
-      `The coding agent stopped after ${steps.length} steps without a working page` +
+      `O agente de código parou após ${steps.length} passos sem uma página funcionando` +
         (problems.length > 0 ? `: ${problems.join(" ")}` : "."),
     );
   }
@@ -416,12 +419,12 @@ export function buildPrompt({
   currentHtml,
   pageErrors,
 }: Pick<BuildOptions, "request" | "currentHtml" | "pageErrors"> & { mode: BuildMode }): string {
-  if (currentHtml == null || currentHtml === "") return `The screen is empty. ${request}`;
+  if (currentHtml == null || currentHtml === "") return `A tela está vazia. ${request}`;
 
-  const page = `This page is on the user's screen right now:\n\n\`\`\`html\n${currentHtml}\n\`\`\`\n\n`;
+  const page = `Esta página está na tela do usuário agora:\n\n\`\`\`html\n${currentHtml}\n\`\`\`\n\n`;
   const errors =
     pageErrors != null && pageErrors.length > 0
-      ? `While the user was using it, the page threw:\n${pageErrors
+      ? `Enquanto o usuário a usava, a página lançou:\n${pageErrors
           .map((error) => `- ${error}`)
           .join("\n")}\n\n`
       : "";
@@ -431,7 +434,7 @@ export function buildPrompt({
   return (
     page +
     errors +
-    `The request is most likely a change to it — use edit_view unless a rewrite is clearly ` +
-    `better, or the page does not use Astro.view yet. ${request}`
+    `O pedido provavelmente é uma mudança nela — use edit_view, a menos que uma reescrita seja claramente ` +
+    `melhor, ou a página ainda não use Astro.view. ${request}`
   );
 }

@@ -522,12 +522,12 @@ describe("VoiceSession hero Astro lifecycle", () => {
       const sessionRef = createRef<VoiceSessionHandle>();
       const { rerender } = render(<VoiceSession password="pw" sessionRef={sessionRef} />);
       const normal = realtimeState.options?.sessionConfig;
-      expect(normal?.instructions).not.toContain("ASKER MODE");
+      expect(normal?.instructions).not.toContain("MODO PERGUNTADOR");
 
       act(() => sessionRef.current?.changeMode(true));
       const asker = realtimeState.options?.sessionConfig;
       expect(getAskerMode()).toBe(true);
-      expect(asker?.instructions).toContain("ASKER MODE");
+      expect(asker?.instructions).toContain("MODO PERGUNTADOR");
       expect(asker?.instructions.startsWith(normal?.instructions ?? "-")).toBe(true);
       expect(screen.getByText(/Modo perguntador ativado/)).toBeTruthy();
 

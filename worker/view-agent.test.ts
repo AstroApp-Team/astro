@@ -195,7 +195,7 @@ describe("buildView", () => {
      * the loop still works and the wait goes silent.
      */
     const fixing = progress.find((update) => update.phase === "fixing");
-    expect(fixing?.problems.join(" ")).toContain("not found");
+    expect(fixing?.problems.join(" ")).toContain("não foi encontrado");
   });
 
   it("refuses an ambiguous edit unless replaceAll is set", async () => {
@@ -238,7 +238,7 @@ describe("buildView", () => {
 
     expect(view.html).not.toContain("innerHTML");
     const fixing = progress.find((update) => update.phase === "fixing");
-    expect(fixing?.problems.join(" ")).toContain("writes HTML into the DOM");
+    expect(fixing?.problems.join(" ")).toContain("escreve HTML direto no DOM");
   });
 
   it("fails loudly when the agent never reaches a working page", async () => {
@@ -256,7 +256,7 @@ describe("buildView", () => {
         onDraft: noop,
         onCost: noop,
       }),
-    ).rejects.toThrow(/without a working page/);
+    ).rejects.toThrow(/sem uma página funcionando/);
   });
 
   it("reports what every step cost, including a run that never succeeds", async () => {
@@ -277,7 +277,7 @@ describe("buildView", () => {
         onDraft: noop,
         onCost: (usd) => costs.push(usd),
       }),
-    ).rejects.toThrow(/without a working page/);
+    ).rejects.toThrow(/sem uma página funcionando/);
 
     expect(costs.length).toBeGreaterThan(1);
     expect(costs.every((usd) => usd === 0.0000243)).toBe(true);
@@ -286,7 +286,7 @@ describe("buildView", () => {
 
 describe("buildPrompt", () => {
   it("starts an empty screen from the request alone", () => {
-    expect(buildPrompt({ mode: "edit", request: "a timer" })).toBe("The screen is empty. a timer");
+    expect(buildPrompt({ mode: "edit", request: "a timer" })).toBe("A tela está vazia. a timer");
   });
 
   it("passes the page and the errors it threw in use along with an edit", () => {
@@ -311,8 +311,8 @@ describe("buildPrompt", () => {
     });
 
     expect(prompt).toContain(GOOD_PAGE);
-    expect(prompt).toContain("Why: the unicorn button never charges anything");
-    expect(prompt).toContain("ONE write_view");
+    expect(prompt).toContain("Motivo: the unicorn button never charges anything");
+    expect(prompt).toContain("UM write_view");
     expect(prompt).toContain("Astro.restore");
     expect(prompt).not.toContain("use edit_view");
   });

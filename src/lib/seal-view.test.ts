@@ -114,7 +114,7 @@ describe("the Astro runtime", () => {
     const problems = posted.find((m) => m.type === "astro:check")?.["problems"] as string[];
 
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("action inc()");
+    expect(problems[0]).toContain("ação inc()");
   });
 
   it("reports a view that throws", async () => {
@@ -130,7 +130,7 @@ describe("the Astro runtime", () => {
     const { posted } = await load(page, { check: true });
     const problems = posted.find((m) => m.type === "astro:check")?.["problems"] as string[];
 
-    expect(problems.join(" ")).toContain("never calls Astro.view");
+    expect(problems.join(" ")).toContain("nunca chama Astro.view");
   });
 
   it("runs Astro.start in the check, so a library that never loaded is caught", async () => {
