@@ -140,7 +140,7 @@ export function useViewBuilder({ password }: { password: string }) {
         `Corrigindo ${problems.length} ${problems.length === 1 ? "problema" : "problemas"}…`,
       );
       send(
-        "Running the page found these problems. Fix them without changing anything else:\n" +
+        "Ao executar a página, foram encontrados estes problemas. Corrija-os sem mudar mais nada:\n" +
           problems.map((problem) => `- ${problem}`).join("\n"),
         { mode: "edit", currentHtml: landed.html },
       );
@@ -178,7 +178,7 @@ export function useViewBuilder({ password }: { password: string }) {
       setStatus(null);
       setFailure(error.message);
       console.error("Building the page failed:", error);
-      say(`Building the page failed: ${error.message}`);
+      say(`A construção da página falhou: ${error.message}`);
     },
   });
 
@@ -246,18 +246,18 @@ export function useViewBuilder({ password }: { password: string }) {
 
 /** Phrased for the voice model, which decides what is worth saying aloud. */
 export function describeLanding(landed: View, baseline: string | null, problems: string[]): string {
-  let text = `The page is on screen, titled "${landed.title}".`;
+  let text = `A página está na tela, com o título "${landed.title}".`;
 
   const removed = baseline == null ? [] : removedSpecItems(baseline, landed.html);
   if (removed.length > 0) {
     text +=
-      ` It no longer lists these features: ${removed.join("; ")}. If the user did not ask ` +
-      "for that, mention it and ask whether they want them back. Do not change the page yourself.";
+      ` Ela não lista mais estas funcionalidades: ${removed.join("; ")}. Se o usuário não pediu ` +
+      "isso, avise e pergunte se quer que voltem. Não mude a página por conta própria.";
   }
   if (problems.length > 0) {
     text +=
-      ` A check still finds problems: ${problems.join("; ")}. Mention it briefly and ask ` +
-      "whether they want it fixed. Do not change the page yourself.";
+      ` Uma verificação ainda encontra problemas: ${problems.join("; ")}. Avise com brevidade e pergunte ` +
+      "se o usuário quer que sejam corrigidos. Não mude a página por conta própria.";
   }
   return text;
 }

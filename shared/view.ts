@@ -151,24 +151,24 @@ export function checkViewHtml(html: string): string[] {
   const problems: string[] = [];
 
   if (html.trim() === "") {
-    problems.push("The document is empty.");
+    problems.push("O documento está vazio.");
     return problems;
   }
 
   const bytes = new TextEncoder().encode(html).length;
   if (bytes > MAX_VIEW_HTML_BYTES) {
     problems.push(
-      `The document is ${Math.round(bytes / 1024)}KB, over the ${Math.round(
+      `O documento tem ${Math.round(bytes / 1024)}KB, acima do limite de ${Math.round(
         MAX_VIEW_HTML_BYTES / 1024,
-      )}KB limit. Make it smaller.`,
+      )}KB. Deixe-o menor.`,
     );
   }
 
   const spec = viewSpec(html);
   if (spec == null || spec.length === 0) {
     problems.push(
-      "The page has no spec. Right after <title>, add a `<!-- spec` comment with one " +
-        "`- item` line per feature the user has asked for, and keep it current.",
+      "A página não tem spec. Logo depois de <title>, adicione um comentário `<!-- spec` com uma " +
+        "linha `- item` para cada funcionalidade que o usuário pediu, e mantenha-o atualizado.",
     );
   }
 
@@ -180,8 +180,8 @@ export function checkViewHtml(html: string): string[] {
    */
   if (/\b(?:innerHTML|outerHTML|insertAdjacentHTML)\b|\bdocument\s*\.\s*write\b/.test(html)) {
     problems.push(
-      "The page writes HTML into the DOM directly. Everything on screen comes from " +
-        "Astro.view(...); change state in an action and let the view re-render.",
+      "A página escreve HTML direto no DOM. Tudo que aparece na tela vem de " +
+        "Astro.view(...); mude o estado em uma action e deixe a view renderizar de novo.",
     );
   }
   /** The page's own channel to the app — a Web Worker's `postMessage` is fine. */
@@ -190,14 +190,14 @@ export function checkViewHtml(html: string): string[] {
     /(?:^|[^.\w]|\b(?:window|self)\s*\.\s*)addEventListener\(\s*["']message["']/.test(html)
   ) {
     problems.push(
-      "The page handles messages itself. The runtime already saves and restores " +
-        "Astro.state; to tell the voice assistant something, call Astro.emit(name, value).",
+      "A página trata mensagens por conta própria. O runtime já salva e restaura " +
+        "Astro.state; para avisar o assistente de voz de algo, chame Astro.emit(name, value).",
     );
   }
   if (/<script\b/i.test(html) && !/\bAstro\s*\.\s*view\s*\(/.test(html)) {
     problems.push(
-      "The page has a script but no Astro.view(...). Put state in Astro.state, the " +
-        "screen in Astro.view, and changes in Astro.actions.",
+      "A página tem um script mas nenhum Astro.view(...). Coloque o estado em Astro.state, a " +
+        "tela em Astro.view e as mudanças em Astro.actions.",
     );
   }
 
@@ -210,8 +210,8 @@ export function checkViewHtml(html: string): string[] {
    */
   if (html.includes("\\${")) {
     problems.push(
-      "The document escapes template placeholders as `\\${...}`, which renders " +
-        'the literal text "${...}" instead of the value. Write `${...}`.',
+      "O documento escapa os placeholders de template como `\\${...}`, o que renderiza " +
+        'o texto literal "${...}" em vez do valor. Escreva `${...}`.',
     );
   }
 

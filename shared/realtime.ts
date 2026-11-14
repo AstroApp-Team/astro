@@ -121,23 +121,23 @@ export const REALTIME_TOOLS: Experimental_RealtimeToolDefinition[] = [
     type: "function",
     name: RENDER_VIEW_TOOL_NAME,
     description:
-      "Put something on the user's screen. Hands the request to a coding agent, " +
-      "which writes a small self-contained web page and renders it. Use this for " +
-      "anything worth seeing rather than hearing: a chart, a diagram, a table, a " +
-      "countdown, a drawing, a simulation, a form. It returns as soon as the work " +
-      "starts, not when the page is ready — say something to the user while they " +
-      "wait, and the app will tell you when it lands.",
+      "Coloca algo na tela do usuário. Entrega o pedido a um agente de código, " +
+      "que escreve uma pequena página web autocontida e a exibe. Use para " +
+      "tudo que vale mais ser visto do que ouvido: um gráfico, um diagrama, uma tabela, " +
+      "uma contagem regressiva, um desenho, uma simulação, um formulário. Ela retorna " +
+      "assim que o trabalho começa, não quando a página fica pronta — diga algo ao " +
+      "usuário enquanto ele espera, e o app avisará quando a página chegar.",
     parameters: {
       type: "object",
       properties: {
         request: {
           type: "string",
           description:
-            "What the user should end up seeing, in plain language, written for " +
-            "someone who cannot hear the conversation. Include any concrete data " +
-            "or numbers that came up — the coding agent has no other source for " +
-            "them. If the user is changing something already on screen, say what " +
-            "to change rather than describing the whole page again.",
+            "O que o usuário deve acabar vendo, em linguagem simples, escrito para " +
+            "alguém que não ouve a conversa. Inclua quaisquer dados concretos " +
+            "ou números que surgiram — o agente de código não tem outra fonte para " +
+            "eles. Se o usuário está mudando algo que já está na tela, diga o que " +
+            "mudar em vez de descrever a página inteira de novo.",
         },
       },
       required: ["request"],
@@ -148,21 +148,21 @@ export const REALTIME_TOOLS: Experimental_RealtimeToolDefinition[] = [
     type: "function",
     name: REBUILD_VIEW_TOOL_NAME,
     description:
-      "Have a stronger, slower coding model rewrite the page on screen from scratch, from the " +
-      "list of features the user has asked for. Use it when the page has outgrown quick edits: " +
-      "the user says things are broken, inconsistent or missing, a change made something else " +
-      "stop working, or edits keep failing. Only when the user asks — never on your own, " +
-      "and never because of an (app status) message or a page error. It takes " +
-      "ten seconds or more; the current page stays usable meanwhile and the user's data " +
-      "carries over. Not for new pages or small changes — use render_view for those.",
+      "Pede a um modelo de código mais forte e mais lento que reescreva do zero a página da tela, a partir da " +
+      "lista de funcionalidades que o usuário pediu. Use quando a página já passou do ponto de edições rápidas: " +
+      "o usuário diz que há coisas quebradas, inconsistentes ou faltando, uma mudança fez outra coisa " +
+      "parar de funcionar, ou as edições continuam falhando. Só quando o usuário pedir — nunca por conta própria, " +
+      "e nunca por causa de uma mensagem (status do app) ou de um erro da página. Leva " +
+      "dez segundos ou mais; a página atual continua utilizável nesse meio-tempo e os dados do usuário " +
+      "são mantidos. Não serve para páginas novas nem mudanças pequenas — use render_view para isso.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
           description:
-            "What is wrong, in the user's terms: what broke, what is missing, what behaves " +
-            "inconsistently. Include any change the user wants made as part of the rewrite.",
+            "O que está errado, nos termos do usuário: o que quebrou, o que está faltando, o que se comporta " +
+            "de forma inconsistente. Inclua qualquer mudança que o usuário queira fazer como parte da reescrita.",
         },
       },
       required: ["reason"],

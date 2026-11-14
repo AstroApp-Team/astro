@@ -47,14 +47,14 @@ describe("checkViewHtml", () => {
 
   it("rejects an oversize document", () => {
     const huge = `<!doctype html><p>${"x".repeat(MAX_VIEW_HTML_BYTES)}</p>`;
-    expect(checkViewHtml(huge).join(" ")).toContain("limit");
+    expect(checkViewHtml(huge).join(" ")).toContain("limite");
   });
 
   it("catches escaped template placeholders", () => {
     // Runs without erroring and renders "${day}" as text, so nothing else
     // would catch it before the user saw it on screen.
     const escaped = String.raw`${page}<script>Astro.view((s) => html\`\${s.day}\`)</script>`;
-    expect(checkViewHtml(escaped).join(" ")).toContain("escapes template placeholders");
+    expect(checkViewHtml(escaped).join(" ")).toContain("escapa os placeholders de template");
     // The correct form must stay clean.
     expect(checkViewHtml(page + "<script>Astro.view((s) => html`${s.day}`)</script>")).toEqual([]);
   });
@@ -64,8 +64,10 @@ describe("checkViewHtml", () => {
   });
 
   it("requires a spec, because it is the only record of what the user asked for", () => {
-    expect(checkViewHtml("<title>x</title><p>hi</p>").join(" ")).toContain("no spec");
-    expect(checkViewHtml("<title>x</title><!-- spec\n--><p>hi</p>").join(" ")).toContain("no spec");
+    expect(checkViewHtml("<title>x</title><p>hi</p>").join(" ")).toContain("não tem spec");
+    expect(checkViewHtml("<title>x</title><!-- spec\n--><p>hi</p>").join(" ")).toContain(
+      "não tem spec",
+    );
   });
 
   it("keeps the screen and the message channels with the runtime", () => {
